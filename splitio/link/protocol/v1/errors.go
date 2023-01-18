@@ -1,4 +1,4 @@
-package protocol
+package v1
 
 import (
 	"errors"
@@ -7,7 +7,8 @@ import (
 )
 
 var (
-	ErrInternal = errors.New("internal agent error")
+	ErrInternal           = errors.New("internal agent error")
+	ErrIncorrectArguments = errors.New("opcode doesn't match arguments type")
 )
 
 type InvocationErrorCode int
