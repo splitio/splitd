@@ -15,3 +15,5 @@
 # vendor/
 
 ./splitd
+
+splitd.yaml
