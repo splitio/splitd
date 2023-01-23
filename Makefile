@@ -6,11 +6,11 @@ go.sum: go.mod
 	go mod tidy
 
 clean:
-	rm -Rf split-cli splitd
+	rm -Rf splitcli splitd
 
 splitd: $(GO_FILES)
 	go build -o splitd cmd/splitd/main.go
 
-split-cli: $(GO_FILES)
-	go build -o split-cli cmd/split-cli/main.go
+splitcli: $(GO_FILES)
+	go build -o splitcli cmd/splitcli/main.go
 

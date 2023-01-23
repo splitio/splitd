@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync/atomic"
 
 	"github.com/splitio/go-toolkit/v5/logging"
 )
@@ -13,31 +14,26 @@ type OnClientAttachedCallback = func(conn RawConn)
 type RawConnFactory = func(conn net.Conn) RawConn
 
 type Acceptor struct {
-	onClientAttachedCallback OnClientAttachedCallback
+	listener atomic.Value
 	rawConnFactory RawConnFactory
 	logger logging.LoggerInterface
 	address net.Addr
 }
 
-func NewAcceptor(
-	address net.Addr,
-	onClientAttachedCallback OnClientAttachedCallback,
-	rawConnFactory RawConnFactory,
-	logger logging.LoggerInterface,
-) *Acceptor {
+func newAcceptor(address net.Addr, rawConnFactory RawConnFactory, logger logging.LoggerInterface) *Acceptor {
 	return &Acceptor{
-		onClientAttachedCallback: onClientAttachedCallback,
 		rawConnFactory: rawConnFactory,
 		logger: logger,
 		address: address,
 	}
 }
 
-func (a *Acceptor) Start() (<-chan error, error) {
+func (a *Acceptor) Start(onClientAttachedCallback OnClientAttachedCallback) (<-chan error, error) {
 	l, err := net.Listen(a.address.Network(), a.address.String())
 	if err != nil {
 		return nil, fmt.Errorf("error listening on provided address: %w", err)
 	}
+	a.listener.Store(l)
 
 	ret := make(chan error, 1)
 	go func() {
@@ -54,10 +50,22 @@ func (a *Acceptor) Start() (<-chan error, error) {
 				return
 			}
 			wrappedConn := a.rawConnFactory(conn)
-			go a.onClientAttachedCallback(wrappedConn)
+			go onClientAttachedCallback(wrappedConn)
 		}
 	}()
 	return ret, nil
 }
 
+func (a *Acceptor) Shutdown() error {
+	listener, ok := a.listener.Load().(net.Listener)
+	if !ok {
+		return nil // No listener set yet
+	}
 
+	err := listener.Close()
+	if err != nil {
+		return fmt.Errorf("error shutting down listener: %w", err)
+	}
+
+	return nil
+}

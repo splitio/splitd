@@ -7,7 +7,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/splitio/splitd/splitio/link/listeners/framing"
+	"github.com/splitio/splitd/splitio/link/transfer/framing"
 )
 
 var (
@@ -34,7 +34,7 @@ func newConnWrapper(c net.Conn, f framing.Interface, bufSize int) RawConn {
 
 	return &Impl{
 		conn:       c,
-		readBuffer: make([]byte, 0, bufSize),
+		readBuffer: make([]byte, bufSize),
 	}
 }
 
@@ -88,7 +88,7 @@ func (w *FramingRawConnWrapper) SetDeadline(t time.Time) error      { return w.c
 func (w *FramingRawConnWrapper) SetReadDeadline(t time.Time) error  { return w.c.SetReadDeadline(t) }
 func (w *FramingRawConnWrapper) SetWriteDeadline(t time.Time) error { return w.c.SetWriteDeadline(t) }
 func (w *FramingRawConnWrapper) Read(b []byte) (n int, err error)   { return w.f.ReadFrame(w.c, b) }
-func (w *FramingRawConnWrapper) Write(b []byte) (n int, err error)  { return w.c.Write(w.f.Frame(b)) }
+func (w *FramingRawConnWrapper) Write(b []byte) (n int, err error)  { return w.f.WriteFrame(w.c, b) }
 
 var _ net.Conn = (*FramingRawConnWrapper)(nil)
 
