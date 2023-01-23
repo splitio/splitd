@@ -12,7 +12,17 @@ type Config struct {
 	Splits           Splits
 	Segments         Segments
 	Impressions      Impressions
-	URLs URLs
+	URLs             URLs
+}
+
+func (c *Config) ParseOptions(options []Option) error {
+	for _, apply := range options {
+		err := apply(c)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type Splits struct {
@@ -37,9 +47,9 @@ type Impressions struct {
 }
 
 type URLs struct {
-	Auth string
-	SDK string
-	Events string
+	Auth      string
+	SDK       string
+	Events    string
 	Streaming string
 	Telemetry string
 }
@@ -88,4 +98,35 @@ func DefaultConfig() *Config {
 			Telemetry: "https://telemetry.split.io/api/v1",
 		},
 	}
+}
+
+type Option func(c *Config) error
+
+func WithLabelsEnabled(v bool) Option {
+	return func(c *Config) error { c.LabelsEnabled = v; return nil }
+}
+
+func WithStreamingEnabled(v bool) Option {
+	return func(c *Config) error { c.StreamingEnabled = v; return nil }
+}
+
+func WithAuthURL(v string) Option {
+	return func(c *Config) error { c.URLs.Auth = v; return nil }
+}
+
+func WithSDKURL(v string) Option {
+	return func(c *Config) error { c.URLs.SDK = v; return nil }
+}
+
+func WithEventsURL(v string) Option {
+	return func(c *Config) error { c.URLs.Events = v; return nil }
+}
+
+func WithStreamingURL(v string) Option {
+	return func(c *Config) error { c.URLs.Streaming = v; return nil }
+}
+
+
+func WithTelemetryURL(v string) Option {
+	return func(c *Config) error { c.URLs.Telemetry = v; return nil }
 }

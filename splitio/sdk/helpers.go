@@ -26,14 +26,13 @@ import (
 	"github.com/splitio/go-toolkit/v5/logging"
 )
 
-func setupWorkers(logger logging.LoggerInterface, api *api.SplitAPI, str *storages) (*synchronizer.Workers, error) {
-	hc := &application.Dummy{}
+func setupWorkers(logger logging.LoggerInterface, api *api.SplitAPI, str *storages, hc application.MonitorProducerInterface) *synchronizer.Workers {
 	splitChangeWorker := split.NewSplitFetcher(str.splits, api.SplitFetcher, logger, str.telemetry, hc)
 	segmentChangeWorker := segment.NewSegmentFetcher(str.splits, str.segments, api.SegmentFetcher, logger, str.telemetry, hc)
 	return &synchronizer.Workers{
 		SplitFetcher:   splitChangeWorker,
 		SegmentFetcher: segmentChangeWorker,
-	}, nil
+	}
 }
 
 func setupTasks(
@@ -44,10 +43,8 @@ func setupTasks(
 	impComponents impComponents,
 	md dtos.Metadata,
 	api *api.SplitAPI,
-) (*synchronizer.SplitTasks, error) {
-
+) *synchronizer.SplitTasks {
 	impCfg := cfg.Impressions
-
 	return &synchronizer.SplitTasks{
 		SplitSyncTask:      tasks.NewFetchSplitsTask(workers.SplitFetcher, int(cfg.Splits.SyncPeriod.Seconds()), logger),
 		SegmentSyncTask:    tasks.NewFetchSegmentsTask(workers.SegmentFetcher, int(cfg.Segments.SyncPeriod.Seconds()), cfg.Segments.WorkerCount, cfg.Segments.QueueSize, logger),
@@ -62,7 +59,7 @@ func setupTasks(
 		UniqueKeysTask:        &NoOpTask{},
 		CleanFilterTask:       &NoOpTask{},
 		ImpsCountConsumerTask: &NoOpTask{},
-	}, nil
+	}
 }
 
 type impComponents struct {
