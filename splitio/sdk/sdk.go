@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/splitio/splitd/splitio/sdk/conf"
 	sdkConf "github.com/splitio/splitd/splitio/sdk/conf"
 	"github.com/splitio/splitd/splitio/sdk/storage"
 	"github.com/splitio/splitd/splitio/sdk/types"
@@ -35,23 +36,27 @@ type Impl struct {
 	status chan int
 }
 
-func New(logger logging.LoggerInterface, apikey string) (*Impl, error) {
+func New(logger logging.LoggerInterface, apikey string, opts ...conf.Option) (*Impl, error) {
 
 	md := dtos.Metadata{SDKVersion: fmt.Sprintf("splitd-%s", splitio.Version)}
 	c := sdkConf.DefaultConfig()
 	advCfg := c.ToAdvancedConfig()
+	if err := c.ParseOptions(opts); err != nil {
+		return nil, fmt.Errorf("error parsing SDK config: %w", err)
+	}
 
 	stores := setupStorages(c)
 	impc, err := setupImpressionsComponents(&c.Impressions, stores.telemetry)
 	if err != nil {
-		return nil, fmt.Errorf("error setting up impressions storage")
+		return nil, fmt.Errorf("error setting up impressions components")
 	}
 
-	splitApi := api.NewSplitAPI(apikey, *advCfg, logger, md)
-	workers, _ := setupWorkers(logger, splitApi, stores)
-	tasks, _ := setupTasks(c, stores, logger, workers, impc, md, splitApi)
-	sync := synchronizer.NewSynchronizer(*advCfg, *tasks, *workers, logger, nil, nil)
 	hc := &application.Dummy{}
+	splitApi := api.NewSplitAPI(apikey, *advCfg, logger, md)
+	workers := setupWorkers(logger, splitApi, stores, hc)
+	tasks := setupTasks(c, stores, logger, workers, impc, md, splitApi)
+	sync := synchronizer.NewSynchronizer(*advCfg, *tasks, *workers, logger, nil, nil)
+
 	status := make(chan int, 10)
 	manager, err := synchronizer.NewSynchronizerManager(sync, logger, *advCfg, splitApi.AuthClient, stores.splits, status, stores.telemetry, md, nil, hc)
 	if err != nil {
