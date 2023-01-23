@@ -40,10 +40,10 @@ func New(logger logging.LoggerInterface, apikey string, opts ...conf.Option) (*I
 
 	md := dtos.Metadata{SDKVersion: fmt.Sprintf("splitd-%s", splitio.Version)}
 	c := sdkConf.DefaultConfig()
-	advCfg := c.ToAdvancedConfig()
 	if err := c.ParseOptions(opts); err != nil {
 		return nil, fmt.Errorf("error parsing SDK config: %w", err)
 	}
+	advCfg := c.ToAdvancedConfig()
 
 	stores := setupStorages(c)
 	impc, err := setupImpressionsComponents(&c.Impressions, stores.telemetry)
