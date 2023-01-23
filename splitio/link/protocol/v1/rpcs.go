@@ -24,12 +24,12 @@ const (
 
 type RPC struct {
 	protocol.RPCBase
-	OpCode  OpCode
-	Args    []interface{}
+	OpCode OpCode
+	Args   []interface{}
 }
 
 const (
-	RegisterArgIDIdx = 0
+	RegisterArgIDIdx         = 0
 	RegisterArgSDKVersionIdx = 1
 )
 
@@ -39,7 +39,7 @@ type RegisterArgs struct {
 }
 
 func (r *RegisterArgs) PopulateFromRPC(rpc *RPC) error {
-	if rpc.OpCode !=  OCRegister {
+	if rpc.OpCode != OCRegister {
 		return ErrIncorrectArguments
 	}
 
@@ -109,10 +109,10 @@ func (t *TreatmentArgs) PopulateFromRPC(rpc *RPC) error {
 		}
 	}
 
-	if t.Attributes, ok = rpc.Args[TreatmentArgAttributesIdx].(map[string]interface{}); !ok {
+	if t.Attributes, ok = rpc.Args[TreatmentArgAttributesIdx].(map[string]interface{}); !ok && rpc.Args[TreatmentArgAttributesIdx] != nil {
 		return &InvocationError{
 			code:    InvocationErrorInvalidArgs,
-			message: fmt.Sprintf("error parsing key. expected map[string->object], got: %T", rpc.Args[TreatmentArgAttributesIdx]),
+			message: fmt.Sprintf("error parsing attributes. expected map[string->object], got: %T", rpc.Args[TreatmentArgAttributesIdx]),
 		}
 	}
 

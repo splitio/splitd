@@ -3,21 +3,13 @@ package v1
 type Result byte
 
 const (
-	ResultOk            Result = 0x00
+	ResultOk            Result = 0x01
 	ResultInternalError Result = 0x10
 )
-
-type Response interface {
-	Get() interface{}
-}
 
 type ResponseWrapper[T validPayloadsConstraint] struct {
 	Status  Result
 	Payload T
-}
-
-func (w *ResponseWrapper[T]) Get() interface{} {
-	return w
 }
 
 type RegisterPayload struct{}

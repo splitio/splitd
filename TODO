@@ -1,0 +1,8 @@
+- move serialization logic from service to link
+- keep track of open conns
+- set appropriate timeouts
+- msgpack - array serialization of maps
+- logging
+- testing
+- admin endpoints?
+- healthcheck & harakiri?

@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/splitio/go-split-commons/v4/conf"
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio/link"
 	"github.com/splitio/splitd/splitio/sdk"
@@ -27,8 +26,7 @@ func main() {
 		LogLevel: logging.LevelInfo,
 	})
 
-	splitCFG := conf.GetDefaultAdvancedConfig()
-	splitSDK, err := sdk.New(logger, cfg.Apikey, &splitCFG)
+	splitSDK, err := sdk.New(logger, cfg.Apikey)
 
 	errc, lShutdown, err := link.Listen(logger, splitSDK, cfg.Link.toLinkOpts()...)
 	if err != nil {
@@ -88,7 +86,7 @@ func (l Link) toLinkOpts() []link.Option {
 		opts = append(opts, link.WithSockType(*l.Type))
 	}
 	if l.Address != nil {
-		opts = append(opts, link.WithSockFN(*l.Address))
+		opts = append(opts, link.WithAddress(*l.Address))
 	}
 	if l.Serialization != nil {
 		opts = append(opts, link.WithSerialization(*l.Serialization))

@@ -2,70 +2,122 @@ package sdk
 
 import (
 	"fmt"
+	"time"
+
+	sdkConf "github.com/splitio/splitd/splitio/sdk/conf"
+	"github.com/splitio/splitd/splitio/sdk/storage"
+	"github.com/splitio/splitd/splitio/sdk/types"
 
 	"github.com/splitio/go-client/v6/splitio/engine"
 	"github.com/splitio/go-client/v6/splitio/engine/evaluator"
-	"github.com/splitio/go-split-commons/v4/conf"
+
 	"github.com/splitio/go-split-commons/v4/dtos"
 	"github.com/splitio/go-split-commons/v4/healthcheck/application"
+	"github.com/splitio/go-split-commons/v4/provisional"
 	"github.com/splitio/go-split-commons/v4/service/api"
-	"github.com/splitio/go-split-commons/v4/storage/inmemory"
-	"github.com/splitio/go-split-commons/v4/storage/inmemory/mutexmap"
 	"github.com/splitio/go-split-commons/v4/synchronizer"
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio"
 )
 
-type ClientMetadata struct {
-	ID         string
-	SdkVersion string
-}
-
 type Interface interface {
-	Treatment(md *ClientMetadata, Key string, BucketingKey string, Feature string, attributes map[string]interface{}) (string, error)
+	Treatment(md *types.ClientMetadata, Key string, BucketingKey string, Feature string, attributes map[string]interface{}) (string, error)
 }
 
 type Impl struct {
+	logger logging.LoggerInterface
 	ev     evaluator.Interface
 	sm     synchronizer.Manager
 	ss     synchronizer.Synchronizer
+	is     *storage.ImpressionsStorage
+	iq     provisional.ImpressionManager
+	cfg    sdkConf.Config
 	status chan int
 }
 
-func New(logger logging.LoggerInterface, apikey string, cfg *conf.AdvancedConfig) (*Impl, error) {
+func New(logger logging.LoggerInterface, apikey string) (*Impl, error) {
 
+	md := dtos.Metadata{SDKVersion: fmt.Sprintf("splitd-%s", splitio.Version)}
+	c := sdkConf.DefaultConfig()
+	advCfg := c.ToAdvancedConfig()
+
+	stores := setupStorages(c)
+	impc, err := setupImpressionsComponents(&c.Impressions, stores.telemetry)
+	if err != nil {
+		return nil, fmt.Errorf("error setting up impressions storage")
+	}
+
+	splitApi := api.NewSplitAPI(apikey, *advCfg, logger, md)
+	workers, _ := setupWorkers(logger, splitApi, stores)
+	tasks, _ := setupTasks(c, stores, logger, workers, impc, md, splitApi)
+	sync := synchronizer.NewSynchronizer(*advCfg, *tasks, *workers, logger, nil, nil)
 	hc := &application.Dummy{}
 	status := make(chan int, 10)
-	md := dtos.Metadata{SDKVersion: fmt.Sprintf("splitd-%s", splitio.Version)}
-	splitApi := api.NewSplitAPI(apikey, *cfg, logger, md)
-	ts, _ := inmemory.NewTelemetryStorage()
-	stores := &storages{splits: mutexmap.NewMMSplitStorage(), segments: mutexmap.NewMMSegmentStorage(), telemetry: ts}
-	workers, _ := setupWorkers(logger, splitApi, stores)
-	tasks, _ := setupTastsk(cfg, logger, workers)
-	sync := synchronizer.NewSynchronizer(*cfg, *tasks, *workers, logger, nil, nil)
-	manager, err := synchronizer.NewSynchronizerManager(sync, logger, *cfg, splitApi.AuthClient, stores.splits, status, stores.telemetry, md, nil, hc)
+	manager, err := synchronizer.NewSynchronizerManager(sync, logger, *advCfg, splitApi.AuthClient, stores.splits, status, stores.telemetry, md, nil, hc)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing split evaluation service: %w", err)
 	}
 
-	i := &Impl{sm: manager, ss: sync, ev: evaluator.NewEvaluator(stores.splits, stores.segments, engine.NewEngine(logger), logger)}
-
-	i.sm.Start()
+	// Start initial sync and await readiness
+	manager.Start()
 	res := <-status
 	if res == synchronizer.Error {
 		return nil, fmt.Errorf("failed to perform initial sync")
 	}
 
-	return i, nil
+	return &Impl{
+		logger: logger,
+		sm:     manager,
+		ss:     sync,
+		ev:     evaluator.NewEvaluator(stores.splits, stores.segments, engine.NewEngine(logger), logger),
+		is:     stores.impressions,
+		iq:     impc.manager,
+		cfg:    *c,
+	}, nil
 }
 
 // Treatment implements Interface
-func (i *Impl) Treatment(md *ClientMetadata, key string, bucketingKey string, feature string, attributes map[string]interface{}) (string, error) {
+func (i *Impl) Treatment(md *types.ClientMetadata, key string, bucketingKey string, feature string, attributes map[string]interface{}) (string, error) {
 	res := i.ev.EvaluateFeature(key, &bucketingKey, feature, attributes)
 	if res == nil {
 		return "", fmt.Errorf("nil result")
 	}
+
+	err := i.handleImpression(key, bucketingKey, feature, res, *md)
+	if err != nil {
+		i.logger.Error("error handling impression: ", err)
+	}
+
 	return res.Treatment, nil
+}
+
+func (i *Impl) handleImpression(key string, bk string, f string, r *evaluator.Result, cm types.ClientMetadata) error {
+	var label string
+	if i.cfg.LabelsEnabled {
+		label = r.Label
+	}
+
+	imp := dtos.Impression{
+		FeatureName:  f,
+		BucketingKey: bk,
+		ChangeNumber: r.SplitChangeNumber,
+		KeyName:      key,
+		Label:        label,
+		Treatment:    r.Treatment,
+		Time:         timeMillis(),
+	}
+
+	shouldStore := i.iq.ProcessSingle(&imp)
+	if shouldStore {
+		_, err := i.is.Push(cm, imp)
+		return err
+	}
+
+	return nil
+}
+
+func timeMillis() int64 {
+	return time.Now().UTC().UnixMilli()
 }
 
 var _ Interface = (*Impl)(nil)
