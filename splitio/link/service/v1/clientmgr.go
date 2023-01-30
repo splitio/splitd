@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/splitio/go-toolkit/v5/logging"
 
@@ -50,11 +51,17 @@ func (m *ClientManager) Manage() {
 func (m *ClientManager) handleClientInteractions() error {
 	for {
 		rpc, err := m.fetchRPC()
-		if errors.Is(err, io.EOF) {
-			return nil
-		} else if err != nil {
-			m.logger.Error(fmt.Sprintf("error reading RPC: %s", err))
-			continue
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				m.logger.Debug(fmt.Sprintf("connection remotely closed for metadata=%+v", m.metadata))
+				return nil // connection ended, no error
+			} else if errors.Is(err, os.ErrDeadlineExceeded) {
+				m.logger.Debug(fmt.Sprintf("read timeout/no RPC fetched. restarting loop for metadata=%+v", m.metadata))
+				continue // we waited for an RPC, got none, try again.
+			} else {
+				m.logger.Error(fmt.Sprintf("unexpected error reading RPC: %s. Closing conn for metadata=%+v", err, m.metadata))
+				return err
+			}
 		}
 
 		response, err := m.handleRPC(rpc)
@@ -101,7 +108,7 @@ func (m *ClientManager) sendResponse(response interface{}) error {
 
 func (m *ClientManager) handleRPC(rpc *protov1.RPC) (interface{}, error) {
 
-	if m.metadata == nil && rpc.OpCode !=  protov1.OCRegister {
+	if m.metadata == nil && rpc.OpCode != protov1.OCRegister {
 		return nil, fmt.Errorf("first call must be 'register'`")
 	}
 
@@ -112,37 +119,36 @@ func (m *ClientManager) handleRPC(rpc *protov1.RPC) (interface{}, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error parsing arguments: %w", err)
 		}
-		return m.handleRegistration(&args), nil
+		return m.handleRegistration(&args)
 	case protov1.OCTreatment:
 		var args protov1.TreatmentArgs
 		err := args.PopulateFromRPC(rpc)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing arguments: %w", err)
 		}
-		return m.handleGetTreatment(&args), nil
+		return m.handleGetTreatment(&args)
 	}
 	return nil, fmt.Errorf("RPC not implemented")
 }
 
-func (m *ClientManager) handleRegistration(args *protov1.RegisterArgs) interface{} {
+func (m *ClientManager) handleRegistration(args *protov1.RegisterArgs) (interface{}, error) {
 	m.metadata = &types.ClientMetadata{
 		ID:         args.ID,
 		SdkVersion: args.SDKVersion,
 	}
-	return protov1.ResponseWrapper[protov1.RegisterPayload]{Status: protov1.ResultOk}
+	return protov1.ResponseWrapper[protov1.RegisterPayload]{Status: protov1.ResultOk}, nil
 
 }
 
-func (m *ClientManager) handleGetTreatment(args *protov1.TreatmentArgs) interface{} {
+func (m *ClientManager) handleGetTreatment(args *protov1.TreatmentArgs) (interface{}, error) {
 	treatment, err := m.splitSDK.Treatment(m.metadata, args.Key, args.BucketingKey, args.Feature, args.Attributes)
 	if err != nil {
-		// TODO(mredolatti): Log!
-		return &protov1.ResponseWrapper[protov1.TreatmentPayload]{Status: protov1.ResultInternalError}
+		return &protov1.ResponseWrapper[protov1.TreatmentPayload]{Status: protov1.ResultInternalError}, err
 	}
 	return &protov1.ResponseWrapper[protov1.TreatmentPayload]{
 		Status: protov1.ResultOk,
 		Payload: protov1.TreatmentPayload{
 			Treatment: treatment,
 		},
-	}
+	}, nil
 }
