@@ -17,12 +17,13 @@ import (
 	"github.com/splitio/go-split-commons/v4/provisional"
 	"github.com/splitio/go-split-commons/v4/service/api"
 	"github.com/splitio/go-split-commons/v4/synchronizer"
+	"github.com/splitio/go-toolkit/v5/common"
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio"
 )
 
 type Interface interface {
-	Treatment(md *types.ClientMetadata, Key string, BucketingKey string, Feature string, attributes map[string]interface{}) (string, error)
+	Treatment(md *types.ClientMetadata, Key string, BucketingKey *string, Feature string, attributes map[string]interface{}) (string, error)
 }
 
 type Impl struct {
@@ -82,8 +83,8 @@ func New(logger logging.LoggerInterface, apikey string, opts ...conf.Option) (*I
 }
 
 // Treatment implements Interface
-func (i *Impl) Treatment(md *types.ClientMetadata, key string, bucketingKey string, feature string, attributes map[string]interface{}) (string, error) {
-	res := i.ev.EvaluateFeature(key, &bucketingKey, feature, attributes)
+func (i *Impl) Treatment(md *types.ClientMetadata, key string, bucketingKey *string, feature string, attributes map[string]interface{}) (string, error) {
+	res := i.ev.EvaluateFeature(key, bucketingKey, feature, attributes)
 	if res == nil {
 		return "", fmt.Errorf("nil result")
 	}
@@ -96,7 +97,7 @@ func (i *Impl) Treatment(md *types.ClientMetadata, key string, bucketingKey stri
 	return res.Treatment, nil
 }
 
-func (i *Impl) handleImpression(key string, bk string, f string, r *evaluator.Result, cm types.ClientMetadata) error {
+func (i *Impl) handleImpression(key string, bk *string, f string, r *evaluator.Result, cm types.ClientMetadata) error {
 	var label string
 	if i.cfg.LabelsEnabled {
 		label = r.Label
@@ -104,7 +105,7 @@ func (i *Impl) handleImpression(key string, bk string, f string, r *evaluator.Re
 
 	imp := dtos.Impression{
 		FeatureName:  f,
-		BucketingKey: bk,
+		BucketingKey: common.StringFromRef(bk),
 		ChangeNumber: r.SplitChangeNumber,
 		KeyName:      key,
 		Label:        label,
