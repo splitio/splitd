@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/splitio/splitd/splitio/link/protocol"
@@ -73,7 +74,7 @@ const (
 
 type TreatmentArgs struct {
 	Key          string
-	BucketingKey string
+	BucketingKey *string
 	Feature      string
 	Attributes   map[string]interface{}
 }
@@ -95,7 +96,8 @@ func (t *TreatmentArgs) PopulateFromRPC(rpc *RPC) error {
 		}
 	}
 
-	if t.BucketingKey, ok = rpc.Args[TreatmentArgBucketingKeyIdx].(string); !ok {
+	var err error
+	if t.BucketingKey, err = getOptionalRef[string](rpc.Args[TreatmentArgBucketingKeyIdx]); err != nil {
 		return &InvocationError{
 			code:    InvocationErrorInvalidArgs,
 			message: fmt.Sprintf("error parsing bucketing key. expected string, got: %T", rpc.Args[TreatmentArgBucketingKeyIdx]),
@@ -109,10 +111,10 @@ func (t *TreatmentArgs) PopulateFromRPC(rpc *RPC) error {
 		}
 	}
 
-	if t.Attributes, ok = rpc.Args[TreatmentArgAttributesIdx].(map[string]interface{}); !ok && rpc.Args[TreatmentArgAttributesIdx] != nil {
+	if t.Attributes, err = getOptional[map[string]interface{}](rpc.Args[TreatmentArgAttributesIdx]); err != nil {
 		return &InvocationError{
 			code:    InvocationErrorInvalidArgs,
-			message: fmt.Sprintf("error parsing attributes. expected map[string->object], got: %T", rpc.Args[TreatmentArgAttributesIdx]),
+			message: fmt.Sprintf("error parsing attributes. expected map[string->any], got: %T", rpc.Args[TreatmentArgAttributesIdx]),
 		}
 	}
 
@@ -148,4 +150,37 @@ func (t *TrackArgs) isValidFor(opode OpCode) bool {
 
 func (t *TrackArgs) fromRawArgs(raw []interface{}) error {
 	return nil
+}
+
+
+// -- helpers
+var ErrWrongType = errors.New("wrong type")
+
+func getOptionalRef[T any](i interface{}) (*T, error) {
+
+	if i == nil {
+		return nil, nil
+	}
+
+	ass, ok := i.(T)
+	if !ok {
+		return nil, ErrWrongType
+	}
+
+	return &ass, nil
+}
+
+func getOptional[T any /*TODO(mredolatti): restrict!*/](i interface{}) (T, error) {
+	if i == nil {
+		var t T
+		return t, nil
+	}
+
+	ass, ok := i.(T)
+	if !ok {
+		var t T
+		return t, ErrWrongType
+	}
+
+	return ass, nil
 }
