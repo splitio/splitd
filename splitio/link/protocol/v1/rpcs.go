@@ -111,12 +111,14 @@ func (t *TreatmentArgs) PopulateFromRPC(rpc *RPC) error {
 		}
 	}
 
-	if t.Attributes, err = getOptional[map[string]interface{}](rpc.Args[TreatmentArgAttributesIdx]); err != nil {
+	rawAttrs, err := getOptional[map[string]interface{}](rpc.Args[TreatmentArgAttributesIdx])
+	if err != nil {
 		return &InvocationError{
 			code:    InvocationErrorInvalidArgs,
 			message: fmt.Sprintf("error parsing attributes. expected map[string->any], got: %T", rpc.Args[TreatmentArgAttributesIdx]),
 		}
 	}
+	t.Attributes = sanitizeAttributes(rawAttrs)
 
 	return nil
 }
@@ -152,7 +154,6 @@ func (t *TrackArgs) fromRawArgs(raw []interface{}) error {
 	return nil
 }
 
-
 // -- helpers
 var ErrWrongType = errors.New("wrong type")
 
@@ -183,4 +184,37 @@ func getOptional[T any /*TODO(mredolatti): restrict!*/](i interface{}) (T, error
 	}
 
 	return ass, nil
+}
+
+func sanitizeAttributes(attrs map[string]interface{}) map[string]interface{} {
+	for k, v := range attrs {
+		switch parsed := v.(type) {
+		case uint8:
+			attrs[k] = int(parsed)
+		case uint16:
+			attrs[k] = int(parsed)
+		case uint32:
+			attrs[k] = int(parsed)
+		case uint64:
+			attrs[k] = int(parsed)
+		case int8:
+			attrs[k] = int(parsed)
+		case int16:
+			attrs[k] = int(parsed)
+		case int32:
+			attrs[k] = int(parsed)
+		case int64:
+			attrs[k] = int(parsed)
+		case int:
+			attrs[k] = int(parsed)
+		case []interface{}:
+			asStrSlice := make([]string, len(parsed))
+			for idx, item := range parsed {
+				if asString, ok := item.(string); ok {
+					asStrSlice[idx] = asString
+				}
+			}
+		}
+	}
+	return attrs
 }
