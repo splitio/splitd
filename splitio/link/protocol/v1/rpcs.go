@@ -214,6 +214,7 @@ func sanitizeAttributes(attrs map[string]interface{}) map[string]interface{} {
 					asStrSlice[idx] = asString
 				}
 			}
+			attrs[k] = asStrSlice
 		}
 	}
 	return attrs
