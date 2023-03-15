@@ -3,6 +3,7 @@ package v1
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/splitio/splitd/splitio/link/protocol"
 )
@@ -207,6 +208,8 @@ func sanitizeAttributes(attrs map[string]interface{}) map[string]interface{} {
 			attrs[k] = int(parsed)
 		case int:
 			attrs[k] = int(parsed)
+		case time.Time:
+			attrs[k] = parsed.Unix()
 		case []interface{}:
 			asStrSlice := make([]string, len(parsed))
 			for idx, item := range parsed {
