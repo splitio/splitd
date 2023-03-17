@@ -191,23 +191,23 @@ func sanitizeAttributes(attrs map[string]interface{}) map[string]interface{} {
 	for k, v := range attrs {
 		switch parsed := v.(type) {
 		case uint8:
-			attrs[k] = int(parsed)
+			attrs[k] = int64(parsed)
 		case uint16:
-			attrs[k] = int(parsed)
+			attrs[k] = int64(parsed)
 		case uint32:
-			attrs[k] = int(parsed)
+			attrs[k] = int64(parsed)
 		case uint64:
-			attrs[k] = int(parsed)
+			attrs[k] = int64(parsed)
 		case int8:
-			attrs[k] = int(parsed)
+			attrs[k] = int64(parsed)
 		case int16:
-			attrs[k] = int(parsed)
+			attrs[k] = int64(parsed)
 		case int32:
-			attrs[k] = int(parsed)
+			attrs[k] = int64(parsed)
 		case int64:
-			attrs[k] = int(parsed)
+			attrs[k] = int64(parsed)
 		case int:
-			attrs[k] = int(parsed)
+			attrs[k] = int64(parsed)
 		case time.Time:
 			attrs[k] = parsed.Unix()
 		case []interface{}:
