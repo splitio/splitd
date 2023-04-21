@@ -21,7 +21,6 @@ type ClientManager struct {
 	logger     logging.LoggerInterface
 	metadata   *types.ClientMetadata
 	splitSDK   sdk.Interface
-	sdkFacade  sdk.Interface
 }
 
 func NewClientManager(
@@ -39,25 +38,28 @@ func NewClientManager(
 }
 
 func (m *ClientManager) Manage() {
-	defer m.cc.Shutdown()
-
+	defer func() {
+		if r := recover(); r != nil {
+            m.logger.Error("CRITICAL - connection handlers are panicking: ", r)
+		}
+	}()
 	err := m.handleClientInteractions()
 	if err != nil {
-		m.logger.Error(fmt.Sprintf("an error occured when interacting with the client: %s. aboting", err))
-		return
+		m.logger.Error(fmt.Sprintf("an error occured when interacting with the client: %s. aborting", err))
 	}
 }
 
 func (m *ClientManager) handleClientInteractions() error {
+	defer m.cc.Shutdown()
 	for {
 		rpc, err := m.fetchRPC()
 		if err != nil {
-			if errors.Is(err, io.EOF) {
+			if errors.Is(err, io.EOF) { // connection ended, no error
 				m.logger.Debug(fmt.Sprintf("connection remotely closed for metadata=%+v", m.metadata))
-				return nil // connection ended, no error
-			} else if errors.Is(err, os.ErrDeadlineExceeded) {
+				return nil
+			} else if errors.Is(err, os.ErrDeadlineExceeded) { // we waited for an RPC, got none, try again.
 				m.logger.Debug(fmt.Sprintf("read timeout/no RPC fetched. restarting loop for metadata=%+v", m.metadata))
-				continue // we waited for an RPC, got none, try again.
+				continue
 			} else {
 				m.logger.Error(fmt.Sprintf("unexpected error reading RPC: %s. Closing conn for metadata=%+v", err, m.metadata))
 				return err
@@ -83,8 +85,7 @@ func (m *ClientManager) fetchRPC() (*protov1.RPC, error) {
 	}
 
 	var parsed protov1.RPC
-	err = m.serializer.Parse(read, &parsed)
-	if err != nil {
+	if err = m.serializer.Parse(read, &parsed); err != nil {
 		return nil, fmt.Errorf("error parsing message: %w", err)
 	}
 	return &parsed, nil
@@ -115,15 +116,13 @@ func (m *ClientManager) handleRPC(rpc *protov1.RPC) (interface{}, error) {
 	switch rpc.OpCode {
 	case protov1.OCRegister:
 		var args protov1.RegisterArgs
-		err := args.PopulateFromRPC(rpc)
-		if err != nil {
+		if err := args.PopulateFromRPC(rpc); err != nil {
 			return nil, fmt.Errorf("error parsing arguments: %w", err)
 		}
 		return m.handleRegistration(&args)
 	case protov1.OCTreatment:
 		var args protov1.TreatmentArgs
-		err := args.PopulateFromRPC(rpc)
-		if err != nil {
+		if err := args.PopulateFromRPC(rpc); err != nil {
 			return nil, fmt.Errorf("error parsing arguments: %w", err)
 		}
 		return m.handleGetTreatment(&args)
@@ -133,22 +132,30 @@ func (m *ClientManager) handleRPC(rpc *protov1.RPC) (interface{}, error) {
 
 func (m *ClientManager) handleRegistration(args *protov1.RegisterArgs) (interface{}, error) {
 	m.metadata = &types.ClientMetadata{
-		ID:         args.ID,
-		SdkVersion: args.SDKVersion,
+		ID:                   args.ID,
+		SdkVersion:           args.SDKVersion,
+		ReturnImpressionData: (args.Flags & protov1.RegisterFlagReturnImpressionData) != 0,
 	}
-	return protov1.ResponseWrapper[protov1.RegisterPayload]{Status: protov1.ResultOk}, nil
-
+	return &protov1.ResponseWrapper[protov1.RegisterPayload]{Status: protov1.ResultOk}, nil
 }
 
 func (m *ClientManager) handleGetTreatment(args *protov1.TreatmentArgs) (interface{}, error) {
-	treatment, err := m.splitSDK.Treatment(m.metadata, args.Key, args.BucketingKey, args.Feature, args.Attributes)
+	treatment, imp, err := m.splitSDK.Treatment(m.metadata, args.Key, args.BucketingKey, args.Feature, args.Attributes)
 	if err != nil {
 		return &protov1.ResponseWrapper[protov1.TreatmentPayload]{Status: protov1.ResultInternalError}, err
 	}
-	return &protov1.ResponseWrapper[protov1.TreatmentPayload]{
-		Status: protov1.ResultOk,
-		Payload: protov1.TreatmentPayload{
-			Treatment: treatment,
-		},
-	}, nil
+
+	response := &protov1.ResponseWrapper[protov1.TreatmentPayload]{
+		Status:  protov1.ResultOk,
+		Payload: protov1.TreatmentPayload{Treatment: treatment},
+	}
+
+	if m.metadata.ReturnImpressionData {
+		response.Payload.ListenerData = &protov1.ListenerExtraData{
+			Label:     imp.Label,
+			Timestamp: imp.Time,
+		}
+	}
+
+	return response, nil
 }
