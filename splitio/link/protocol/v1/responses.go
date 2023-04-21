@@ -15,23 +15,34 @@ type ResponseWrapper[T validPayloadsConstraint] struct {
 type RegisterPayload struct{}
 
 type TreatmentPayload struct {
-	Treatment string
+	Treatment    string             `msgpack:"t"`
+	ListenerData *ListenerExtraData `msgpack:"l"`
 }
 
 type TreatmentsPayload struct {
-	Treatments map[string]string
+	Treatments map[string]struct {
+		Treatment    string             `msgpack:"t"`
+		ListenerData *ListenerExtraData `msgpack:"l"`
+	}
 }
 
 type TreatmentWithConfigPayload struct {
-	Treatment string
-	Config    string
+	Treatment    string             `msgpack:"t"`
+	Config       string             `msgpack:"c"`
+	ListenerData *ListenerExtraData `msgpack:"l"`
 }
 
 type TreatmentsWithConfigPayload struct {
 	Results map[string]struct {
-		Treatment string
-		Config    string
+		Treatment    string             `msgpack:"t"`
+		Config       string             `msgpack:"c"`
+		ListenerData *ListenerExtraData `msgpack:"l"`
 	}
+}
+
+type ListenerExtraData struct {
+	Label     string `msgpack:"l"`
+	Timestamp int64  `msgpack:"m"`
 }
 
 type validPayloadsConstraint interface {
