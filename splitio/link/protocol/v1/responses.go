@@ -8,15 +8,15 @@ const (
 )
 
 type ResponseWrapper[T validPayloadsConstraint] struct {
-	Status  Result
-	Payload T
+	Status  Result `msgpack:"s"`
+	Payload T      `msgpack:"p"`
 }
 
 type RegisterPayload struct{}
 
 type TreatmentPayload struct {
 	Treatment    string             `msgpack:"t"`
-	ListenerData *ListenerExtraData `msgpack:"l"`
+	ListenerData *ListenerExtraData `msgpack:"l,omitempty"`
 }
 
 type TreatmentsPayload struct {

@@ -25,8 +25,8 @@ const (
 
 type RPC struct {
 	protocol.RPCBase
-	OpCode OpCode
-	Args   []interface{}
+	OpCode OpCode        `msgpack:"o"`
+	Args   []interface{} `msgpack:"a"`
 }
 
 const (
@@ -63,11 +63,11 @@ func (r *RegisterArgs) PopulateFromRPC(rpc *RPC) error {
 	if r.SDKVersion, ok = rpc.Args[RegisterArgSDKVersionIdx].(string); !ok {
 		return RPCParseError{Code: PECInvalidArgType, Data: int64(RegisterArgSDKVersionIdx)}
 	}
-    if asUInt, ok := rpc.Args[RegisterArgFlagsIdx].(uint64); ok {
-        r.Flags = RegisterFlags(asUInt)
+	if asUInt, ok := tryInt2[uint64](rpc.Args[RegisterArgFlagsIdx]); ok {
+		r.Flags = RegisterFlags(asUInt)
 	} else {
 		return RPCParseError{Code: PECInvalidArgType, Data: int64(RegisterArgFlagsIdx)}
-    }
+	}
 
 	return nil
 }
@@ -266,7 +266,7 @@ func getOptional[T any /*TODO(mredolatti): restrict!*/](i interface{}) (T, error
 func sanitizeAttributes(attrs map[string]interface{}) map[string]interface{} {
 	for k, v := range attrs {
 
-		if asInt, ok := tryInt(v); ok {
+		if asInt, ok := tryInt2[int64](v); ok {
 			attrs[k] = asInt
 		}
 
@@ -286,6 +286,32 @@ func sanitizeAttributes(attrs map[string]interface{}) map[string]interface{} {
 		}
 	}
 	return attrs
+}
+
+func tryInt2[T int8|int16|int32|int64|uint8|uint16|uint32|uint64](x interface{}) (T, bool) {
+	switch parsed := x.(type) {
+	case uint8:
+		return T(parsed), true
+	case uint16:
+		return T(parsed), true
+	case uint32:
+		return T(parsed), true
+	case uint64:
+		return T(parsed), true
+	case int8:
+		return T(parsed), true
+	case int16:
+		return T(parsed), true
+	case int32:
+		return T(parsed), true
+	case int64:
+		return T(parsed), true
+	case int:
+		return T(parsed), true
+	case uint:
+		return T(parsed), true
+	}
+	return T(0), false
 }
 
 func tryInt(x interface{}) (int64, bool) {
@@ -315,7 +341,7 @@ func tryInt(x interface{}) (int64, bool) {
 }
 
 func tryNumberAsFloat(x interface{}) (float64, bool) {
-	if asInt, ok := tryInt(x); ok {
+	if asInt, ok := tryInt2[int64](x); ok {
 		return float64(asInt), true
 	}
 
