@@ -150,7 +150,7 @@ func (m *ClientManager) handleGetTreatment(args *protov1.TreatmentArgs) (interfa
 		Payload: protov1.TreatmentPayload{Treatment: treatment},
 	}
 
-	if m.metadata.ReturnImpressionData {
+	if m.metadata.ReturnImpressionData && imp != nil {
 		response.Payload.ListenerData = &protov1.ListenerExtraData{
 			Label:     imp.Label,
 			Timestamp: imp.Time,
