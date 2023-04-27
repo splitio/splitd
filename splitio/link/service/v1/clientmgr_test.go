@@ -81,7 +81,7 @@ func TestRegisterWithImpsAndTreatmentHappyPath(t *testing.T) {
 			Args:    []interface{}{"key", nil, "someFeature", map[string]interface{}(nil)},
 		}
 	}).Once()
-	serializerMock.On("Serialize", newTreatmentResp(true, "on", &v1.ListenerExtraData{Label: "l1", Timestamp: 1234556})).
+	serializerMock.On("Serialize", newTreatmentResp(true, "on", &v1.ListenerExtraData{Label: "l1", Timestamp: 1234556, ChangeNumber: 321654})).
 		Return([]byte("successPayload"), nil).Once()
 
 	sdkMock := &SDKMock{}
@@ -89,7 +89,7 @@ func TestRegisterWithImpsAndTreatmentHappyPath(t *testing.T) {
 		On("Treatment",
 			&types.ClientMetadata{ID: "someID", SdkVersion: "some_sdk-1.2.3", ReturnImpressionData: true},
 			"key", (*string)(nil), "someFeature", map[string]interface{}(nil)).
-		Return("on", &dtos.Impression{Label: "l1", Time: 1234556}, nil).Once()
+            Return("on", &dtos.Impression{Label: "l1", Time: 1234556, ChangeNumber: 321654}, nil).Once()
 
 	logger := logging.NewLogger(nil)
 	cm := NewClientManager(rawConnMock, logger, sdkMock, serializerMock)

@@ -40,7 +40,7 @@ func NewClientManager(
 func (m *ClientManager) Manage() {
 	defer func() {
 		if r := recover(); r != nil {
-            m.logger.Error("CRITICAL - connection handlers are panicking: ", r)
+			m.logger.Error("CRITICAL - connection handlers are panicking: ", r)
 		}
 	}()
 	err := m.handleClientInteractions()
@@ -152,8 +152,9 @@ func (m *ClientManager) handleGetTreatment(args *protov1.TreatmentArgs) (interfa
 
 	if m.metadata.ReturnImpressionData && imp != nil {
 		response.Payload.ListenerData = &protov1.ListenerExtraData{
-			Label:     imp.Label,
-			Timestamp: imp.Time,
+			Label:        imp.Label,
+			Timestamp:    imp.Time,
+			ChangeNumber: imp.ChangeNumber,
 		}
 	}
 
