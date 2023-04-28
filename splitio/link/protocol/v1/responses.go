@@ -41,8 +41,9 @@ type TreatmentsWithConfigPayload struct {
 }
 
 type ListenerExtraData struct {
-	Label     string `msgpack:"l"`
-	Timestamp int64  `msgpack:"m"`
+	Label        string `msgpack:"l"`
+	Timestamp    int64  `msgpack:"m"`
+	ChangeNumber int64  `msgpack:"c"`
 }
 
 type validPayloadsConstraint interface {
