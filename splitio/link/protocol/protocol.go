@@ -7,5 +7,5 @@ const (
 )
 
 type RPCBase struct {
-	Version Version
+	Version Version `msgpack:"v"`
 }
