@@ -23,7 +23,7 @@ import (
 )
 
 type Interface interface {
-	Treatment(md *types.ClientMetadata, Key string, BucketingKey *string, Feature string, attributes map[string]interface{}) (string, error)
+	Treatment(md *types.ClientMetadata, Key string, BucketingKey *string, Feature string, attributes map[string]interface{}) (string, *dtos.Impression, error)
 }
 
 type Impl struct {
@@ -83,27 +83,33 @@ func New(logger logging.LoggerInterface, apikey string, opts ...conf.Option) (*I
 }
 
 // Treatment implements Interface
-func (i *Impl) Treatment(md *types.ClientMetadata, key string, bucketingKey *string, feature string, attributes map[string]interface{}) (string, error) {
+func (i *Impl) Treatment(
+	md *types.ClientMetadata,
+	key string,
+	bucketingKey *string,
+	feature string,
+	attributes map[string]interface{},
+) (string, *dtos.Impression, error) {
 	res := i.ev.EvaluateFeature(key, bucketingKey, feature, attributes)
 	if res == nil {
-		return "", fmt.Errorf("nil result")
+		return "", nil, fmt.Errorf("nil result")
 	}
 
-	err := i.handleImpression(key, bucketingKey, feature, res, *md)
+	imp, err := i.handleImpression(key, bucketingKey, feature, res, *md)
 	if err != nil {
 		i.logger.Error("error handling impression: ", err)
 	}
 
-	return res.Treatment, nil
+	return res.Treatment, imp, nil
 }
 
-func (i *Impl) handleImpression(key string, bk *string, f string, r *evaluator.Result, cm types.ClientMetadata) error {
+func (i *Impl) handleImpression(key string, bk *string, f string, r *evaluator.Result, cm types.ClientMetadata) (*dtos.Impression, error) {
 	var label string
 	if i.cfg.LabelsEnabled {
 		label = r.Label
 	}
 
-	imp := dtos.Impression{
+	imp := &dtos.Impression{
 		FeatureName:  f,
 		BucketingKey: common.StringFromRef(bk),
 		ChangeNumber: r.SplitChangeNumber,
@@ -113,13 +119,13 @@ func (i *Impl) handleImpression(key string, bk *string, f string, r *evaluator.R
 		Time:         timeMillis(),
 	}
 
-	shouldStore := i.iq.ProcessSingle(&imp)
+	shouldStore := i.iq.ProcessSingle(imp)
 	if shouldStore {
-		_, err := i.is.Push(cm, imp)
-		return err
+		_, err := i.is.Push(cm, *imp)
+		return nil, err
 	}
 
-	return nil
+	return imp, nil
 }
 
 func timeMillis() int64 {
