@@ -154,6 +154,7 @@ func (m *ClientManager) handleGetTreatment(args *protov1.TreatmentArgs) (interfa
 		response.Payload.ListenerData = &protov1.ListenerExtraData{
 			Label:     imp.Label,
 			Timestamp: imp.Time,
+            ChangeNumber: imp.ChangeNumber,
 		}
 	}
 
