@@ -122,7 +122,7 @@ func (i *Impl) handleImpression(key string, bk *string, f string, r *evaluator.R
 	shouldStore := i.iq.ProcessSingle(imp)
 	if shouldStore {
 		_, err := i.is.Push(cm, *imp)
-		return nil, err
+		return imp, err
 	}
 
 	return imp, nil
