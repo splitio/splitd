@@ -47,7 +47,58 @@ func TestRegisterAndTreatmentHappyPath(t *testing.T) {
 	sdkMock := &SDKMock{}
 	sdkMock.
 		On("Treatment", &types.ClientMetadata{ID: "someID", SdkVersion: "some_sdk-1.2.3"}, "key", (*string)(nil), "someFeature", map[string]interface{}(nil)).
-		Return("on", (*dtos.Impression)(nil), nil).Once()
+		Return(&sdk.Result{Treatment: "on"}, nil).Once()
+
+	logger := logging.NewLogger(nil)
+	cm := NewClientManager(rawConnMock, logger, sdkMock, serializerMock)
+	err := cm.handleClientInteractions()
+	assert.Nil(t, err)
+	rawConnMock.AssertNumberOfCalls(t, "Shutdown", 1)
+}
+
+func TestRegisterAndTreatmentsHappyPath(t *testing.T) {
+	rawConnMock := &RawConnMock{}
+	rawConnMock.On("ReceiveMessage").Return([]byte("registrationMessage"), nil).Once()
+	rawConnMock.On("SendMessage", []byte("successRegistration")).Return(nil).Once()
+	rawConnMock.On("ReceiveMessage").Return([]byte("treatmentsMessage"), nil).Once()
+	rawConnMock.On("SendMessage", []byte("successPayload")).Return(nil).Once()
+	rawConnMock.On("ReceiveMessage").Return([]byte(nil), io.EOF).Once()
+	rawConnMock.On("Shutdown").Return(nil).Once()
+
+	serializerMock := &SerializerMock{}
+	serializerMock.On("Parse", []byte("registrationMessage"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(1).(*v1.RPC) = v1.RPC{
+			RPCBase: protocol.RPCBase{Version: protocol.V1},
+			OpCode:  v1.OCRegister,
+			Args:    []interface{}{"someID", "some_sdk-1.2.3", uint64(0)},
+		}
+	}).Once()
+	serializerMock.On("Serialize", newRegisterResp(true)).Return([]byte("successRegistration"), nil).Once()
+	serializerMock.On("Parse", []byte("treatmentsMessage"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(1).(*v1.RPC) = v1.RPC{
+			RPCBase: protocol.RPCBase{Version: protocol.V1},
+			OpCode:  v1.OCTreatments,
+			Args:    []interface{}{"key", nil, []string{"feat1", "feat2", "feat3"}, map[string]interface{}(nil)},
+		}
+	}).Once()
+	serializerMock.On("Serialize", newTreatmentsResp(true, []sdk.Result{
+		{Treatment: "on"}, {Treatment: "off"}, {Treatment: "control"},
+	})).Return([]byte("successPayload"), nil).Once()
+
+	sdkMock := &SDKMock{}
+	sdkMock.
+		On(
+			"Treatments",
+			&types.ClientMetadata{ID: "someID", SdkVersion: "some_sdk-1.2.3"},
+			"key",
+			(*string)(nil),
+			[]string{"feat1", "feat2", "feat3"},
+			map[string]interface{}(nil),
+		).Return(map[string]sdk.Result{
+		"feat1": {Treatment: "on"},
+		"feat2": {Treatment: "off"},
+		"feat3": {Treatment: "control"},
+	}, nil).Once()
 
 	logger := logging.NewLogger(nil)
 	cm := NewClientManager(rawConnMock, logger, sdkMock, serializerMock)
@@ -89,7 +140,7 @@ func TestRegisterWithImpsAndTreatmentHappyPath(t *testing.T) {
 		On("Treatment",
 			&types.ClientMetadata{ID: "someID", SdkVersion: "some_sdk-1.2.3", ReturnImpressionData: true},
 			"key", (*string)(nil), "someFeature", map[string]interface{}(nil)).
-		Return("on", &dtos.Impression{Label: "l1", Time: 1234556}, nil).Once()
+		Return(&sdk.Result{Treatment: "on", Impression: &dtos.Impression{Label: "l1", Time: 1234556}}, nil).Once()
 
 	logger := logging.NewLogger(nil)
 	cm := NewClientManager(rawConnMock, logger, sdkMock, serializerMock)
@@ -151,11 +202,36 @@ func newTreatmentResp(ok bool, treatment string, ilData *v1.ListenerExtraData) *
 		res = v1.ResultInternalError
 	}
 	return &v1.ResponseWrapper[v1.TreatmentPayload]{
-		Status:  res,
+		Status: res,
 		Payload: v1.TreatmentPayload{
-            Treatment: treatment,
-            ListenerData: ilData,
-        },
+			Treatment:    treatment,
+			ListenerData: ilData,
+		},
+	}
+}
+
+func newTreatmentsResp(ok bool, data []sdk.Result) *v1.ResponseWrapper[v1.TreatmentsPayload] {
+	res := v1.ResultOk
+	if !ok {
+		res = v1.ResultInternalError
+	}
+
+	payload := make([]v1.TreatmentPayload, 0, len(data))
+	for _, r := range data {
+		p := v1.TreatmentPayload{Treatment: r.Treatment}
+		if r.Impression != nil {
+			p.ListenerData = &v1.ListenerExtraData{
+				Label:        r.Impression.Label,
+				Timestamp:    r.Impression.Time,
+				ChangeNumber: r.Impression.ChangeNumber,
+			}
+		}
+		payload = append(payload, p)
+	}
+
+	return &v1.ResponseWrapper[v1.TreatmentsPayload]{
+		Status:  res,
+		Payload: v1.TreatmentsPayload{Results: payload},
 	}
 }
 
@@ -204,9 +280,27 @@ type SDKMock struct {
 }
 
 // Treatment implements sdk.Interface
-func (m *SDKMock) Treatment(md *types.ClientMetadata, key string, bucketingKey *string, feature string, attributes map[string]interface{}) (string, *dtos.Impression, error) {
+func (m *SDKMock) Treatment(
+	md *types.ClientMetadata,
+	key string,
+	bucketingKey *string,
+	feature string,
+	attributes map[string]interface{},
+) (*sdk.Result, error) {
 	args := m.Called(md, key, bucketingKey, feature, attributes)
-	return args.String(0), args.Get(1).(*dtos.Impression), nil
+	return args.Get(0).(*sdk.Result), nil
+}
+
+// Treatments implements sdk.Interface
+func (m *SDKMock) Treatments(
+	md *types.ClientMetadata,
+	key string,
+	bucketingKey *string,
+	features []string,
+	attributes map[string]interface{},
+) (map[string]sdk.Result, error) {
+	args := m.Called(md, key, bucketingKey, features, attributes)
+	return args.Get(0).(map[string]sdk.Result), nil
 }
 
 var _ transfer.RawConn = (*RawConnMock)(nil)

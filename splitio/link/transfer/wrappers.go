@@ -55,7 +55,7 @@ func (c *Impl) ReceiveMessage() ([]byte, error) {
 		if err == io.EOF {
 			return nil, err
 		}
-		return nil, fmt.Errorf("error reading from UDSPacket connection: %w", err)
+		return nil, fmt.Errorf("error reading from socket: %w", err)
 	}
 
 	if n == len(c.readBuffer)-1 {
