@@ -20,24 +20,17 @@ type TreatmentPayload struct {
 }
 
 type TreatmentsPayload struct {
-	Treatments map[string]struct {
-		Treatment    string             `msgpack:"t"`
-		ListenerData *ListenerExtraData `msgpack:"l"`
-	}
+	Results []TreatmentPayload `msgpack:"r"`
 }
 
 type TreatmentWithConfigPayload struct {
 	Treatment    string             `msgpack:"t"`
 	Config       string             `msgpack:"c"`
-	ListenerData *ListenerExtraData `msgpack:"l"`
+	ListenerData *ListenerExtraData `msgpack:"l,omitempty"`
 }
 
 type TreatmentsWithConfigPayload struct {
-	Results map[string]struct {
-		Treatment    string             `msgpack:"t"`
-		Config       string             `msgpack:"c"`
-		ListenerData *ListenerExtraData `msgpack:"l"`
-	}
+	Results []TreatmentWithConfigPayload `msgpack:"r"`
 }
 
 type ListenerExtraData struct {

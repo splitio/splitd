@@ -23,7 +23,8 @@ import (
 )
 
 type Interface interface {
-	Treatment(md *types.ClientMetadata, Key string, BucketingKey *string, Feature string, attributes map[string]interface{}) (string, *dtos.Impression, error)
+	Treatment(md *types.ClientMetadata, Key string, BucketingKey *string, Feature string, attributes map[string]interface{}) (*Result, error)
+	Treatments(md *types.ClientMetadata, Key string, BucketingKey *string, Features []string, attributes map[string]interface{}) (map[string]Result, error)
 }
 
 type Impl struct {
@@ -89,10 +90,10 @@ func (i *Impl) Treatment(
 	bucketingKey *string,
 	feature string,
 	attributes map[string]interface{},
-) (string, *dtos.Impression, error) {
+) (*Result, error) {
 	res := i.ev.EvaluateFeature(key, bucketingKey, feature, attributes)
 	if res == nil {
-		return "", nil, fmt.Errorf("nil result")
+		return nil, fmt.Errorf("nil result")
 	}
 
 	imp, err := i.handleImpression(key, bucketingKey, feature, res, *md)
@@ -100,7 +101,37 @@ func (i *Impl) Treatment(
 		i.logger.Error("error handling impression: ", err)
 	}
 
-	return res.Treatment, imp, nil
+	return &Result{
+		Treatment:  res.Treatment,
+		Impression: imp,
+		Config:     res.Config,
+	}, nil
+}
+
+// Treatment implements Interface
+func (i *Impl) Treatments(
+	md *types.ClientMetadata,
+	key string,
+	bucketingKey *string,
+	features []string,
+	attributes map[string]interface{},
+) (map[string]Result, error) {
+
+	res := i.ev.EvaluateFeatures(key, bucketingKey, features, attributes)
+	toRet := make(map[string]Result, len(res.Evaluations))
+	for feature, res := range res.Evaluations {
+		var err error
+		var eres Result
+		eres.Treatment = res.Treatment
+		eres.Impression, err = i.handleImpression(key, bucketingKey, feature, &res, *md)
+        eres.Config = res.Config
+		if err != nil {
+			i.logger.Error("error handling impression: ", err)
+		}
+		toRet[feature] = eres
+	}
+
+	return toRet, nil
 }
 
 func (i *Impl) handleImpression(key string, bk *string, f string, r *evaluator.Result, cm types.ClientMetadata) (*dtos.Impression, error) {

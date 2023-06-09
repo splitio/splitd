@@ -1,11 +1,14 @@
 package transfer
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"sync/atomic"
+
+	"golang.org/x/sync/semaphore"
 
 	"github.com/splitio/go-toolkit/v5/logging"
 )
@@ -18,6 +21,7 @@ type Acceptor struct {
 	rawConnFactory RawConnFactory
 	logger logging.LoggerInterface
 	address net.Addr
+    sem *semaphore.Weighted
 }
 
 func newAcceptor(address net.Addr, rawConnFactory RawConnFactory, logger logging.LoggerInterface) *Acceptor {
@@ -25,6 +29,7 @@ func newAcceptor(address net.Addr, rawConnFactory RawConnFactory, logger logging
 		rawConnFactory: rawConnFactory,
 		logger: logger,
 		address: address,
+        sem: semaphore.NewWeighted(32),
 	}
 }
 
@@ -39,6 +44,8 @@ func (a *Acceptor) Start(onClientAttachedCallback OnClientAttachedCallback) (<-c
 	go func() {
 		defer l.Close()
 		for {
+
+            a.sem.Acquire(context.Background(), 1)
 			conn, err := l.Accept()
 			if err != nil {
 				var toSend error
@@ -50,7 +57,10 @@ func (a *Acceptor) Start(onClientAttachedCallback OnClientAttachedCallback) (<-c
 				return
 			}
 			wrappedConn := a.rawConnFactory(conn)
-			go onClientAttachedCallback(wrappedConn)
+			go func() {
+                onClientAttachedCallback(wrappedConn)
+                a.sem.Release(1)
+            }()
 		}
 	}()
 	return ret, nil

@@ -3,8 +3,11 @@ package conf
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
+	"strings"
 
+	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio/link"
 	"github.com/splitio/splitd/splitio/sdk/conf"
 	"gopkg.in/yaml.v3"
@@ -13,8 +16,9 @@ import (
 const defaultConfigFN = "/etc/splitd.yaml"
 
 type config struct {
-	SDK  SDK  `yaml:"sdk"`
-	Link Link `yaml:"link"`
+	Logger Logger `yaml:"logging"`
+	SDK    SDK    `yaml:"sdk"`
+	Link   Link   `yaml:"link"`
 }
 
 func (c *config) parse(fn string) error {
@@ -99,6 +103,24 @@ func (u *URLs) ToSDKConf() []conf.Option {
 	}
 	return opts
 
+}
+
+type Logger struct {
+	Level *string `yaml:"level"`
+}
+
+func (l *Logger) ToLoggerOptions() *logging.LoggerOptions {
+
+	opts := &logging.LoggerOptions{
+        LogLevel: logging.LevelError,
+        StandardLoggerFlags: log.Ltime | log.Lshortfile,
+    }
+
+	if l.Level != nil {
+		opts.LogLevel = logging.Level(strings.ToUpper(*l.Level))
+	}
+
+	return opts
 }
 
 func ReadConfig() (*config, error) {
