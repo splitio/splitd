@@ -121,19 +121,19 @@ func (m *ClientManager) handleRPC(rpc *protov1.RPC) (interface{}, error) {
 	case protov1.OCRegister:
 		var args protov1.RegisterArgs
 		if err := args.PopulateFromRPC(rpc); err != nil {
-			return nil, fmt.Errorf("error parsing arguments: %w", err)
+			return nil, fmt.Errorf("error parsing register arguments: %w", err)
 		}
 		return m.handleRegistration(&args)
 	case protov1.OCTreatment:
 		var args protov1.TreatmentArgs
 		if err := args.PopulateFromRPC(rpc); err != nil {
-			return nil, fmt.Errorf("error parsing arguments: %w", err)
+			return nil, fmt.Errorf("error parsing treatment arguments: %w", err)
 		}
 		return m.handleGetTreatment(&args)
 	case protov1.OCTreatments:
 		var args protov1.TreatmentsArgs
 		if err := args.PopulateFromRPC(rpc); err != nil {
-			return nil, fmt.Errorf("error parsing arguments: %w", err)
+			return nil, fmt.Errorf("error parsing treatments arguments: %w", err)
 		}
 		return m.handleGetTreatments(&args)
 	}
