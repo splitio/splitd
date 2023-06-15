@@ -1,4 +1,6 @@
 # vim:ft=yaml
+logging:
+  level: "ERROR"
 sdk:
   apikey: "YOUR_API_KEY"
   urls:

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/splitio/go-toolkit/v5/logging"
@@ -20,18 +19,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger := logging.NewLogger(&logging.LoggerOptions{
-		StandardLoggerFlags: log.Ltime | log.Lshortfile,
-		LogLevel: logging.LevelInfo,
-	})
+	logger := logging.NewLogger(cfg.Logger.ToLoggerOptions())
 
 	splitSDK, err := sdk.New(logger, cfg.SDK.Apikey, cfg.SDK.ToSDKConf()...)
+    exitOnErr("sdk initialization", err)
 
 	errc, lShutdown, err := link.Listen(logger, splitSDK, cfg.Link.ToLinkOpts()...)
-	if err != nil {
-		logger.Error("startup error: ", err)
-		os.Exit(1)
-	}
+    exitOnErr("rpc listener setup", err)
 
 	shutdown := util.NewShutdownHandler()
 	shutdown.RegisterHook(func() {
@@ -44,7 +38,13 @@ func main() {
 
 	// Wait for connection to end (either gracefully of because of an error)
 	err = <-errc
+    exitOnErr("shutdown: ", err)
+}
+
+func exitOnErr(ctxStr string, err error) {
 	if err != nil {
-		logger.Error(err)
+        fmt.Printf("%s: startup error: %s\n", ctxStr, err.Error())
+		os.Exit(1)
 	}
+
 }

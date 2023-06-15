@@ -55,7 +55,6 @@ func Consumer(logger logging.LoggerInterface, os ...Option) (client.Interface, e
 	return client.New(logger, conn, opts.forApp()...)
 }
 
-
 type Option func(*opts) error
 
 func WithSockType(s string) Option {
@@ -109,12 +108,20 @@ func WithProtocol(p string) Option {
 
 }
 
+func WithMaxSimultaneousConns(m int) Option {
+	return func(o *opts) error {
+		o.maxSimulateneousConns = m
+		return nil
+	}
+}
+
 type opts struct {
-	sockType      transfer.ConnType
-	address       string
-	serialization serializer.Mechanism
-	protocolV     protocol.Version
-	bufSize       int
+	sockType              transfer.ConnType
+	address               string
+	serialization         serializer.Mechanism
+	protocolV             protocol.Version
+	bufSize               int
+	maxSimulateneousConns int
 }
 
 func (o *opts) populate(options []Option) error {
@@ -138,6 +145,9 @@ func (o *opts) forTransfer() []transfer.Option {
 	if o.bufSize != 0 {
 		toRet = append(toRet, transfer.WithBufSize(o.bufSize))
 	}
+    if o.maxSimulateneousConns != 0 {
+        toRet = append(toRet, transfer.WithMaxConns(o.maxSimulateneousConns))
+    }
 	return toRet
 }
 
@@ -151,4 +161,3 @@ func (o *opts) forApp() []common.Option {
 	}
 	return toRet
 }
-
