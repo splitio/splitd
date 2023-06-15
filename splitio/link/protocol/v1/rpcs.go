@@ -156,10 +156,15 @@ func (t *TreatmentsArgs) PopulateFromRPC(rpc *RPC) error {
 
 	}
 
-	if t.Features, ok = rpc.Args[TreatmentsArgFeaturesIdx].([]string); !ok {
+    rawFeatureList, ok := rpc.Args[TreatmentsArgFeaturesIdx].([]interface{})
+    if !ok {
 		return RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsArgFeaturesIdx)}
 
 	}
+    t.Features, ok = sanitizeFeatureList(rawFeatureList)
+    if !ok {
+        return RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsArgFeaturesIdx)}
+    }
 
 	rawAttrs, err := getOptional[map[string]interface{}](rpc.Args[TreatmentsArgAttributesIdx])
 	if err != nil {
@@ -288,6 +293,18 @@ func sanitizeAttributes(attrs map[string]interface{}) map[string]interface{} {
 	return attrs
 }
 
+func sanitizeFeatureList(raw []interface{}) ([]string, bool) {
+    features := make([]string, 0, len(raw))
+    for _, f := range raw {
+        asStr, ok := f.(string)
+        if !ok {
+            return nil, false
+        }
+        features = append(features, asStr)
+    }
+    return features, true
+}
+
 func tryInt2[T int8|int16|int32|int64|uint8|uint16|uint32|uint64](x interface{}) (T, bool) {
 	switch parsed := x.(type) {
 	case uint8:
@@ -312,32 +329,6 @@ func tryInt2[T int8|int16|int32|int64|uint8|uint16|uint32|uint64](x interface{})
 		return T(parsed), true
 	}
 	return T(0), false
-}
-
-func tryInt(x interface{}) (int64, bool) {
-	switch parsed := x.(type) {
-	case uint8:
-		return int64(parsed), true
-	case uint16:
-		return int64(parsed), true
-	case uint32:
-		return int64(parsed), true
-	case uint64:
-		return int64(parsed), true
-	case int8:
-		return int64(parsed), true
-	case int16:
-		return int64(parsed), true
-	case int32:
-		return int64(parsed), true
-	case int64:
-		return int64(parsed), true
-	case int:
-		return int64(parsed), true
-	case uint:
-		return int64(parsed), true
-	}
-	return 0, false
 }
 
 func tryNumberAsFloat(x interface{}) (float64, bool) {

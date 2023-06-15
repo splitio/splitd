@@ -15,12 +15,14 @@ import (
 	"github.com/splitio/splitd/splitio/sdk/types"
 )
 
+
+
 type ClientManager struct {
 	cc         transfer.RawConn
 	serializer serializer.Interface
 	logger     logging.LoggerInterface
 	metadata   *types.ClientMetadata
-	splitSDK   sdk.Interface
+    splitSDK   sdk.Interface
 }
 
 func NewClientManager(
@@ -40,7 +42,7 @@ func NewClientManager(
 func (m *ClientManager) Manage() {
 	defer func() {
 		if r := recover(); r != nil {
-            m.logger.Error("CRITICAL - connection handlers are panicking: ", r)
+			m.logger.Error("CRITICAL - connection handlers are panicking: ", r)
 		}
 	}()
 	err := m.handleClientInteractions()
@@ -88,11 +90,13 @@ func (m *ClientManager) fetchRPC() (*protov1.RPC, error) {
 	if err = m.serializer.Parse(read, &parsed); err != nil {
 		return nil, fmt.Errorf("error parsing message: %w", err)
 	}
+
 	return &parsed, nil
 }
 
 func (m *ClientManager) sendResponse(response interface{}) error {
 	serialized, err := m.serializer.Serialize(response)
+
 	if err != nil {
 		// TODO(mredolatti): see if this is recoverable
 		return fmt.Errorf("error serializing response: %w", err)
@@ -117,15 +121,21 @@ func (m *ClientManager) handleRPC(rpc *protov1.RPC) (interface{}, error) {
 	case protov1.OCRegister:
 		var args protov1.RegisterArgs
 		if err := args.PopulateFromRPC(rpc); err != nil {
-			return nil, fmt.Errorf("error parsing arguments: %w", err)
+			return nil, fmt.Errorf("error parsing register arguments: %w", err)
 		}
 		return m.handleRegistration(&args)
 	case protov1.OCTreatment:
 		var args protov1.TreatmentArgs
 		if err := args.PopulateFromRPC(rpc); err != nil {
-			return nil, fmt.Errorf("error parsing arguments: %w", err)
+			return nil, fmt.Errorf("error parsing treatment arguments: %w", err)
 		}
 		return m.handleGetTreatment(&args)
+	case protov1.OCTreatments:
+		var args protov1.TreatmentsArgs
+		if err := args.PopulateFromRPC(rpc); err != nil {
+			return nil, fmt.Errorf("error parsing treatments arguments: %w", err)
+		}
+		return m.handleGetTreatments(&args)
 	}
 	return nil, fmt.Errorf("RPC not implemented")
 }
@@ -140,22 +150,54 @@ func (m *ClientManager) handleRegistration(args *protov1.RegisterArgs) (interfac
 }
 
 func (m *ClientManager) handleGetTreatment(args *protov1.TreatmentArgs) (interface{}, error) {
-	treatment, imp, err := m.splitSDK.Treatment(m.metadata, args.Key, args.BucketingKey, args.Feature, args.Attributes)
+	res, err := m.splitSDK.Treatment(m.metadata, args.Key, args.BucketingKey, args.Feature, args.Attributes)
 	if err != nil {
 		return &protov1.ResponseWrapper[protov1.TreatmentPayload]{Status: protov1.ResultInternalError}, err
 	}
 
 	response := &protov1.ResponseWrapper[protov1.TreatmentPayload]{
 		Status:  protov1.ResultOk,
-		Payload: protov1.TreatmentPayload{Treatment: treatment},
+		Payload: protov1.TreatmentPayload{Treatment: res.Treatment},
 	}
 
-	if m.metadata.ReturnImpressionData && imp != nil {
+	if m.metadata.ReturnImpressionData && res.Impression != nil {
 		response.Payload.ListenerData = &protov1.ListenerExtraData{
-			Label:     imp.Label,
-			Timestamp: imp.Time,
-            ChangeNumber: imp.ChangeNumber,
+			Label:        res.Impression.Label,
+			Timestamp:    res.Impression.Time,
+			ChangeNumber: res.Impression.ChangeNumber,
 		}
+	}
+
+	return response, nil
+}
+
+func (m *ClientManager) handleGetTreatments(args *protov1.TreatmentsArgs) (interface{}, error) {
+	res, err := m.splitSDK.Treatments(m.metadata, args.Key, args.BucketingKey, args.Features, args.Attributes)
+	if err != nil {
+		return &protov1.ResponseWrapper[protov1.TreatmentPayload]{Status: protov1.ResultInternalError}, err
+	}
+
+	results := make([]protov1.TreatmentPayload, len(args.Features))
+	for idx, feature := range args.Features {
+		ff, ok := res[feature]
+		if !ok {
+			results[idx].Treatment = "control"
+			continue
+		}
+
+		results[idx].Treatment = ff.Treatment
+		if ff.Impression != nil {
+			results[idx].ListenerData = &protov1.ListenerExtraData{
+				Label:        ff.Impression.Label,
+				Timestamp:    ff.Impression.Time,
+				ChangeNumber: ff.Impression.ChangeNumber,
+			}
+		}
+	}
+
+	response := &protov1.ResponseWrapper[protov1.TreatmentsPayload]{
+		Status:  protov1.ResultOk,
+		Payload: protov1.TreatmentsPayload{Results: results},
 	}
 
 	return response, nil

@@ -40,7 +40,7 @@ func NewAcceptor(opts ...Option) (*Acceptor, error) {
 	}
 
 	connFactory := func(c net.Conn) RawConn { return newConnWrapper(c, framer, o.bufsize) }
-	return newAcceptor(address, connFactory, o.logger), nil
+	return newAcceptor(address, connFactory, o.logger, o.maxSimultaneousConnections), nil
 }
 
 func NewClientConn(opts ...Option) (RawConn, error) {
@@ -75,21 +75,21 @@ func WithAddress(address string) Option                { return func(o *options)
 func WithType(t ConnType) Option                       { return func(o *options) { o.ctype = t } }
 func WithLogger(logger logging.LoggerInterface) Option { return func(o *options) { o.logger = logger } }
 func WithBufSize(s int) Option                         { return func(o *options) { o.bufsize = s } }
-
-
+func WithMaxConns(m int) Option                        { return func(o *options) { o.maxSimultaneousConnections = m } }
 
 type options struct {
-	ctype   ConnType
-	address string
-	logger  logging.LoggerInterface
-	bufsize int
+	ctype                      ConnType
+	address                    string
+	logger                     logging.LoggerInterface
+	bufsize                    int
+	maxSimultaneousConnections int
 }
 
 func defaultOpts() options {
 	return options{
-		ctype: ConnTypeUnixSeqPacket,
+		ctype:   ConnTypeUnixSeqPacket,
 		address: "/var/run/splitd.sock",
-		logger: logging.NewLogger(nil),
+		logger:  logging.NewLogger(nil),
 		bufsize: 1024,
 	}
 }
