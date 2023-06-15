@@ -13,6 +13,10 @@ import (
 	"github.com/splitio/go-toolkit/v5/logging"
 )
 
+const (
+    defaultMaxSimultaneousConns = 32
+)
+
 type OnClientAttachedCallback = func(conn RawConn)
 type RawConnFactory = func(conn net.Conn) RawConn
 
@@ -24,12 +28,17 @@ type Acceptor struct {
     sem *semaphore.Weighted
 }
 
-func newAcceptor(address net.Addr, rawConnFactory RawConnFactory, logger logging.LoggerInterface) *Acceptor {
+func newAcceptor(address net.Addr, rawConnFactory RawConnFactory, logger logging.LoggerInterface, maxConns int) *Acceptor {
+
+    if maxConns == 0 {
+        maxConns = defaultMaxSimultaneousConns
+    }
+
 	return &Acceptor{
 		rawConnFactory: rawConnFactory,
 		logger: logger,
 		address: address,
-        sem: semaphore.NewWeighted(32),
+        sem: semaphore.NewWeighted(int64(maxConns)),
 	}
 }
 

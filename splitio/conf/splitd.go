@@ -37,22 +37,31 @@ func (c *config) parse(fn string) error {
 }
 
 type Link struct {
-	Type          *string `yaml:"type"`
-	Address       *string `yaml:"address"`
-	Serialization *string `yaml:"serialization"`
+	Type                 *string `yaml:"type"`
+	Address              *string `yaml:"address"`
+	Serialization        *string `yaml:"serialization"`
+	MaxSimultaneousConns *int    `yaml:"maxSimultaneousConns"`
 }
 
 func (l *Link) ToLinkOpts() []link.Option {
 	var opts []link.Option
+
 	if l.Type != nil {
 		opts = append(opts, link.WithSockType(*l.Type))
 	}
+
 	if l.Address != nil {
 		opts = append(opts, link.WithAddress(*l.Address))
 	}
+
 	if l.Serialization != nil {
 		opts = append(opts, link.WithSerialization(*l.Serialization))
 	}
+
+    if l.MaxSimultaneousConns != nil {
+        opts = append(opts, link.WithMaxSimultaneousConns(*l.MaxSimultaneousConns))
+    }
+
 	return opts
 }
 
@@ -112,9 +121,9 @@ type Logger struct {
 func (l *Logger) ToLoggerOptions() *logging.LoggerOptions {
 
 	opts := &logging.LoggerOptions{
-        LogLevel: logging.LevelError,
-        StandardLoggerFlags: log.Ltime | log.Lshortfile,
-    }
+		LogLevel:            logging.LevelError,
+		StandardLoggerFlags: log.Ltime | log.Lshortfile,
+	}
 
 	if l.Level != nil {
 		opts.LogLevel = logging.Level(strings.ToUpper(*l.Level))
