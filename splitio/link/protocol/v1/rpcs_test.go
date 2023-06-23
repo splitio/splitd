@@ -127,13 +127,13 @@ func TestTreatmentsRPCParsing(t *testing.T) {
 		r.PopulateFromRPC(&RPC{
 			RPCBase: protocol.RPCBase{Version: protocol.V1},
 			OpCode:  OCTreatments,
-			Args:    []interface{}{"key", "bk", []string{"feat1", "feat2"}, 123}}),
+			Args:    []interface{}{"key", "bk", []interface{}{"feat1", "feat2"}, 123}}),
 	)
 
 	err := r.PopulateFromRPC(&RPC{
 		RPCBase: protocol.RPCBase{Version: protocol.V1},
 		OpCode:  OCTreatments,
-		Args:    []interface{}{"key", "bk", []string{"feat1", "feat2"}, map[string]interface{}{"a": 1}}})
+		Args:    []interface{}{"key", "bk", []interface{}{"feat1", "feat2"}, map[string]interface{}{"a": 1}}})
 	assert.Nil(t, err)
 	assert.Equal(t, "key", r.Key)
 	assert.Equal(t, ref("bk"), r.BucketingKey)
@@ -144,7 +144,7 @@ func TestTreatmentsRPCParsing(t *testing.T) {
     err = r.PopulateFromRPC(&RPC{
 		RPCBase: protocol.RPCBase{Version: protocol.V1},
 		OpCode:  OCTreatments,
-		Args:    []interface{}{"key", nil, []string{"feat1", "feat2"}, map[string]interface{}{"a": 1}}})
+		Args:    []interface{}{"key", nil, []interface{}{"feat1", "feat2"}, map[string]interface{}{"a": 1}}})
 	assert.Nil(t, err)
 	assert.Equal(t, "key", r.Key)
 	assert.Nil(t, r.BucketingKey)
@@ -154,7 +154,7 @@ func TestTreatmentsRPCParsing(t *testing.T) {
 	err = r.PopulateFromRPC(&RPC{
 		RPCBase: protocol.RPCBase{Version: protocol.V1},
 		OpCode:  OCTreatments,
-		Args:    []interface{}{"key", "bk", []string{"feat1", "feat2"}, nil}})
+		Args:    []interface{}{"key", "bk", []interface{}{"feat1", "feat2"}, nil}})
 	assert.Nil(t, err)
 	assert.Equal(t, "key", r.Key)
 	assert.Equal(t, ref("bk"), r.BucketingKey)
