@@ -8,7 +8,7 @@ on:
       - dev
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'push' && github.run_number || github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
