@@ -55,22 +55,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: ${{ matrix.version }}
-          extensions: mbstring, intl, pcntl, sockets
-          ini-values: post_max_size=256M, max_execution_time=180
-          coverage: pcov
-
       - name: Build ginaries
         run: make splitd splitcli
 
       - name: Run tests
         run: make test
-
-      - name: Set VERSION env
-        run: echo "VERSION=$(cat src/Version.php | grep 'const CURRENT' | cut -d "'" -f 2 | sed "s/'//g")" >> $GITHUB_ENV
 
           #      - name: SonarQube Scan (Push)
           #        if: matrix.version == '8.2' && github.event_name == 'push'
