@@ -78,7 +78,7 @@ func TestRegisterAndTreatmentsHappyPath(t *testing.T) {
 		*args.Get(1).(*v1.RPC) = v1.RPC{
 			RPCBase: protocol.RPCBase{Version: protocol.V1},
 			OpCode:  v1.OCTreatments,
-			Args:    []interface{}{"key", nil, []string{"feat1", "feat2", "feat3"}, map[string]interface{}(nil)},
+			Args:    []interface{}{"key", nil, []interface{}{"feat1", "feat2", "feat3"}, map[string]interface{}(nil)},
 		}
 	}).Once()
 	serializerMock.On("Serialize", newTreatmentsResp(true, []sdk.Result{
