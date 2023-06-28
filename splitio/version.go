@@ -1,3 +1,3 @@
 package splitio
 
-const Version = "0.0.1-alpha9"
+const Version = "1.0.0-test2"
