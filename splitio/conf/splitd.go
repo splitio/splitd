@@ -41,26 +41,34 @@ type Link struct {
 	Address              *string `yaml:"address"`
 	Serialization        *string `yaml:"serialization"`
 	MaxSimultaneousConns *int    `yaml:"maxSimultaneousConns"`
+	ReadTimeoutMS        *int    `yaml:"readTimeoutMS"`
+	WriteTimeoutMS       *int    `yaml:"writeTimeoutMS"`
+	AcceptTimeoutMS      *int    `yaml:"acceptTimeoutMS"`
 }
 
 func (l *Link) ToLinkOpts() []link.Option {
 	var opts []link.Option
-
 	if l.Type != nil {
 		opts = append(opts, link.WithSockType(*l.Type))
 	}
-
 	if l.Address != nil {
 		opts = append(opts, link.WithAddress(*l.Address))
 	}
-
 	if l.Serialization != nil {
 		opts = append(opts, link.WithSerialization(*l.Serialization))
 	}
-
-    if l.MaxSimultaneousConns != nil {
-        opts = append(opts, link.WithMaxSimultaneousConns(*l.MaxSimultaneousConns))
-    }
+	if l.MaxSimultaneousConns != nil {
+		opts = append(opts, link.WithMaxSimultaneousConns(*l.MaxSimultaneousConns))
+	}
+	if l.AcceptTimeoutMS != nil {
+		opts = append(opts, link.WithAcceptTimeoutMs(*l.AcceptTimeoutMS))
+	}
+	if l.ReadTimeoutMS != nil {
+		opts = append(opts, link.WithReadTimeoutMs(*l.ReadTimeoutMS))
+	}
+	if l.WriteTimeoutMS != nil {
+		opts = append(opts, link.WithWriteTimeoutMs(*l.WriteTimeoutMS))
+	}
 
 	return opts
 }

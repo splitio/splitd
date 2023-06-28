@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio/link/transfer/framing"
@@ -23,39 +24,35 @@ var (
 func NewAcceptor(opts ...Option) (*Acceptor, error) {
 
 	o := defaultOpts()
-	for _, configure := range opts {
-		configure(&o)
-	}
+    o.Parse(opts)
 
 	var address net.Addr
 	var framer framing.Interface
-	switch o.ctype {
+	switch o.ConnType {
 	case ConnTypeUnixSeqPacket:
-		address = &net.UnixAddr{Net: "unixpacket", Name: o.address}
+		address = &net.UnixAddr{Net: "unixpacket", Name: o.Address}
 	case ConnTypeUnixStream:
-		address = &net.UnixAddr{Net: "unix", Name: o.address}
+		address = &net.UnixAddr{Net: "unix", Name: o.Address}
 		framer = &framing.LengthPrefixImpl{}
 	default:
 		return nil, ErrInvalidConnType
 	}
 
-	connFactory := func(c net.Conn) RawConn { return newConnWrapper(c, framer, o.bufsize) }
-	return newAcceptor(address, connFactory, o.logger, o.maxSimultaneousConnections), nil
+	connFactory := func(c net.Conn) RawConn { return newConnWrapper(c, framer, &o) }
+	return newAcceptor(address, connFactory, &o), nil
 }
 
 func NewClientConn(opts ...Option) (RawConn, error) {
 	o := defaultOpts()
-	for _, configure := range opts {
-		configure(&o)
-	}
+    o.Parse(opts)
 
 	var address net.Addr
 	var framer framing.Interface
-	switch o.ctype {
+	switch o.ConnType {
 	case ConnTypeUnixSeqPacket:
-		address = &net.UnixAddr{Net: "unixpacket", Name: o.address}
+		address = &net.UnixAddr{Net: "unixpacket", Name: o.Address}
 	case ConnTypeUnixStream:
-		address = &net.UnixAddr{Net: "unix", Name: o.address}
+		address = &net.UnixAddr{Net: "unix", Name: o.Address}
 		framer = &framing.LengthPrefixImpl{}
 	default:
 		return nil, ErrInvalidConnType
@@ -66,30 +63,46 @@ func NewClientConn(opts ...Option) (RawConn, error) {
 		return nil, fmt.Errorf("error creating connection: %w", err)
 	}
 
-	return newConnWrapper(c, framer, o.bufsize), nil
+	return newConnWrapper(c, framer, &o), nil
 }
 
-type Option func(*options)
+type Option func(*Options)
 
-func WithAddress(address string) Option                { return func(o *options) { o.address = address } }
-func WithType(t ConnType) Option                       { return func(o *options) { o.ctype = t } }
-func WithLogger(logger logging.LoggerInterface) Option { return func(o *options) { o.logger = logger } }
-func WithBufSize(s int) Option                         { return func(o *options) { o.bufsize = s } }
-func WithMaxConns(m int) Option                        { return func(o *options) { o.maxSimultaneousConnections = m } }
+func WithAddress(address string) Option                { return func(o *Options) { o.Address = address } }
+func WithType(t ConnType) Option                       { return func(o *Options) { o.ConnType = t } }
+func WithLogger(logger logging.LoggerInterface) Option { return func(o *Options) { o.Logger = logger } }
+func WithBufSize(s int) Option                         { return func(o *Options) { o.BufferSize = s } }
+func WithMaxConns(m int) Option                        { return func(o *Options) { o.MaxSimultaneousConnections = m } }
+func WithReadTimeout(d time.Duration) Option           { return func(o *Options) { o.ReadTimeout = d } }
+func WithWriteTimeout(d time.Duration) Option          { return func(o *Options) { o.WriteTimeout = d } }
+func WithAcceptTimeout(d time.Duration) Option         { return func(o *Options) { o.AcceptTimeout = d } }
 
-type options struct {
-	ctype                      ConnType
-	address                    string
-	logger                     logging.LoggerInterface
-	bufsize                    int
-	maxSimultaneousConnections int
+type Options struct {
+	ConnType                   ConnType
+	Address                    string
+	Logger                     logging.LoggerInterface
+	BufferSize                 int
+	MaxSimultaneousConnections int
+	ReadTimeout                time.Duration
+	WriteTimeout               time.Duration
+	AcceptTimeout              time.Duration
 }
 
-func defaultOpts() options {
-	return options{
-		ctype:   ConnTypeUnixSeqPacket,
-		address: "/var/run/splitd.sock",
-		logger:  logging.NewLogger(nil),
-		bufsize: 1024,
+func (o *Options) Parse(opts []Option) {
+	for _, configure := range opts {
+		configure(o)
+	}
+}
+
+func defaultOpts() Options {
+	return Options{
+		ConnType:                   ConnTypeUnixSeqPacket,
+		Address:                    "/var/run/splitd.sock",
+		Logger:                     logging.NewLogger(nil),
+		BufferSize:                 1024,
+		MaxSimultaneousConnections: 32,
+		ReadTimeout:                1 * time.Second,
+		WriteTimeout:               1 * time.Second,
+		AcceptTimeout:              1 * time.Second,
 	}
 }

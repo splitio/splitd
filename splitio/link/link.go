@@ -2,6 +2,7 @@ package link
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio/link/client"
@@ -15,7 +16,7 @@ import (
 
 func Listen(logger logging.LoggerInterface, sdkFacade sdk.Interface, os ...Option) (<-chan error, func() error, error) {
 
-	var opts opts
+	var opts Options
 	err := opts.populate(os)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error parsing config options: %w", err)
@@ -41,7 +42,7 @@ func Listen(logger logging.LoggerInterface, sdkFacade sdk.Interface, os ...Optio
 
 func Consumer(logger logging.LoggerInterface, os ...Option) (client.Interface, error) {
 
-	var opts opts
+	var opts Options
 	err := opts.populate(os)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing config options: %w", err)
@@ -55,10 +56,10 @@ func Consumer(logger logging.LoggerInterface, os ...Option) (client.Interface, e
 	return client.New(logger, conn, opts.forApp()...)
 }
 
-type Option func(*opts) error
+type Option func(*Options) error
 
 func WithSockType(s string) Option {
-	return func(o *opts) error {
+	return func(o *Options) error {
 		switch s {
 		case "unix-seqpacket":
 			o.sockType = transfer.ConnTypeUnixSeqPacket
@@ -72,21 +73,15 @@ func WithSockType(s string) Option {
 }
 
 func WithAddress(s string) Option {
-	return func(o *opts) error {
-		o.address = s
-		return nil
-	}
+	return func(o *Options) error { o.address = s; return nil }
 }
 
 func WithBufSize(b int) Option {
-	return func(o *opts) error {
-		o.bufSize = b
-		return nil
-	}
+	return func(o *Options) error { o.bufSize = b; return nil }
 }
 
 func WithSerialization(s string) Option {
-	return func(o *opts) error {
+	return func(o *Options) error {
 		switch s {
 		case "msgpack":
 			o.serialization = serializer.MsgPack
@@ -97,7 +92,7 @@ func WithSerialization(s string) Option {
 }
 
 func WithProtocol(p string) Option {
-	return func(o *opts) error {
+	return func(o *Options) error {
 		switch p {
 		case "v1":
 			o.protocolV = protocol.V1
@@ -109,22 +104,34 @@ func WithProtocol(p string) Option {
 }
 
 func WithMaxSimultaneousConns(m int) Option {
-	return func(o *opts) error {
-		o.maxSimulateneousConns = m
-		return nil
-	}
+	return func(o *Options) error { o.maxSimulateneousConns = m; return nil }
 }
 
-type opts struct {
+func WithReadTimeoutMs(m int) Option {
+	return func(o *Options) error { o.readTimeoutMS = m; return nil }
+}
+
+func WithWriteTimeoutMs(m int) Option {
+	return func(o *Options) error { o.writeTimeoutMS = m; return nil }
+}
+
+func WithAcceptTimeoutMs(m int) Option {
+	return func(o *Options) error { o.acceptTimeoutMS = m; return nil }
+}
+
+type Options struct {
 	sockType              transfer.ConnType
 	address               string
 	serialization         serializer.Mechanism
 	protocolV             protocol.Version
 	bufSize               int
 	maxSimulateneousConns int
+	readTimeoutMS         int
+	writeTimeoutMS        int
+	acceptTimeoutMS       int
 }
 
-func (o *opts) populate(options []Option) error {
+func (o *Options) populate(options []Option) error {
 	for _, configure := range options {
 		err := configure(o)
 		if err != nil {
@@ -134,7 +141,7 @@ func (o *opts) populate(options []Option) error {
 	return nil
 }
 
-func (o *opts) forTransfer() []transfer.Option {
+func (o *Options) forTransfer() []transfer.Option {
 	var toRet []transfer.Option
 	if o.sockType != 0 {
 		toRet = append(toRet, transfer.WithType(o.sockType))
@@ -145,13 +152,22 @@ func (o *opts) forTransfer() []transfer.Option {
 	if o.bufSize != 0 {
 		toRet = append(toRet, transfer.WithBufSize(o.bufSize))
 	}
-    if o.maxSimulateneousConns != 0 {
-        toRet = append(toRet, transfer.WithMaxConns(o.maxSimulateneousConns))
-    }
+	if o.maxSimulateneousConns != 0 {
+		toRet = append(toRet, transfer.WithMaxConns(o.maxSimulateneousConns))
+	}
+	if o.readTimeoutMS != 0 {
+		toRet = append(toRet, transfer.WithReadTimeout(time.Duration(o.readTimeoutMS)*time.Millisecond))
+	}
+	if o.writeTimeoutMS != 0 {
+		toRet = append(toRet, transfer.WithWriteTimeout(time.Duration(o.writeTimeoutMS)*time.Millisecond))
+	}
+	if o.acceptTimeoutMS != 0 {
+		toRet = append(toRet, transfer.WithAcceptTimeout(time.Duration(o.acceptTimeoutMS)*time.Millisecond))
+	}
 	return toRet
 }
 
-func (o *opts) forApp() []common.Option {
+func (o *Options) forApp() []common.Option {
 	var toRet []common.Option
 	if o.protocolV != 0 {
 		toRet = append(toRet, common.WithProtocolV(o.protocolV))
