@@ -109,12 +109,19 @@ func (i *Impl) Treatments(cfg *types.ClientConfig, key string, bk *string, featu
 
 	res := i.ev.EvaluateFeatures(key, bk, features, attributes)
 	toRet := make(map[string]Result, len(res.Evaluations))
-	for feature, res := range res.Evaluations {
+	for _, feature := range features {
+        
+        curr, ok := res.Evaluations[feature]
+        if !ok {
+            toRet[feature] = Result{Treatment: "control"}
+            continue
+        }
+
 		var err error
 		var eres Result
-		eres.Treatment = res.Treatment
-		eres.Impression, err = i.handleImpression(key, bk, feature, &res, cfg.Metadata)
-		eres.Config = res.Config
+		eres.Treatment = curr.Treatment
+		eres.Impression, err = i.handleImpression(key, bk, feature, &curr, cfg.Metadata)
+		eres.Config = curr.Config
 		if err != nil {
 			i.logger.Error("error handling impression: ", err)
 		}
