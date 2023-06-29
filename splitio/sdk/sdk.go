@@ -25,8 +25,8 @@ import (
 type Attributes = map[string]interface{}
 
 type Interface interface {
-	Treatment(md *types.ClientMetadata, Key string, BucketingKey *string, Feature string, attributes map[string]interface{}) (*Result, error)
-	Treatments(md *types.ClientMetadata, Key string, BucketingKey *string, Features []string, attributes map[string]interface{}) (map[string]Result, error)
+	Treatment(cfg *types.ClientConfig, Key string, BucketingKey *string, Feature string, attributes map[string]interface{}) (*Result, error)
+	Treatments(cfg *types.ClientConfig, Key string, BucketingKey *string, Features []string, attributes map[string]interface{}) (map[string]Result, error)
 }
 
 type Impl struct {
@@ -86,13 +86,13 @@ func New(logger logging.LoggerInterface, apikey string, opts ...conf.Option) (*I
 }
 
 // Treatment implements Interface
-func (i *Impl) Treatment(md *types.ClientMetadata, key string, bk *string, feature string, attributes Attributes) (*Result, error) {
+func (i *Impl) Treatment(cfg *types.ClientConfig, key string, bk *string, feature string, attributes Attributes) (*Result, error) {
 	res := i.ev.EvaluateFeature(key, bk, feature, attributes)
 	if res == nil {
 		return nil, fmt.Errorf("nil result")
 	}
 
-	imp, err := i.handleImpression(key, bk, feature, res, *md)
+	imp, err := i.handleImpression(key, bk, feature, res, cfg.Metadata)
 	if err != nil {
 		i.logger.Error("error handling impression: ", err)
 	}
@@ -105,7 +105,7 @@ func (i *Impl) Treatment(md *types.ClientMetadata, key string, bk *string, featu
 }
 
 // Treatment implements Interface
-func (i *Impl) Treatments(md *types.ClientMetadata, key string, bk *string, features []string, attributes Attributes) (map[string]Result, error) {
+func (i *Impl) Treatments(cfg *types.ClientConfig, key string, bk *string, features []string, attributes Attributes) (map[string]Result, error) {
 
 	res := i.ev.EvaluateFeatures(key, bk, features, attributes)
 	toRet := make(map[string]Result, len(res.Evaluations))
@@ -113,7 +113,7 @@ func (i *Impl) Treatments(md *types.ClientMetadata, key string, bk *string, feat
 		var err error
 		var eres Result
 		eres.Treatment = res.Treatment
-		eres.Impression, err = i.handleImpression(key, bk, feature, &res, *md)
+		eres.Impression, err = i.handleImpression(key, bk, feature, &res, cfg.Metadata)
 		eres.Config = res.Config
 		if err != nil {
 			i.logger.Error("error handling impression: ", err)
