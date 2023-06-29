@@ -203,6 +203,7 @@ func TestTreatments(t *testing.T) {
 }
 
 func assertImpressionEquals(t *testing.T, i1, i2 *dtos.Impression) {
+    t.Helper()
 	assert.Equal(t, i1.KeyName, i2.KeyName)
 	assert.Equal(t, i1.BucketingKey, i2.BucketingKey)
 	assert.Equal(t, i1.FeatureName, i2.FeatureName)
