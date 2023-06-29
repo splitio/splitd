@@ -1,7 +1,11 @@
 package types
 
-type ClientMetadata struct {
-	ID                   string
-	SdkVersion           string
+type ClientConfig struct {
 	ReturnImpressionData bool
+	Metadata             ClientMetadata
+}
+
+type ClientMetadata struct {
+	ID         string
+	SdkVersion string
 }
