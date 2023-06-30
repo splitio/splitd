@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio"
@@ -48,9 +47,8 @@ func main() {
 }
 
 func printHeader() {
-    title := "= splitd - " + splitio.Version + " ="
-    sep := strings.Repeat("=", len(title))
-    fmt.Printf("\n%s\n%s\n%s\n\n", sep, title, sep)
+    fmt.Println(splitio.ASCILogo)
+    fmt.Printf("Splitd Agent - Version %s. (2023)\n\n", splitio.Version)
 }
 
 func handleFlags(cfg *conf.Config) {
