@@ -46,7 +46,7 @@ func TestRegisterAndTreatmentHappyPath(t *testing.T) {
 
 	sdkMock := &SDKMock{}
 	sdkMock.
-		On("Treatment", &types.ClientMetadata{ID: "someID", SdkVersion: "some_sdk-1.2.3"}, "key", (*string)(nil), "someFeature", map[string]interface{}(nil)).
+    On("Treatment", &types.ClientConfig{Metadata: types.ClientMetadata{ID: "someID", SdkVersion: "some_sdk-1.2.3"}}, "key", (*string)(nil), "someFeature", map[string]interface{}(nil)).
 		Return(&sdk.Result{Treatment: "on"}, nil).Once()
 
 	logger := logging.NewLogger(nil)
@@ -89,7 +89,7 @@ func TestRegisterAndTreatmentsHappyPath(t *testing.T) {
 	sdkMock.
 		On(
 			"Treatments",
-			&types.ClientMetadata{ID: "someID", SdkVersion: "some_sdk-1.2.3"},
+            &types.ClientConfig{Metadata: types.ClientMetadata{ID: "someID", SdkVersion: "some_sdk-1.2.3"}},
 			"key",
 			(*string)(nil),
 			[]string{"feat1", "feat2", "feat3"},
@@ -138,7 +138,7 @@ func TestRegisterWithImpsAndTreatmentHappyPath(t *testing.T) {
 	sdkMock := &SDKMock{}
 	sdkMock.
 		On("Treatment",
-			&types.ClientMetadata{ID: "someID", SdkVersion: "some_sdk-1.2.3", ReturnImpressionData: true},
+        &types.ClientConfig{Metadata: types.ClientMetadata{ID: "someID", SdkVersion: "some_sdk-1.2.3"}, ReturnImpressionData: true},
 			"key", (*string)(nil), "someFeature", map[string]interface{}(nil)).
 		Return(&sdk.Result{Treatment: "on", Impression: &dtos.Impression{Label: "l1", Time: 1234556}}, nil).Once()
 
@@ -281,7 +281,7 @@ type SDKMock struct {
 
 // Treatment implements sdk.Interface
 func (m *SDKMock) Treatment(
-	md *types.ClientMetadata,
+	md *types.ClientConfig,
 	key string,
 	bucketingKey *string,
 	feature string,
@@ -293,7 +293,7 @@ func (m *SDKMock) Treatment(
 
 // Treatments implements sdk.Interface
 func (m *SDKMock) Treatments(
-	md *types.ClientMetadata,
+	md *types.ClientConfig,
 	key string,
 	bucketingKey *string,
 	features []string,

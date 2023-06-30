@@ -22,9 +22,11 @@ import (
 	"github.com/splitio/splitd/splitio"
 )
 
+type Attributes = map[string]interface{}
+
 type Interface interface {
-	Treatment(md *types.ClientMetadata, Key string, BucketingKey *string, Feature string, attributes map[string]interface{}) (*Result, error)
-	Treatments(md *types.ClientMetadata, Key string, BucketingKey *string, Features []string, attributes map[string]interface{}) (map[string]Result, error)
+	Treatment(cfg *types.ClientConfig, Key string, BucketingKey *string, Feature string, attributes map[string]interface{}) (*Result, error)
+	Treatments(cfg *types.ClientConfig, Key string, BucketingKey *string, Features []string, attributes map[string]interface{}) (map[string]Result, error)
 }
 
 type Impl struct {
@@ -84,19 +86,13 @@ func New(logger logging.LoggerInterface, apikey string, opts ...conf.Option) (*I
 }
 
 // Treatment implements Interface
-func (i *Impl) Treatment(
-	md *types.ClientMetadata,
-	key string,
-	bucketingKey *string,
-	feature string,
-	attributes map[string]interface{},
-) (*Result, error) {
-	res := i.ev.EvaluateFeature(key, bucketingKey, feature, attributes)
+func (i *Impl) Treatment(cfg *types.ClientConfig, key string, bk *string, feature string, attributes Attributes) (*Result, error) {
+	res := i.ev.EvaluateFeature(key, bk, feature, attributes)
 	if res == nil {
 		return nil, fmt.Errorf("nil result")
 	}
 
-	imp, err := i.handleImpression(key, bucketingKey, feature, res, *md)
+	imp, err := i.handleImpression(key, bk, feature, res, cfg.Metadata)
 	if err != nil {
 		i.logger.Error("error handling impression: ", err)
 	}
@@ -109,22 +105,23 @@ func (i *Impl) Treatment(
 }
 
 // Treatment implements Interface
-func (i *Impl) Treatments(
-	md *types.ClientMetadata,
-	key string,
-	bucketingKey *string,
-	features []string,
-	attributes map[string]interface{},
-) (map[string]Result, error) {
+func (i *Impl) Treatments(cfg *types.ClientConfig, key string, bk *string, features []string, attributes Attributes) (map[string]Result, error) {
 
-	res := i.ev.EvaluateFeatures(key, bucketingKey, features, attributes)
+	res := i.ev.EvaluateFeatures(key, bk, features, attributes)
 	toRet := make(map[string]Result, len(res.Evaluations))
-	for feature, res := range res.Evaluations {
+	for _, feature := range features {
+        
+        curr, ok := res.Evaluations[feature]
+        if !ok {
+            toRet[feature] = Result{Treatment: "control"}
+            continue
+        }
+
 		var err error
 		var eres Result
-		eres.Treatment = res.Treatment
-		eres.Impression, err = i.handleImpression(key, bucketingKey, feature, &res, *md)
-        eres.Config = res.Config
+		eres.Treatment = curr.Treatment
+		eres.Impression, err = i.handleImpression(key, bk, feature, &curr, cfg.Metadata)
+		eres.Config = curr.Config
 		if err != nil {
 			i.logger.Error("error handling impression: ", err)
 		}

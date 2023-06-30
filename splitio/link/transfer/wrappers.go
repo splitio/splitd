@@ -10,11 +10,6 @@ import (
 	"github.com/splitio/splitd/splitio/link/transfer/framing"
 )
 
-const (
-	readTimeout  time.Duration = 1 * time.Second
-	writeTimeout time.Duration = 1 * time.Second
-)
-
 var (
 	ErrSentDataMismatch = errors.New("sent data size mismatch")
 	ErrBufferTooSmall   = errors.New("insufficient capacity in read buffer")
@@ -33,20 +28,22 @@ type Impl struct {
 	writeTimeout time.Duration
 }
 
-func newConnWrapper(c net.Conn, f framing.Interface, bufSize int) RawConn {
+func newConnWrapper(c net.Conn, f framing.Interface, o *Options) RawConn {
 	if f != nil {
 		c = &FramingRawConnWrapper{f: f, c: c}
 	}
 
 	return &Impl{
 		conn:       c,
-		readBuffer: make([]byte, bufSize),
+		readBuffer: make([]byte, o.BufferSize),
+        readTimeout: o.ReadTimeout,
+        writeTimeout: o.WriteTimeout,
 	}
 }
 
 // ReceiveMessage implements ClientConnection
 func (c *Impl) ReceiveMessage() ([]byte, error) {
-	if err := c.conn.SetReadDeadline(time.Now().Add(readTimeout)); err != nil {
+	if err := c.conn.SetReadDeadline(time.Now().Add(c.readTimeout)); err != nil {
 		return nil, fmt.Errorf("error setting read timeout: %w", err)
 	}
 
@@ -58,7 +55,7 @@ func (c *Impl) ReceiveMessage() ([]byte, error) {
 		return nil, fmt.Errorf("error reading from socket: %w", err)
 	}
 
-	if n == len(c.readBuffer)-1 {
+	if n == len(c.readBuffer) {
 		return nil, ErrBufferTooSmall
 	}
 	return c.readBuffer[:n], nil
@@ -66,7 +63,7 @@ func (c *Impl) ReceiveMessage() ([]byte, error) {
 
 // SendMessage implements ClientConnection
 func (c *Impl) SendMessage(data []byte) error {
-	if err := c.conn.SetWriteDeadline(time.Now().Add(writeTimeout)); err != nil {
+	if err := c.conn.SetWriteDeadline(time.Now().Add(c.writeTimeout)); err != nil {
 		return fmt.Errorf("error setting read timeout: %w", err)
 	}
 

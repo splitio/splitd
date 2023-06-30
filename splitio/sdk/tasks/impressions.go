@@ -1,6 +1,8 @@
 package tasks
 
 import (
+	"errors"
+
 	sdkconf "github.com/splitio/splitd/splitio/sdk/conf"
 	"github.com/splitio/splitd/splitio/sdk/types"
 
@@ -39,7 +41,7 @@ func NewImpressionSyncTask(
 	return asynctask.NewAsyncTask(
 		"impressions-sender",
 		func(logging.LoggerInterface) error { helper.synchronize(cfg.PostConcurrency); return nil },
-		int(cfg.CountSyncPeriod.Seconds()),
+		int(cfg.SyncPeriod.Seconds()),
 		nil,
 		func(logging.LoggerInterface) { helper.synchronize(cfg.PostConcurrency) },
 		logger,
@@ -49,14 +51,18 @@ func NewImpressionSyncTask(
 
 func (i *impressionSyncTaskHelper) synchronize(parallelism int) []error {
 
-	var errors []error
+	var errs []error
 	if err := i.iq.RangeAndClear(func(md types.ClientMetadata, q *sss.LockingQueue[dtos.Impression]) {
 		extracted := make([]dtos.Impression, 0, q.Len())
-		_, err := q.Pop(q.Len(), &extracted) // TODO(mredolatti) check n
-		if err != nil {
+		n, err := q.Pop(q.Len(), &extracted)
+		if err != nil && !errors.Is(err, sss.ErrQueueEmpty) {
 			i.logger.Error("error fetching items from queue: ", err)
 			return // continue with next one
 		}
+
+        if n == 0 {
+            return // nothing to do here
+        }
 
 		tmp := make(map[string]*dtos.ImpressionsDTO)
 		for idx := range extracted {
@@ -83,11 +89,11 @@ func (i *impressionSyncTaskHelper) synchronize(parallelism int) []error {
 		}
 
 		if err := i.llrec.Record(payload, dtos.Metadata{SDKVersion: md.SdkVersion}, nil); err != nil {
-			errors = append(errors, err)
+			errs = append(errs, err)
 		}
 	}); err != nil {
 		i.logger.Error("error traversing impression queues: ", err)
 	}
 
-	return errors
+	return errs
 }

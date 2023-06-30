@@ -15,14 +15,12 @@ import (
 	"github.com/splitio/splitd/splitio/sdk/types"
 )
 
-
-
 type ClientManager struct {
-	cc         transfer.RawConn
-	serializer serializer.Interface
-	logger     logging.LoggerInterface
-	metadata   *types.ClientMetadata
-    splitSDK   sdk.Interface
+	cc           transfer.RawConn
+	serializer   serializer.Interface
+	logger       logging.LoggerInterface
+	clientConfig *types.ClientConfig
+	splitSDK     sdk.Interface
 }
 
 func NewClientManager(
@@ -57,13 +55,13 @@ func (m *ClientManager) handleClientInteractions() error {
 		rpc, err := m.fetchRPC()
 		if err != nil {
 			if errors.Is(err, io.EOF) { // connection ended, no error
-				m.logger.Debug(fmt.Sprintf("connection remotely closed for metadata=%+v", m.metadata))
+				m.logger.Debug(fmt.Sprintf("connection remotely closed for metadata=%+v", m.clientConfig))
 				return nil
 			} else if errors.Is(err, os.ErrDeadlineExceeded) { // we waited for an RPC, got none, try again.
-				m.logger.Debug(fmt.Sprintf("read timeout/no RPC fetched. restarting loop for metadata=%+v", m.metadata))
+				m.logger.Debug(fmt.Sprintf("read timeout/no RPC fetched. restarting loop for metadata=%+v", m.clientConfig))
 				continue
 			} else {
-				m.logger.Error(fmt.Sprintf("unexpected error reading RPC: %s. Closing conn for metadata=%+v", err, m.metadata))
+				m.logger.Error(fmt.Sprintf("unexpected error reading RPC: %s. Closing conn for metadata=%+v", err, m.clientConfig))
 				return err
 			}
 		}
@@ -113,7 +111,7 @@ func (m *ClientManager) sendResponse(response interface{}) error {
 
 func (m *ClientManager) handleRPC(rpc *protov1.RPC) (interface{}, error) {
 
-	if m.metadata == nil && rpc.OpCode != protov1.OCRegister {
+	if m.clientConfig == nil && rpc.OpCode != protov1.OCRegister {
 		return nil, fmt.Errorf("first call must be 'register'`")
 	}
 
@@ -141,16 +139,18 @@ func (m *ClientManager) handleRPC(rpc *protov1.RPC) (interface{}, error) {
 }
 
 func (m *ClientManager) handleRegistration(args *protov1.RegisterArgs) (interface{}, error) {
-	m.metadata = &types.ClientMetadata{
-		ID:                   args.ID,
-		SdkVersion:           args.SDKVersion,
+	m.clientConfig = &types.ClientConfig{
+		Metadata: types.ClientMetadata{
+			ID:         args.ID,
+			SdkVersion: args.SDKVersion,
+		},
 		ReturnImpressionData: (args.Flags & protov1.RegisterFlagReturnImpressionData) != 0,
 	}
 	return &protov1.ResponseWrapper[protov1.RegisterPayload]{Status: protov1.ResultOk}, nil
 }
 
 func (m *ClientManager) handleGetTreatment(args *protov1.TreatmentArgs) (interface{}, error) {
-	res, err := m.splitSDK.Treatment(m.metadata, args.Key, args.BucketingKey, args.Feature, args.Attributes)
+	res, err := m.splitSDK.Treatment(m.clientConfig, args.Key, args.BucketingKey, args.Feature, args.Attributes)
 	if err != nil {
 		return &protov1.ResponseWrapper[protov1.TreatmentPayload]{Status: protov1.ResultInternalError}, err
 	}
@@ -160,7 +160,7 @@ func (m *ClientManager) handleGetTreatment(args *protov1.TreatmentArgs) (interfa
 		Payload: protov1.TreatmentPayload{Treatment: res.Treatment},
 	}
 
-	if m.metadata.ReturnImpressionData && res.Impression != nil {
+	if m.clientConfig.ReturnImpressionData && res.Impression != nil {
 		response.Payload.ListenerData = &protov1.ListenerExtraData{
 			Label:        res.Impression.Label,
 			Timestamp:    res.Impression.Time,
@@ -172,7 +172,7 @@ func (m *ClientManager) handleGetTreatment(args *protov1.TreatmentArgs) (interfa
 }
 
 func (m *ClientManager) handleGetTreatments(args *protov1.TreatmentsArgs) (interface{}, error) {
-	res, err := m.splitSDK.Treatments(m.metadata, args.Key, args.BucketingKey, args.Features, args.Attributes)
+	res, err := m.splitSDK.Treatments(m.clientConfig, args.Key, args.BucketingKey, args.Features, args.Attributes)
 	if err != nil {
 		return &protov1.ResponseWrapper[protov1.TreatmentPayload]{Status: protov1.ResultInternalError}, err
 	}

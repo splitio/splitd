@@ -64,7 +64,6 @@ func (c *Config) ToAdvancedConfig() *conf.AdvancedConfig {
 	d.EventsURL = c.URLs.Events
 	d.StreamingServiceURL = c.URLs.Streaming
 	d.TelemetryServiceURL = c.URLs.Telemetry
-	// TODO(update with custom opts)
 	return &d
 }
 
