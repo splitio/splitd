@@ -7,3 +7,6 @@ splitcli
 shared
 testcfg
 TODO
+
+splitd.linux.*
+splitd.darwin.*
