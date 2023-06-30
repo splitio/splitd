@@ -3,7 +3,6 @@
 # This script will generate a splitd.yaml file based on environment variables output.
 
 set -e
-set -o xtrace
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
 TPL_FILE="${TPL_FILE:-${SCRIPT_DIR}/splitd.yaml.tpl}"
@@ -32,6 +31,8 @@ accum=$(yq '.sdk.apikey = env(SPLITD_APIKEY) | .link.address = env(SPLITD_LINK_A
 [ ! -z ${SPLITD_LINK_READ_TIMEOUT_MS+x} ]   && accum=$(echo "${accum}" | yq '.link.readTimeoutMS = env(SPLITD_LINK_READ_TIMEOUT_MS)')
 [ ! -z ${SPLITD_LINK_WRITE_TIMEOUT_MS+x} ]  && accum=$(echo "${accum}" | yq '.link.writeTimeoutMS = env(SPLITD_LINK_WRITE_TIMEOUT_MS)')
 [ ! -z ${SPLITD_LINK_ACCEPT_TIMEOUT_MS+x} ] && accum=$(echo "${accum}" | yq '.link.acceptTimeoutMS = env(SPLITD_LINK_ACCEPT_TIMEOUT_MS)')
+# logger configs
+[ ! -z ${SPLITD_LOG_LEVEL+x} ] 		        && accum=$(echo "${accum}" | yq '.logging.level = env(SPLITD_LOG_LEVEL)')
 # @}
 # Output final config and start daemon
 echo "${accum}" > ${SPLITD_CFG_OUTPUT}

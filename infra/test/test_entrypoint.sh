@@ -35,6 +35,7 @@ function testAllVars {
     export SPLITD_LINK_READ_TIMEOUT_MS=2
     export SPLITD_LINK_WRITE_TIMEOUT_MS=3
     export SPLITD_LINK_ACCEPT_TIMEOUT_MS=4
+    export SPLITD_LOG_LEVEL="WARNING"
   
     # Exec entrypoint
     [ -f "./testcfg" ] && rm ./testcfg
@@ -59,6 +60,7 @@ function testAllVars {
     assert_eq "2" $(echo "$conf_json" | jq '.Link.ReadTimeoutMS') "invalid read timeout"
     assert_eq "3" $(echo "$conf_json" | jq '.Link.WriteTimeoutMS') "invalid write timeout"
     assert_eq "4" $(echo "$conf_json" | jq '.Link.AcceptTimeoutMS') "invalid accept timeout"
+    assert_eq "\"WARNING\"" $(echo "$conf_json" | jq '.Logger.Level') "invalid log level"
 }
 
 
