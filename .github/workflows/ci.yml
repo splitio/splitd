@@ -53,8 +53,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Build ginaries
+      - name: Build binaries for host machine
         run: make splitd splitcli
+
+      - name: Cross build for GNU Linux & Darwin x amd64 & arm64
+        run: make binaries_release
 
       - name: Run tests
         run: make test
