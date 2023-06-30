@@ -1,6 +1,7 @@
 package conf
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -15,13 +16,22 @@ import (
 
 const defaultConfigFN = "/etc/splitd.yaml"
 
-type config struct {
+type Config struct {
 	Logger Logger `yaml:"logging"`
 	SDK    SDK    `yaml:"sdk"`
 	Link   Link   `yaml:"link"`
 }
 
-func (c *config) parse(fn string) error {
+func (c Config) String() string {
+    if len(c.SDK.Apikey) > 4 {
+        c.SDK.Apikey = c.SDK.Apikey[:4] + "xxxxxxx"
+    }
+
+    output, _ := json.Marshal(c)
+    return string(output)
+}
+
+func (c *Config) parse(fn string) error {
 
 	raw, err := ioutil.ReadFile(fn)
 	if err != nil {
@@ -140,12 +150,12 @@ func (l *Logger) ToLoggerOptions() *logging.LoggerOptions {
 	return opts
 }
 
-func ReadConfig() (*config, error) {
+func ReadConfig() (*Config, error) {
 	cfgFN := defaultConfigFN
 	if fromEnv := os.Getenv("SPLITD_CONF_FILE"); fromEnv != "" {
 		cfgFN = fromEnv
 	}
 
-	var c config
+	var c Config
 	return &c, c.parse(cfgFN)
 }
