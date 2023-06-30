@@ -19,3 +19,6 @@
 /splitd.yaml
 testcfg
 shared
+
+splitd.darwin.*
+splitd.linux.*
