@@ -30,7 +30,7 @@ type Impl struct {
 
 func (s *Impl) HandleNewClient(cc transfer.RawConn) {
 	cm := s.newClientManager(cc)
-	go cm.Manage()
+	cm.Manage()
 	// TODO(mredolatti): Track active connections
 }
 

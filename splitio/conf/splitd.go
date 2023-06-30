@@ -1,6 +1,7 @@
 package conf
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -15,13 +16,22 @@ import (
 
 const defaultConfigFN = "/etc/splitd.yaml"
 
-type config struct {
+type Config struct {
 	Logger Logger `yaml:"logging"`
 	SDK    SDK    `yaml:"sdk"`
 	Link   Link   `yaml:"link"`
 }
 
-func (c *config) parse(fn string) error {
+func (c Config) String() string {
+    if len(c.SDK.Apikey) > 4 {
+        c.SDK.Apikey = c.SDK.Apikey[:4] + "xxxxxxx"
+    }
+
+    output, _ := json.Marshal(c)
+    return string(output)
+}
+
+func (c *Config) parse(fn string) error {
 
 	raw, err := ioutil.ReadFile(fn)
 	if err != nil {
@@ -41,26 +51,34 @@ type Link struct {
 	Address              *string `yaml:"address"`
 	Serialization        *string `yaml:"serialization"`
 	MaxSimultaneousConns *int    `yaml:"maxSimultaneousConns"`
+	ReadTimeoutMS        *int    `yaml:"readTimeoutMS"`
+	WriteTimeoutMS       *int    `yaml:"writeTimeoutMS"`
+	AcceptTimeoutMS      *int    `yaml:"acceptTimeoutMS"`
 }
 
 func (l *Link) ToLinkOpts() []link.Option {
 	var opts []link.Option
-
 	if l.Type != nil {
 		opts = append(opts, link.WithSockType(*l.Type))
 	}
-
 	if l.Address != nil {
 		opts = append(opts, link.WithAddress(*l.Address))
 	}
-
 	if l.Serialization != nil {
 		opts = append(opts, link.WithSerialization(*l.Serialization))
 	}
-
-    if l.MaxSimultaneousConns != nil {
-        opts = append(opts, link.WithMaxSimultaneousConns(*l.MaxSimultaneousConns))
-    }
+	if l.MaxSimultaneousConns != nil {
+		opts = append(opts, link.WithMaxSimultaneousConns(*l.MaxSimultaneousConns))
+	}
+	if l.AcceptTimeoutMS != nil {
+		opts = append(opts, link.WithAcceptTimeoutMs(*l.AcceptTimeoutMS))
+	}
+	if l.ReadTimeoutMS != nil {
+		opts = append(opts, link.WithReadTimeoutMs(*l.ReadTimeoutMS))
+	}
+	if l.WriteTimeoutMS != nil {
+		opts = append(opts, link.WithWriteTimeoutMs(*l.WriteTimeoutMS))
+	}
 
 	return opts
 }
@@ -132,12 +150,12 @@ func (l *Logger) ToLoggerOptions() *logging.LoggerOptions {
 	return opts
 }
 
-func ReadConfig() (*config, error) {
+func ReadConfig() (*Config, error) {
 	cfgFN := defaultConfigFN
 	if fromEnv := os.Getenv("SPLITD_CONF_FILE"); fromEnv != "" {
 		cfgFN = fromEnv
 	}
 
-	var c config
+	var c Config
 	return &c, c.parse(cfgFN)
 }

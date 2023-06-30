@@ -58,6 +58,8 @@ func (q *LockingQueue[T]) Pop(n int, buf *[]T) (int, error) {
 }
 
 func (q *LockingQueue[T]) Len() int {
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
 	return (q.head - q.tail) & q.mask
 }
 

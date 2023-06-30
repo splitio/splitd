@@ -25,19 +25,23 @@ func (l *LengthPrefixImpl) WriteFrame(writer io.Writer, raw []byte) (int, error)
 	size := len(raw)
 	framedSize := size + 4
 	framed := make([]byte, 0, framedSize)
-	framed = binary.LittleEndian.AppendUint32(framed, uint32(size))
+	framed = encodeSize(size, framed)
 	framed = append(framed, raw...)
 
-	n, err := writer.Write(framed)
-	if err != nil {
-		return n, fmt.Errorf("error writing message")
+	sent := 0
+	for sent < framedSize {
+        n, err := writer.Write(framed[sent:])
+		if err != nil {
+            return n, fmt.Errorf("error writing message: %w", err)
+		}
+		sent += n
 	}
 
-	if n != framedSize {
-		return n, ErrSenSentSizeMismatch
+	if framedSize < 0 {
+		return sent, ErrSenSentSizeMismatch
 	}
 
-	return n-4, nil
+	return sent - 4, nil
 
 }
 
@@ -53,17 +57,29 @@ func (l *LengthPrefixImpl) ReadFrame(reader io.Reader, readBuf []byte) (int, err
 		return 0, ErrInsufficientHeaderData
 	}
 
-	size := binary.LittleEndian.Uint32(sizeb[:])
-
+    size := decodeSize(sizeb[:])
 	lr.N = int64(size)
-	n, err = lr.Read(readBuf[:])
-	if err != nil {
-		return n, fmt.Errorf("error reading message: %w", err)
+	read := 0
+	for read < int(size) {
+		n, err = lr.Read(readBuf[read:])
+		if err != nil {
+			return n, fmt.Errorf("error reading message: %w", err)
+		}
+        read += n
 	}
 
-	if n != int(size) {
-		return n, ErrReceivedSizeMismatch
+	if read != int(size) {
+		return read, ErrReceivedSizeMismatch
 	}
 
-	return n, nil
+	return read, nil
 }
+
+func encodeSize(size int, target []byte) []byte {
+	target = binary.LittleEndian.AppendUint32(target, uint32(size))
+    return target
+}
+func decodeSize(size []byte) uint32 {
+	return binary.LittleEndian.Uint32(size[:])
+}
+
