@@ -1,0 +1,12 @@
+.git
+.github
+.gitignore
+.netrc
+splitd
+splitcli
+shared
+testcfg
+TODO
+
+splitd.linux.*
+splitd.darwin.*
