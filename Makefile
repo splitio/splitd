@@ -54,7 +54,7 @@ images_release: # entrypoints
 	@echo "$(DOCKER) push splitsoftware/splitd-sidecar:$(VERSION)"
 
 ## build release for binaires
-binaries_release: splitd.linux.amd64.$(VERSION).bin splitd.darwin.amd64.$(VERSION).bin splitd.linux.arm.$(VERSION).bin splitd.darwin.arm.$(VERSION).bin
+binaries_release: splitd-linux-amd64-$(VERSION).bin splitd-darwin-amd64-$(VERSION).bin splitd-linux-arm-$(VERSION).bin splitd-darwin-arm-$(VERSION).bin
 
 
 splitd-linux-amd64-$(VERSION).bin: $(GO_FILES)
