@@ -6,8 +6,6 @@ on:
   push:
     branches:
       - main
-    tags:
-      - "v*.*.*"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'push' && github.run_number || github.event.pull_request.number }}
@@ -37,14 +35,6 @@ jobs:
         with:
           script: core.setFailed('[ERROR] Tag already exists.')
 
-      - name: Git tag
-        if: ${{ github.event_name == 'push' }}
-        uses: mathieudutour/github-tag-action@v6.1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          custom_tag: ${{ env.VERSION }}
-          tag_prefix: 'v'
-
       - name: Setup Go version
         uses: actions/setup-go@v4
         with:
@@ -64,10 +54,19 @@ jobs:
       - name: Run tests
         run: make test
 
+      - name: Git tag
+        if: ${{ github.event_name == 'push' }}
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_tag: ${{ env.VERSION }}
+          tag_prefix: 'v'
+
       - name: Release
         uses: softprops/action-gh-release@v1
-        if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}
+        if: ${{ github.event_name == 'push' }}
         with:
+          name: splitd-${{ env.VERSION }}
           files:
             - splitd-darwin-amd64-${{ env.VERSION }}.bin
             - splitd-darwin-arm-${{ env.VERSION }}.bin
