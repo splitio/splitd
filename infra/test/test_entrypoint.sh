@@ -36,10 +36,10 @@ function testAllVars {
     export SPLITD_LINK_WRITE_TIMEOUT_MS=3
     export SPLITD_LINK_ACCEPT_TIMEOUT_MS=4
     export SPLITD_LOG_LEVEL="WARNING"
-  
+
     # Exec entrypoint
     [ -f "./testcfg" ] && rm ./testcfg
-    export SPLITD_CFG_OUTPUT="./testcfg" 
+    export SPLITD_CFG_OUTPUT="./testcfg"
     export SPLITD_EXEC="${SCRIPT_DIR}/../../splitd"
     export TPL_FILE="${SCRIPT_DIR}/../../splitd.yaml.tpl"
     conf_json=$(bash "${SCRIPT_DIR}/../entrypoint.sh" -outputConfig | awk '/^Config:/ {print $2}')

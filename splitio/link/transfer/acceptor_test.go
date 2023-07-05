@@ -24,7 +24,7 @@ func TestAcceptor(t *testing.T) {
     // Second client's server-end of the socket will be closed after the timeout
     // The write not error out (though nothing is written), but will notice that the socket hasbeen remotely closed and update it's state
     // The following read will report an EOF
-    
+
 
 	logger := logging.NewLogger(nil)
 	dir, err := os.MkdirTemp(os.TempDir(), "acceptortest")
