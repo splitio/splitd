@@ -2,10 +2,12 @@ name: ci
 on:
   pull_request:
     branches:
-      - dev
+      - main
   push:
     branches:
-      - dev
+      - main
+    tags:
+      - "v*.*.*"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'push' && github.run_number || github.event.pull_request.number }}
@@ -61,6 +63,16 @@ jobs:
 
       - name: Run tests
         run: make test
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') }}
+        with:
+          files:
+            - splitd-darwin-amd64-1.0.0.bin
+            - splitd-darwin-arm-1.0.0.bin
+            - splitd-linux-amd64-1.0.0.bin
+            - splitd-linux-arm-1.0.0.bin
 
           #      - name: SonarQube Scan (Push)
           #        if: matrix.version == '8.2' && github.event_name == 'push'

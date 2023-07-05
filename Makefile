@@ -19,10 +19,10 @@ go.sum: go.mod
 clean:
 	rm -Rf splitcli \
 		splitd \
-		splitd.linux.amd64.$(VERSION).bin \
-		splitd.darwin.amd64.$(VERSION).bin \
-		splitd.linux.arm.$(VERSION).bin \
-		splitd.darwin.arm.$(VERSION).bin
+		splitd-linux-amd64-$(VERSION).bin \
+		splitd-darwin-amd64-$(VERSION).bin \
+		splitd-linux-arm-$(VERSION).bin \
+		splitd-darwin-arm-$(VERSION).bin
 
 ## build binaries for this platform
 build: splitd splitcli
@@ -57,16 +57,16 @@ images_release: # entrypoints
 binaries_release: splitd.linux.amd64.$(VERSION).bin splitd.darwin.amd64.$(VERSION).bin splitd.linux.arm.$(VERSION).bin splitd.darwin.arm.$(VERSION).bin
 
 
-splitd.linux.amd64.$(VERSION).bin: $(GO_FILES)
+splitd-linux-amd64-$(VERSION).bin: $(GO_FILES)
 	GOARCH=amd64 GOOS=linux $(GO) build -o $@ cmd/splitd/main.go
 
-splitd.darwin.amd64.$(VERSION).bin: $(GO_FILES)
+splitd-darwin-amd64-$(VERSION).bin: $(GO_FILES)
 	GOARCH=amd64 GOOS=darwin $(GO) build -o $@ cmd/splitd/main.go
 
-splitd.linux.arm.$(VERSION).bin: $(GO_FILES)
+splitd-linux-arm-$(VERSION).bin: $(GO_FILES)
 	GOARCH=arm64 GOOS=linux $(GO) build -o $@ cmd/splitd/main.go
 
-splitd.darwin.arm.$(VERSION).bin: $(GO_FILES)
+splitd-darwin-arm-$(VERSION).bin: $(GO_FILES)
 	GOARCH=arm64 GOOS=darwin $(GO) build -o $@ cmd/splitd/main.go
 
 binaries_release: splitd
