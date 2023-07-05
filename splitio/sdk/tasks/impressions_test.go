@@ -1,6 +1,8 @@
 package tasks
 
 import (
+	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -22,7 +24,7 @@ func TestImpressionsTask(t *testing.T) {
 
 	task := NewImpressionSyncTask(rec, is, logger, ts, &conf.Impressions{SyncPeriod: 1 * time.Second})
 
-    var emptyMap map[string]string
+	var emptyMap map[string]string
 	rec.On("Record", []dtos.ImpressionsDTO{{
 		TestName:       "f1",
 		KeyImpressions: []dtos.ImpressionDTO{{KeyName: "k1", Treatment: "on", Time: 123456, ChangeNumber: 123, Label: "l1"}},
@@ -37,7 +39,24 @@ func TestImpressionsTask(t *testing.T) {
 		Return(nil).
 		Once()
 
-	rec.On("Record", []dtos.ImpressionsDTO{
+	rec.On("Record",
+		mock.MatchedBy(func(imps []dtos.ImpressionsDTO) bool {
+			sort.Slice(imps, func(i, j int) bool { return imps[i].TestName < imps[j].TestName })
+			return reflect.DeepEqual(imps, []dtos.ImpressionsDTO{
+				{
+					TestName:       "f3",
+					KeyImpressions: []dtos.ImpressionDTO{{KeyName: "k3", Treatment: "on", Time: 123458, ChangeNumber: 789, Label: "l3"}},
+				},
+				{
+					TestName:       "f4",
+					KeyImpressions: []dtos.ImpressionDTO{{KeyName: "k3", Treatment: "on", Time: 123459, ChangeNumber: 890, Label: "l4"}},
+				},
+			})
+		}),
+		dtos.Metadata{SDKVersion: "python-1.2.3", MachineIP: "", MachineName: ""},
+		emptyMap).Return(nil).Once()
+
+	/*[]dtos.ImpressionsDTO{
 		{
 			TestName:       "f3",
 			KeyImpressions: []dtos.ImpressionDTO{{KeyName: "k3", Treatment: "on", Time: 123458, ChangeNumber: 789, Label: "l3"}},
@@ -49,7 +68,7 @@ func TestImpressionsTask(t *testing.T) {
 	}, dtos.Metadata{SDKVersion: "python-1.2.3", MachineIP: "", MachineName: ""}, emptyMap).
 		Return(nil).
 		Once()
-
+	*/
 	is.Push(types.ClientMetadata{ID: "i1", SdkVersion: "php-1.2.3"},
 		dtos.Impression{KeyName: "k1", FeatureName: "f1", Treatment: "on", Label: "l1", ChangeNumber: 123, Time: 123456})
 	is.Push(types.ClientMetadata{ID: "i2", SdkVersion: "go-1.2.3"},
@@ -66,7 +85,7 @@ func TestImpressionsTask(t *testing.T) {
 	time.Sleep(1500 * time.Millisecond)
 	task.Stop(true)
 
-    rec.AssertExpectations(t)
+	rec.AssertExpectations(t)
 }
 
 type RecorderMock struct {
