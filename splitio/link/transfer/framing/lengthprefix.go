@@ -82,4 +82,3 @@ func encodeSize(size int, target []byte) []byte {
 func decodeSize(size []byte) uint32 {
 	return binary.LittleEndian.Uint32(size[:])
 }
-
