@@ -1,4 +1,5 @@
 name: ci
+
 on:
   pull_request:
     branches:
@@ -16,6 +17,10 @@ jobs:
     name: Run unit tests
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Set VERSION env
         run: echo "VERSION=$(cat splitio/version.go | grep 'Version =' | awk '{print $3}' | tr -d '"')" >> $GITHUB_ENV
@@ -40,19 +45,14 @@ jobs:
         with:
           go-version: '^1.19.1'
 
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
       - name: Build binaries for host machine
         run: make splitd splitcli
 
-      - name: Cross build for GNU Linux & Darwin x amd64 & arm64
-        run: make binaries_release
-
       - name: Run tests
         run: make test
+
+      - name: Cross build for GNU Linux & Darwin x amd64 & arm64
+        run: make binaries_release
 
       - name: SonarQube Scan
         uses: SonarSource/sonarcloud-github-action@v1.9.1

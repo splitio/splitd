@@ -35,7 +35,7 @@ func TestLengthPrefixRead(t *testing.T) {
         Run(func(args mock.Arguments) { copy(args.Get(0).([]byte), []byte(" SEND")) }).
         Return(len(" SEND"), (error)(nil)).Once()
 
-    
+
     var lp LengthPrefixImpl
     var buffer [2048]byte
     n, err := lp.ReadFrame(sock, buffer[:])
@@ -60,7 +60,7 @@ func TestLengthPrefixWrite(t *testing.T) {
     sock.
         On("Write", []byte("TO SEND")).
         Return(7, (error)(nil)).Once()
-    
+
     var lp LengthPrefixImpl
     n, err := lp.WriteFrame(sock, []byte("SOMETHING TO SEND"))
     assert.Nil(t, err)

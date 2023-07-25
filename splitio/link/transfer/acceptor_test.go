@@ -55,9 +55,9 @@ func TestAcceptor(t *testing.T) {
 
 	time.Sleep(1 * time.Second) // to ensure server is started
 
-    clientOpts := DefaultOpts()
-    clientOpts.Address = serverSockFN
-    clientOpts.ConnType = ConnTypeUnixStream
+	clientOpts := DefaultOpts()
+	clientOpts.Address = serverSockFN
+	clientOpts.ConnType = ConnTypeUnixStream
 
 	client1, err := NewClientConn(&clientOpts)
 	assert.Nil(t, err)
