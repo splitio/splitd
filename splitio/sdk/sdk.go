@@ -40,13 +40,9 @@ type Impl struct {
 	status chan int
 }
 
-func New(logger logging.LoggerInterface, apikey string, opts ...conf.Option) (*Impl, error) {
+func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, error) {
 
 	md := dtos.Metadata{SDKVersion: fmt.Sprintf("splitd-%s", splitio.Version)}
-	c := sdkConf.DefaultConfig()
-	if err := c.ParseOptions(opts); err != nil {
-		return nil, fmt.Errorf("error parsing SDK config: %w", err)
-	}
 	advCfg := c.ToAdvancedConfig()
 
 	stores := setupStorages(c)

@@ -39,6 +39,8 @@ func TestImpressionsTask(t *testing.T) {
 		Return(nil).
 		Once()
 
+    // ImpressionsDTO are built from the contents of a map so the ordering is undefined.
+    // to solve this, we sort the input by feature name (& provided an already sorted expected value)
 	rec.On("Record",
 		mock.MatchedBy(func(imps []dtos.ImpressionsDTO) bool {
 			sort.Slice(imps, func(i, j int) bool { return imps[i].TestName < imps[j].TestName })
@@ -56,19 +58,6 @@ func TestImpressionsTask(t *testing.T) {
 		dtos.Metadata{SDKVersion: "python-1.2.3", MachineIP: "", MachineName: ""},
 		emptyMap).Return(nil).Once()
 
-	/*[]dtos.ImpressionsDTO{
-		{
-			TestName:       "f3",
-			KeyImpressions: []dtos.ImpressionDTO{{KeyName: "k3", Treatment: "on", Time: 123458, ChangeNumber: 789, Label: "l3"}},
-		},
-		{
-			TestName:       "f4",
-			KeyImpressions: []dtos.ImpressionDTO{{KeyName: "k3", Treatment: "on", Time: 123459, ChangeNumber: 890, Label: "l4"}},
-		},
-	}, dtos.Metadata{SDKVersion: "python-1.2.3", MachineIP: "", MachineName: ""}, emptyMap).
-		Return(nil).
-		Once()
-	*/
 	is.Push(types.ClientMetadata{ID: "i1", SdkVersion: "php-1.2.3"},
 		dtos.Impression{KeyName: "k1", FeatureName: "f1", Treatment: "on", Label: "l1", ChangeNumber: 123, Time: 123456})
 	is.Push(types.ClientMetadata{ID: "i2", SdkVersion: "go-1.2.3"},

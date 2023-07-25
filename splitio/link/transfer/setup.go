@@ -21,10 +21,7 @@ var (
 	ErrInvalidConnType = errors.New("invalid listener type")
 )
 
-func NewAcceptor(opts ...Option) (*Acceptor, error) {
-
-	o := defaultOpts()
-    o.Parse(opts)
+func NewAcceptor(logger logging.LoggerInterface, o *Options, listenerConfig *AcceptorConfig) (*Acceptor, error) {
 
 	var address net.Addr
 	var framer framing.Interface
@@ -38,13 +35,11 @@ func NewAcceptor(opts ...Option) (*Acceptor, error) {
 		return nil, ErrInvalidConnType
 	}
 
-	connFactory := func(c net.Conn) RawConn { return newConnWrapper(c, framer, &o) }
-	return newAcceptor(address, connFactory, &o), nil
+	connFactory := func(c net.Conn) RawConn { return newConnWrapper(c, framer, o) }
+	return newAcceptor(address, connFactory, logger, listenerConfig), nil
 }
 
-func NewClientConn(opts ...Option) (RawConn, error) {
-	o := defaultOpts()
-    o.Parse(opts)
+func NewClientConn(o *Options) (RawConn, error) {
 
 	var address net.Addr
 	var framer framing.Interface
@@ -63,11 +58,12 @@ func NewClientConn(opts ...Option) (RawConn, error) {
 		return nil, fmt.Errorf("error creating connection: %w", err)
 	}
 
-	return newConnWrapper(c, framer, &o), nil
+	return newConnWrapper(c, framer, o), nil
 }
 
 type Option func(*Options)
 
+/*
 func WithAddress(address string) Option                { return func(o *Options) { o.Address = address } }
 func WithType(t ConnType) Option                       { return func(o *Options) { o.ConnType = t } }
 func WithLogger(logger logging.LoggerInterface) Option { return func(o *Options) { o.Logger = logger } }
@@ -76,33 +72,30 @@ func WithMaxConns(m int) Option                        { return func(o *Options)
 func WithReadTimeout(d time.Duration) Option           { return func(o *Options) { o.ReadTimeout = d } }
 func WithWriteTimeout(d time.Duration) Option          { return func(o *Options) { o.WriteTimeout = d } }
 func WithAcceptTimeout(d time.Duration) Option         { return func(o *Options) { o.AcceptTimeout = d } }
+*/
 
 type Options struct {
 	ConnType                   ConnType
 	Address                    string
 	Logger                     logging.LoggerInterface
 	BufferSize                 int
-	MaxSimultaneousConnections int
 	ReadTimeout                time.Duration
 	WriteTimeout               time.Duration
-	AcceptTimeout              time.Duration
 }
-
+/*
 func (o *Options) Parse(opts []Option) {
 	for _, configure := range opts {
 		configure(o)
 	}
 }
-
-func defaultOpts() Options {
+*/
+func DefaultOpts() Options {
 	return Options{
 		ConnType:                   ConnTypeUnixSeqPacket,
 		Address:                    "/var/run/splitd.sock",
 		Logger:                     logging.NewLogger(nil),
 		BufferSize:                 1024,
-		MaxSimultaneousConnections: 32,
 		ReadTimeout:                1 * time.Second,
 		WriteTimeout:               1 * time.Second,
-		AcceptTimeout:              1 * time.Second,
 	}
 }

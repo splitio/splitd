@@ -26,10 +26,13 @@ func main() {
 
 	logger := logging.NewLogger(cfg.Logger.ToLoggerOptions())
 
-	splitSDK, err := sdk.New(logger, cfg.SDK.Apikey, cfg.SDK.ToSDKConf()...)
+	splitSDK, err := sdk.New(logger, cfg.SDK.Apikey, cfg.SDK.ToSDKConf())
     exitOnErr("sdk initialization", err)
 
-	errc, lShutdown, err := link.Listen(logger, splitSDK, cfg.Link.ToLinkOpts()...)
+    linkCFG, err := cfg.Link.ToListenerOpts()
+    exitOnErr("link config", err)
+
+	errc, lShutdown, err := link.Listen(logger, splitSDK, linkCFG)
     exitOnErr("rpc listener setup", err)
 
 	shutdown := util.NewShutdownHandler()

@@ -68,7 +68,6 @@ func (m *ClientManager) handleClientInteractions() error {
 
 		response, err := m.handleRPC(rpc)
 		if err != nil {
-			// TODO(mredolatti): see if this is recoverable
 			return fmt.Errorf("error handling RPC: %w", err)
 		}
 
@@ -96,13 +95,11 @@ func (m *ClientManager) sendResponse(response interface{}) error {
 	serialized, err := m.serializer.Serialize(response)
 
 	if err != nil {
-		// TODO(mredolatti): see if this is recoverable
 		return fmt.Errorf("error serializing response: %w", err)
 	}
 
 	err = m.cc.SendMessage(serialized)
 	if err != nil {
-		// TODO(mredolatti): see if this is recoverable
 		return fmt.Errorf("error sending response back to the client: %w", err)
 	}
 

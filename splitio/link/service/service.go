@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/splitio/go-toolkit/v5/logging"
-	"github.com/splitio/splitd/splitio/link/common"
 	"github.com/splitio/splitd/splitio/link/protocol"
 	"github.com/splitio/splitd/splitio/link/serializer"
 	"github.com/splitio/splitd/splitio/link/transfer"
@@ -34,13 +33,11 @@ func (s *Impl) HandleNewClient(cc transfer.RawConn) {
 	// TODO(mredolatti): Track active connections
 }
 
-func New(logger logging.LoggerInterface, splitSDK sdk.Interface, opts ...common.Option) (*Impl, error) {
-	o := common.DefaultOpts()
-	o.Parse(opts)
+func New(logger logging.LoggerInterface, splitSDK sdk.Interface, serial serializer.Interface, proto protocol.Version) (*Impl, error) {
 
-	switch o.ProtoV {
+	switch proto {
 	case protocol.V1:
-		cmf, err := newCMFactoryForV1(logger, splitSDK, o.Serial)
+		cmf, err := newCMFactoryForV1(logger, splitSDK, serial)
 		if err != nil {
 			return nil, fmt.Errorf("error setting up client-manager factory: %w", err)
 		}
@@ -50,7 +47,9 @@ func New(logger logging.LoggerInterface, splitSDK sdk.Interface, opts ...common.
 			newClientManager: cmf,
 		}, nil
 	}
-	return nil, fmt.Errorf("unknown protocol version: '%d'", o.ProtoV)
+
+	return nil, fmt.Errorf("unknown protocol version: '%d'", proto)
+
 }
 
 type ClientManager interface {
@@ -59,13 +58,9 @@ type ClientManager interface {
 
 type ClientManagerFactory func(transfer.RawConn) ClientManager
 
-func newCMFactoryForV1(logger logging.LoggerInterface, splitSDK sdk.Interface, serialization serializer.Mechanism) (ClientManagerFactory, error) {
-	ser, err := serializer.Setup(serialization)
-	if err != nil {
-		return nil, err
-	}
+func newCMFactoryForV1(logger logging.LoggerInterface, splitSDK sdk.Interface, serial serializer.Interface) (ClientManagerFactory, error) {
 	return func(conn transfer.RawConn) ClientManager {
-		return serviceV1.NewClientManager(conn, logger, splitSDK, ser)
+		return serviceV1.NewClientManager(conn, logger, splitSDK, serial)
 	}, nil
 }
 

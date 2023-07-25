@@ -11,8 +11,9 @@ import (
 
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio/link"
-	"github.com/splitio/splitd/splitio/link/client"
+	"github.com/splitio/splitd/splitio/link/client/types"
 	"github.com/splitio/splitd/splitio/util"
+	cc "github.com/splitio/splitd/splitio/util/conf"
 )
 
 func main() {
@@ -23,9 +24,23 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger := logging.NewLogger(nil)
+	linkOpts, err := args.linkOpts()
+	if err != nil {
+		fmt.Println("error building options from arguments: ", err.Error())
+		os.Exit(1)
+	}
 
-	c, err := link.Consumer(logger, args.linkOpts()...)
+	logLevel := logging.Level(args.logLevel)
+	logger := logging.NewLogger(&logging.LoggerOptions{
+		LogLevel:      logLevel,
+		ErrorWriter:   os.Stderr,
+		WarningWriter: os.Stderr,
+		InfoWriter:    os.Stderr,
+		DebugWriter:   os.Stderr,
+		VerboseWriter: os.Stderr,
+	})
+
+	c, err := link.Consumer(logger, linkOpts)
 	if err != nil {
 		logger.Error("error creating client wrapper: ", err)
 		os.Exit(2)
@@ -42,7 +57,7 @@ func main() {
 
 	before := time.Now()
 	result, err := executeCall(c, args)
-	fmt.Printf("took: %d\n", time.Since(before).Microseconds())
+	logger.Debug(fmt.Sprintf("took: %d\n", time.Since(before).Microseconds()))
 	if err != nil {
 		logger.Error("error executing call: ", err.Error())
 		os.Exit(3)
@@ -51,10 +66,11 @@ func main() {
 	fmt.Println(result)
 }
 
-func executeCall(c client.Interface, a *cliArgs) (string, error) {
+func executeCall(c types.ClientInterface, a *cliArgs) (string, error) {
 	switch a.method {
 	case "treatment":
-		return c.Treatment(a.key, a.bucketingKey, a.feature, a.attributes)
+		res, err := c.Treatment(a.key, a.bucketingKey, a.feature, a.attributes)
+		return res.Treatment, err
 	case "treatments", "treatmentWithConfig", "treatmentsWithConfig", "track":
 		return "", fmt.Errorf("method '%s' is not yet implemented", a.method)
 	default:
@@ -63,9 +79,16 @@ func executeCall(c client.Interface, a *cliArgs) (string, error) {
 }
 
 type cliArgs struct {
-	connType     string
-	connAddr     string
-	bufSize      int
+	logLevel       string
+	protocol       string
+	serialization  string
+	connType       string
+	connAddr       string
+	bufSize        int
+	readTimeoutMS  int
+	writeTimeoutMS int
+
+	// command
 	method       string
 	key          string
 	bucketingKey string
@@ -77,21 +100,40 @@ type cliArgs struct {
 	attributes   map[string]interface{}
 }
 
-func (a *cliArgs) linkOpts() []link.Option {
-	var ret []link.Option
+func (a *cliArgs) linkOpts() (*link.ConsumerOptions, error) {
+
+	opts := link.DefaultConsumerOptions()
+
+	var err error
+	if a.protocol != "" {
+		if opts.Consumer.Protocol, err = cc.ParseProtocolVersion(a.protocol); err != nil {
+			return nil, fmt.Errorf("invalid protocol version %s", a.protocol)
+		}
+	}
+
 	if a.connType != "" {
-		ret = append(ret, link.WithSockType(a.connType))
+		if opts.Transfer.ConnType, err = cc.ParseConnType(a.connType); err != nil {
+			return nil, fmt.Errorf("invalid connection type %s", a.connType)
+		}
 	}
-	if a.connAddr != "" {
-		ret = append(ret, link.WithAddress(a.connAddr))
+
+	if a.serialization != "" {
+		if opts.Serialization, err = cc.ParseSerializer(a.serialization); err != nil {
+			return nil, fmt.Errorf("invalid serialization %s", a.serialization)
+		}
 	}
-	if a.bufSize != 0 {
-		ret = append(ret, link.WithBufSize(a.bufSize))
-	}
-	return ret
+
+	durationFromMS := func(i int) time.Duration { return time.Duration(i) * time.Millisecond }
+	cc.SetIfNotEmpty(&opts.Transfer.Address, &a.connAddr)
+	cc.SetIfNotEmpty(&opts.Transfer.BufferSize, &a.bufSize)
+	cc.MapIfNotEmpty(&opts.Transfer.ReadTimeout, &a.readTimeoutMS, durationFromMS)
+	cc.MapIfNotEmpty(&opts.Transfer.WriteTimeout, &a.writeTimeoutMS, durationFromMS)
+
+	return &opts, nil
 }
 
 func parseArgs() (*cliArgs, error) {
+	ll := flag.String("log-level", "INFO", "log level [ERROR,WARNING,INFO,DEBUG]")
 	ct := flag.String("conn-type", "", "unix-seqpacket|unix-stream")
 	ca := flag.String("conn-address", "", "path/ipv4-address")
 	bs := flag.Int("buffer-size", 0, "read buffer size in bytes")
@@ -121,6 +163,7 @@ func parseArgs() (*cliArgs, error) {
 	}
 
 	return &cliArgs{
+		logLevel:     *ll,
 		connType:     *ct,
 		connAddr:     *ca,
 		bufSize:      *bs,
