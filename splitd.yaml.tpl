@@ -14,6 +14,3 @@ link:
   type: "unix-seqpacket"
   address: "/var/run/splitd.sock"
   serialization: "msgpack"
-
-
-

@@ -35,7 +35,7 @@ test: unit-tests entrypoint-test
 
 ## run go unit tests
 unit-tests:
-	$(GO) test ./... -count=1 -race
+	$(GO) test ./... -count=1 -race -coverprofile=coverage.out
 
 ## run bash entrypoint tests
 entrypoint-test: splitd # requires splitd binary to generate a config and validate env var forwarding

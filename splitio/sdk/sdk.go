@@ -106,7 +106,7 @@ func (i *Impl) Treatments(cfg *types.ClientConfig, key string, bk *string, featu
 	res := i.ev.EvaluateFeatures(key, bk, features, attributes)
 	toRet := make(map[string]Result, len(res.Evaluations))
 	for _, feature := range features {
-        
+
         curr, ok := res.Evaluations[feature]
         if !ok {
             toRet[feature] = Result{Treatment: "control"}

@@ -22,3 +22,9 @@ shared
 
 splitd.darwin.*
 splitd.linux.*
+
+# Sonarqube files
+.scannerwork
+
+# DS Store
+.DS_Store

@@ -40,7 +40,7 @@ func TestLockingQueueBasic(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 3, n)
 	assert.Equal(t, 3, st.Len())
-	
+
 	n, err = st.Pop(3, &buf)
 	assert.Nil(t, err)
 	assert.Equal(t, 3, n )

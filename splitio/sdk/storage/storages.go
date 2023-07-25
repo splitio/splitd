@@ -24,4 +24,3 @@ func NewEventsQueue(approxSize int) (st *EventsStorage, realSize int) {
 		return NewLKQueue[dtos.EventDTO](bits)
 	}), int(math.Pow(2, float64(bits)))
 }
-

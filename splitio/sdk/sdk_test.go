@@ -171,7 +171,7 @@ func TestTreatments(t *testing.T) {
 	}
 
 	res, err := client.Treatments(
-        &types.ClientConfig{Metadata: types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}}, 
+        &types.ClientConfig{Metadata: types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}},
         "key1", nil, []string{"f1", "f2", "f3"}, Attributes{"a": 1})
 	assert.Nil(t, err)
 	assert.Nil(t, res["f1"].Config)
