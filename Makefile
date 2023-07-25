@@ -4,9 +4,12 @@
 GO ?=go
 DOCKER ?= docker
 SHELL = /usr/bin/env bash -o pipefail
-PLATFORM ?=
-VERSION	:= $(shell cat splitio/version.go | grep 'const Version' | sed 's/const Version = //' | tr -d '"')
 
+# setup platform specific docker image builds
+PLATFORM ?=
+PLATFORM_STR := $(if $(PLATFORM),--platform=$(PLATFORM),)
+
+VERSION	:= $(shell cat splitio/version.go | grep 'const Version' | sed 's/const Version = //' | tr -d '"')
 GO_FILES := $(shell find . -name "*.go") go.sum
 
 default: help
@@ -35,7 +38,7 @@ unit-tests:
 	$(GO) test ./... -count=1 -race
 
 ## run bash entrypoint tests
-entrypoint-test:
+entrypoint-test: splitd # requires splitd binary to generate a config and validate env var forwarding
 	bash infra/test/test_entrypoint.sh
 
 ## build splitd for local machine
@@ -48,14 +51,13 @@ splitcli: $(GO_FILES)
 
 ## build docker images for sidecar
 images_release: # entrypoints
-	$(DOCKER) build $(platform_str) -t splitsoftware/splitd-sidecar:latest -t splitsoftware/splitd-sidecar:$(VERSION) -f infra/sidecar.Dockerfile .
+	$(DOCKER) build $(PLATFORM_STR) -t splitsoftware/splitd-sidecar:latest -t splitsoftware/splitd-sidecar:$(VERSION) -f infra/sidecar.Dockerfile .
 	@echo "Image created. Make sure everything works ok, and then run the following commands to push them."
 	@echo "$(DOCKER) push splitsoftware/splitd-sidecar:latest"
 	@echo "$(DOCKER) push splitsoftware/splitd-sidecar:$(VERSION)"
 
 ## build release for binaires
 binaries_release: splitd-linux-amd64-$(VERSION).bin splitd-darwin-amd64-$(VERSION).bin splitd-linux-arm-$(VERSION).bin splitd-darwin-arm-$(VERSION).bin
-
 
 splitd-linux-amd64-$(VERSION).bin: $(GO_FILES)
 	GOARCH=amd64 GOOS=linux $(GO) build -o $@ cmd/splitd/main.go
@@ -68,11 +70,6 @@ splitd-linux-arm-$(VERSION).bin: $(GO_FILES)
 
 splitd-darwin-arm-$(VERSION).bin: $(GO_FILES)
 	GOARCH=arm64 GOOS=darwin $(GO) build -o $@ cmd/splitd/main.go
-
-binaries_release: splitd
-
-# helper macros
-platform_str = $(if $(PLATFORM),--platform=$(PLATFORM),)
 
 # Help target borrowed from: https://docs.cloudposse.com/reference/best-practices/make-best-practices/
 ## This help screen

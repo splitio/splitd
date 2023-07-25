@@ -34,14 +34,27 @@ type Acceptor struct {
 
 var errNoSetDeadline = errors.New("listener doesn't support setting a deadline")
 
-func newAcceptor(address net.Addr, rawConnFactory RawConnFactory, o *Options) *Acceptor {
+type AcceptorConfig struct {
+	AcceptTimeout              time.Duration
+	MaxSimultaneousConnections int
+}
+
+func DefaultAcceptorConfig() AcceptorConfig {
+    return AcceptorConfig{
+		MaxSimultaneousConnections: 32,
+		AcceptTimeout:              1 * time.Second,
+    }
+}
+
+
+func newAcceptor(address net.Addr, rawConnFactory RawConnFactory, logger logging.LoggerInterface, cfg *AcceptorConfig) *Acceptor {
 	return &Acceptor{
 		rawConnFactory: rawConnFactory,
-		logger:         o.Logger,
+		logger:         logger,
 		address:        address,
-		maxConns:       o.MaxSimultaneousConnections,
-		sem:            semaphore.NewWeighted(int64(o.MaxSimultaneousConnections)),
-		maxWait:        o.AcceptTimeout,
+		maxConns:       cfg.MaxSimultaneousConnections,
+		sem:            semaphore.NewWeighted(int64(cfg.MaxSimultaneousConnections)),
+		maxWait:        cfg.AcceptTimeout,
 	}
 }
 

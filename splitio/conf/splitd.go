@@ -7,10 +7,12 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio/link"
-	"github.com/splitio/splitd/splitio/sdk/conf"
+	sdkConf "github.com/splitio/splitd/splitio/sdk/conf"
+	cc "github.com/splitio/splitd/splitio/util/conf"
 	"gopkg.in/yaml.v3"
 )
 
@@ -23,12 +25,12 @@ type Config struct {
 }
 
 func (c Config) String() string {
-    if len(c.SDK.Apikey) > 4 {
-        c.SDK.Apikey = c.SDK.Apikey[:4] + "xxxxxxx"
-    }
+	if len(c.SDK.Apikey) > 4 {
+		c.SDK.Apikey = c.SDK.Apikey[:4] + "xxxxxxx"
+	}
 
-    output, _ := json.Marshal(c)
-    return string(output)
+	output, _ := json.Marshal(c)
+	return string(output)
 }
 
 func (c *Config) parse(fn string) error {
@@ -49,38 +51,46 @@ func (c *Config) parse(fn string) error {
 type Link struct {
 	Type                 *string `yaml:"type"`
 	Address              *string `yaml:"address"`
-	Serialization        *string `yaml:"serialization"`
 	MaxSimultaneousConns *int    `yaml:"maxSimultaneousConns"`
 	ReadTimeoutMS        *int    `yaml:"readTimeoutMS"`
 	WriteTimeoutMS       *int    `yaml:"writeTimeoutMS"`
 	AcceptTimeoutMS      *int    `yaml:"acceptTimeoutMS"`
+	Serialization        *string `yaml:"serialization"`
+	BufferSize           *int    `yaml:"bufferSize"`
+	Protocol             *string `yaml:"protocol"`
 }
 
-func (l *Link) ToLinkOpts() []link.Option {
-	var opts []link.Option
-	if l.Type != nil {
-		opts = append(opts, link.WithSockType(*l.Type))
-	}
-	if l.Address != nil {
-		opts = append(opts, link.WithAddress(*l.Address))
-	}
-	if l.Serialization != nil {
-		opts = append(opts, link.WithSerialization(*l.Serialization))
-	}
-	if l.MaxSimultaneousConns != nil {
-		opts = append(opts, link.WithMaxSimultaneousConns(*l.MaxSimultaneousConns))
-	}
-	if l.AcceptTimeoutMS != nil {
-		opts = append(opts, link.WithAcceptTimeoutMs(*l.AcceptTimeoutMS))
-	}
-	if l.ReadTimeoutMS != nil {
-		opts = append(opts, link.WithReadTimeoutMs(*l.ReadTimeoutMS))
-	}
-	if l.WriteTimeoutMS != nil {
-		opts = append(opts, link.WithWriteTimeoutMs(*l.WriteTimeoutMS))
+func (l *Link) ToListenerOpts() (*link.ListenerOptions, error) {
+	opts := link.DefaultListenerOptions()
+
+	var err error
+	if l.Protocol != nil {
+		if opts.Protocol, err = cc.ParseProtocolVersion(*l.Protocol); err != nil {
+			return nil, fmt.Errorf("invalid protocol version %s", *l.Protocol)
+		}
 	}
 
-	return opts
+	if l.Type != nil {
+		if opts.Transfer.ConnType, err = cc.ParseConnType(*l.Type); err != nil {
+			return nil, fmt.Errorf("invalid connection type %s", *l.Type)
+		}
+	}
+
+	if l.Serialization != nil {
+		if opts.Serialization, err = cc.ParseSerializer(*l.Serialization); err != nil {
+			return nil, fmt.Errorf("invalid serialization %s", *l.Serialization)
+		}
+	}
+
+	durationFromMS := func(i int) time.Duration { return time.Duration(i) * time.Millisecond }
+	cc.SetIfNotNil(&opts.Transfer.Address, l.Address)
+	cc.SetIfNotNil(&opts.Transfer.BufferSize, l.BufferSize)
+	cc.SetIfNotNil(&opts.Acceptor.MaxSimultaneousConnections, l.MaxSimultaneousConns)
+	cc.MapIfNotNil(&opts.Transfer.ReadTimeout, l.ReadTimeoutMS, durationFromMS)
+	cc.MapIfNotNil(&opts.Transfer.WriteTimeout, l.WriteTimeoutMS, durationFromMS)
+	cc.MapIfNotNil(&opts.Acceptor.AcceptTimeout, l.AcceptTimeoutMS, durationFromMS)
+
+	return &opts, nil
 }
 
 type SDK struct {
@@ -90,16 +100,13 @@ type SDK struct {
 	URLs             URLs   `yaml:"urls"`
 }
 
-func (s *SDK) ToSDKConf() []conf.Option {
-	var opts []conf.Option
-	if s.LabelsEnabled != nil {
-		opts = append(opts, conf.WithLabelsEnabled(*s.LabelsEnabled))
-	}
-	if s.StreamingEnabled != nil {
-		opts = append(opts, conf.WithStreamingEnabled(*s.StreamingEnabled))
-	}
-	opts = append(opts, s.URLs.ToSDKConf()...)
-	return opts
+func (s *SDK) ToSDKConf() *sdkConf.Config {
+
+	cfg := sdkConf.DefaultConfig()
+	cc.SetIfNotNil(&cfg.LabelsEnabled, s.LabelsEnabled)
+	cc.SetIfNotNil(&cfg.StreamingEnabled, s.StreamingEnabled)
+	s.URLs.updateSDKConfURLs(&cfg.URLs)
+	return cfg
 
 }
 
@@ -111,25 +118,12 @@ type URLs struct {
 	Telemetry *string `yaml:"telemetry"`
 }
 
-func (u *URLs) ToSDKConf() []conf.Option {
-	var opts []conf.Option
-	if u.Auth != nil {
-		opts = append(opts, conf.WithAuthURL(*u.Auth))
-	}
-	if u.SDK != nil {
-		opts = append(opts, conf.WithSDKURL(*u.SDK))
-	}
-	if u.Events != nil {
-		opts = append(opts, conf.WithEventsURL(*u.Events))
-	}
-	if u.Streaming != nil {
-		opts = append(opts, conf.WithStreamingURL(*u.Streaming))
-	}
-	if u.Telemetry != nil {
-		opts = append(opts, conf.WithTelemetryURL(*u.Telemetry))
-	}
-	return opts
-
+func (u *URLs) updateSDKConfURLs(dst *sdkConf.URLs) {
+	cc.SetIfNotNil(&dst.SDK, u.SDK)
+	cc.SetIfNotNil(&dst.Events, u.Events)
+	cc.SetIfNotNil(&dst.Auth, u.Auth)
+	cc.SetIfNotNil(&dst.Streaming, u.Streaming)
+	cc.SetIfNotNil(&dst.Telemetry, u.Telemetry)
 }
 
 type Logger struct {
