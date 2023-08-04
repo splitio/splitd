@@ -76,3 +76,26 @@ func TestAcceptor(t *testing.T) {
 	assert.Nil(t, recv)
 	assert.ErrorIs(t, err, io.EOF)
 }
+
+func TestNewAcceptorInstantiation(t *testing.T) {
+	logger := logging.NewLogger(nil)
+
+	opts := DefaultOpts()
+	accCfg := DefaultAcceptorConfig()
+	acc, err := NewAcceptor(logger, &opts, &accCfg)
+	assert.Nil(t, err)
+
+	assert.Equal(t, opts.Address, acc.address.(*net.UnixAddr).Name)
+	assert.Equal(t, "unixpacket", acc.address.(*net.UnixAddr).Network())
+	assert.Nil(t, acc.Shutdown())
+
+	opts.Address = "/var/another/don/ga"
+	opts.ConnType = ConnTypeUnixStream
+	acc, err = NewAcceptor(logger, &opts, &accCfg)
+	assert.Nil(t, err)
+
+	assert.Equal(t, opts.Address, acc.address.(*net.UnixAddr).Name)
+	assert.Equal(t, "unix", acc.address.(*net.UnixAddr).Network())
+	assert.Nil(t, acc.Shutdown())
+
+}

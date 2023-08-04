@@ -76,7 +76,7 @@ func TestTreatmentRPCParsing(t *testing.T) {
 	assert.Equal(t, "feat1", r.Feature)
 	assert.Equal(t, map[string]interface{}{"a": int64(1)}, r.Attributes)
 
-    // nil bucketing key
+	// nil bucketing key
 	err = r.PopulateFromRPC(&RPC{
 		RPCBase: protocol.RPCBase{Version: protocol.V1},
 		OpCode:  OCTreatment,
@@ -87,8 +87,8 @@ func TestTreatmentRPCParsing(t *testing.T) {
 	assert.Equal(t, "feat1", r.Feature)
 	assert.Equal(t, map[string]interface{}{"a": int64(1)}, r.Attributes)
 
-    // nil attributes
-    r = TreatmentArgs{}
+	// nil attributes
+	r = TreatmentArgs{}
 	err = r.PopulateFromRPC(&RPC{
 		RPCBase: protocol.RPCBase{Version: protocol.V1},
 		OpCode:  OCTreatment,
@@ -140,8 +140,8 @@ func TestTreatmentsRPCParsing(t *testing.T) {
 	assert.Equal(t, []string{"feat1", "feat2"}, r.Features)
 	assert.Equal(t, map[string]interface{}{"a": int64(1)}, r.Attributes)
 
-    // nil bucketing key
-    err = r.PopulateFromRPC(&RPC{
+	// nil bucketing key
+	err = r.PopulateFromRPC(&RPC{
 		RPCBase: protocol.RPCBase{Version: protocol.V1},
 		OpCode:  OCTreatments,
 		Args:    []interface{}{"key", nil, []interface{}{"feat1", "feat2"}, map[string]interface{}{"a": 1}}})
@@ -200,7 +200,7 @@ func TestTrackRPCParsing(t *testing.T) {
 			Args:    []interface{}{"key", "tt", "et", 2.8, map[string]interface{}{"a": 1}, nil},
 		}))
 
-    now := time.Now()
+	now := time.Now()
 	err := r.PopulateFromRPC(&RPC{
 		RPCBase: protocol.RPCBase{Version: protocol.V1},
 		OpCode:  OCTrack,
@@ -210,11 +210,11 @@ func TestTrackRPCParsing(t *testing.T) {
 	assert.Equal(t, "key", r.Key)
 	assert.Equal(t, "tt", r.TrafficType)
 	assert.Equal(t, "et", r.EventType)
-    assert.Equal(t, ref(float64(2.8)), r.Value)
+	assert.Equal(t, ref(float64(2.8)), r.Value)
 	assert.Equal(t, map[string]interface{}{"a": int64(1)}, r.Properties)
-    assert.Equal(t, now.UnixMilli(), r.Timestamp)
+	assert.Equal(t, now.UnixMilli(), r.Timestamp)
 
-    // nil properties
+	// nil properties
 	err = r.PopulateFromRPC(&RPC{
 		RPCBase: protocol.RPCBase{Version: protocol.V1},
 		OpCode:  OCTrack,
@@ -224,12 +224,12 @@ func TestTrackRPCParsing(t *testing.T) {
 	assert.Equal(t, "key", r.Key)
 	assert.Equal(t, "tt", r.TrafficType)
 	assert.Equal(t, "et", r.EventType)
-    assert.Equal(t, ref(float64(2.8)), r.Value)
+	assert.Equal(t, ref(float64(2.8)), r.Value)
 	assert.Nil(t, r.Properties)
-    assert.Equal(t, now.UnixMilli(), r.Timestamp)
+	assert.Equal(t, now.UnixMilli(), r.Timestamp)
 
-    // nil value
-    r = TrackArgs{}
+	// nil value
+	r = TrackArgs{}
 	err = r.PopulateFromRPC(&RPC{
 		RPCBase: protocol.RPCBase{Version: protocol.V1},
 		OpCode:  OCTrack,
@@ -239,9 +239,9 @@ func TestTrackRPCParsing(t *testing.T) {
 	assert.Equal(t, "key", r.Key)
 	assert.Equal(t, "tt", r.TrafficType)
 	assert.Equal(t, "et", r.EventType)
-    assert.Nil(t, r.Value)
+	assert.Nil(t, r.Value)
 	assert.Equal(t, map[string]interface{}{"a": int64(1)}, r.Properties)
-    assert.Equal(t, now.UnixMilli(), r.Timestamp)
+	assert.Equal(t, now.UnixMilli(), r.Timestamp)
 
 }
 
@@ -277,6 +277,43 @@ func TestSanitizeAttributes(t *testing.T) {
 	assert.Equal(t, []string{"a", "b", "c"}, attrs["allStr"])
 	assert.Equal(t, []string{"a"}, attrs["mixed"])
 	assert.Equal(t, now.Unix(), attrs["time"])
+}
+
+func TestRPCEncoding(t *testing.T) {
+    ra := RegisterArgs{
+        ID: "someID",
+        SDKVersion: "some-1.2.3",
+        Flags: 0,
+    }
+    encodedRA := ra.Encode()
+    assert.Equal(t, ra.ID, encodedRA[RegisterArgIDIdx].(string))
+    assert.Equal(t, ra.SDKVersion, encodedRA[RegisterArgSDKVersionIdx].(string))
+    assert.Equal(t, ra.Flags, encodedRA[RegisterArgFlagsIdx].(RegisterFlags))
+
+	ta := TreatmentArgs{
+		Key:          "someKey",
+		BucketingKey: ref("someBucketing"),
+		Feature:      "someFeature",
+		Attributes:   map[string]interface{}{"some": "attribute"},
+	}
+	encodedTA := ta.Encode()
+	assert.Equal(t, ta.Key, encodedTA[TreatmentArgKeyIdx].(string))
+	assert.Equal(t, *ta.BucketingKey, encodedTA[TreatmentArgBucketingKeyIdx].(string))
+	assert.Equal(t, ta.Feature, encodedTA[TreatmentArgFeatureIdx].(string))
+	assert.Equal(t, ta.Attributes, encodedTA[TreatmentArgAttributesIdx].(map[string]interface{}))
+
+	tsa := TreatmentsArgs{
+		Key:          "someKey",
+		BucketingKey: ref("someBucketing"),
+		Features:      []string{"someFeature", "someFeature2"},
+		Attributes:   map[string]interface{}{"some": "attribute"},
+	}
+	encodedTsA := tsa.Encode()
+	assert.Equal(t, tsa.Key, encodedTsA[TreatmentsArgKeyIdx].(string))
+	assert.Equal(t, *tsa.BucketingKey, encodedTsA[TreatmentsArgBucketingKeyIdx].(string))
+	assert.Equal(t, tsa.Features, encodedTsA[TreatmentsArgFeaturesIdx].([]string))
+	assert.Equal(t, tsa.Attributes, encodedTsA[TreatmentsArgAttributesIdx].(map[string]interface{}))
+
 }
 
 func ref[T any](t T) *T {
