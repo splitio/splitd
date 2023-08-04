@@ -280,15 +280,15 @@ func TestSanitizeAttributes(t *testing.T) {
 }
 
 func TestRPCEncoding(t *testing.T) {
-    ra := RegisterArgs{
-        ID: "someID",
-        SDKVersion: "some-1.2.3",
-        Flags: 0,
-    }
-    encodedRA := ra.Encode()
-    assert.Equal(t, ra.ID, encodedRA[RegisterArgIDIdx].(string))
-    assert.Equal(t, ra.SDKVersion, encodedRA[RegisterArgSDKVersionIdx].(string))
-    assert.Equal(t, ra.Flags, encodedRA[RegisterArgFlagsIdx].(RegisterFlags))
+	ra := RegisterArgs{
+		ID:         "someID",
+		SDKVersion: "some-1.2.3",
+		Flags:      0,
+	}
+	encodedRA := ra.Encode()
+	assert.Equal(t, ra.ID, encodedRA[RegisterArgIDIdx].(string))
+	assert.Equal(t, ra.SDKVersion, encodedRA[RegisterArgSDKVersionIdx].(string))
+	assert.Equal(t, ra.Flags, encodedRA[RegisterArgFlagsIdx].(RegisterFlags))
 
 	ta := TreatmentArgs{
 		Key:          "someKey",
@@ -305,7 +305,7 @@ func TestRPCEncoding(t *testing.T) {
 	tsa := TreatmentsArgs{
 		Key:          "someKey",
 		BucketingKey: ref("someBucketing"),
-		Features:      []string{"someFeature", "someFeature2"},
+		Features:     []string{"someFeature", "someFeature2"},
 		Attributes:   map[string]interface{}{"some": "attribute"},
 	}
 	encodedTsA := tsa.Encode()
@@ -313,6 +313,22 @@ func TestRPCEncoding(t *testing.T) {
 	assert.Equal(t, *tsa.BucketingKey, encodedTsA[TreatmentsArgBucketingKeyIdx].(string))
 	assert.Equal(t, tsa.Features, encodedTsA[TreatmentsArgFeaturesIdx].([]string))
 	assert.Equal(t, tsa.Attributes, encodedTsA[TreatmentsArgAttributesIdx].(map[string]interface{}))
+
+	tra := TrackArgs{
+		Key:         "someKey",
+		TrafficType: "someTrafficType",
+		EventType:   "someEventType",
+		Value:       ref(123.),
+		Properties:  map[string]interface{}{"a": 1},
+		Timestamp:   123456,
+	}
+	encodedTrA := tra.Encode()
+    assert.Equal(t, tra.Key, encodedTrA[TrackArgKeyIdx].(string))
+    assert.Equal(t, tra.TrafficType, encodedTrA[TrackArgTrafficTypeIdx].(string))
+    assert.Equal(t, tra.EventType, encodedTrA[TrackArgEventTypeIdx].(string))
+    assert.Equal(t, *tra.Value, *encodedTrA[TrackArgValueIdx].(*float64))
+    assert.Equal(t, tra.Properties, encodedTrA[TrackArgPropertiesIdx].(map[string]interface{}))
+    assert.Equal(t, tra.Timestamp, encodedTrA[TrackArgTimestampIdx].(int64))
 
 }
 
