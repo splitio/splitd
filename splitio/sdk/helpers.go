@@ -3,9 +3,9 @@ package sdk
 import (
 	"fmt"
 
-	sss "github.com/splitio/splitd/splitio/sdk/storage"
-	tss "github.com/splitio/splitd/splitio/sdk/tasks"
 	sdkConf "github.com/splitio/splitd/splitio/sdk/conf"
+	sss "github.com/splitio/splitd/splitio/sdk/storage"
+	"github.com/splitio/splitd/splitio/sdk/workers"
 
 	"github.com/splitio/go-split-commons/v4/conf"
 	"github.com/splitio/go-split-commons/v4/dtos"
@@ -26,12 +26,18 @@ import (
 	"github.com/splitio/go-toolkit/v5/logging"
 )
 
-func setupWorkers(logger logging.LoggerInterface, api *api.SplitAPI, str *storages, hc application.MonitorProducerInterface) *synchronizer.Workers {
-	splitChangeWorker := split.NewSplitFetcher(str.splits, api.SplitFetcher, logger, str.telemetry, hc)
-	segmentChangeWorker := segment.NewSegmentFetcher(str.splits, str.segments, api.SegmentFetcher, logger, str.telemetry, hc)
+func setupWorkers(
+	logger logging.LoggerInterface,
+	api *api.SplitAPI,
+	str *storages,
+	hc application.MonitorProducerInterface,
+	cfg *sdkConf.Impressions,
+
+) *synchronizer.Workers {
 	return &synchronizer.Workers{
-		SplitFetcher:   splitChangeWorker,
-		SegmentFetcher: segmentChangeWorker,
+		SplitFetcher:       split.NewSplitFetcher(str.splits, api.SplitFetcher, logger, str.telemetry, hc),
+		SegmentFetcher:     segment.NewSegmentFetcher(str.splits, str.segments, api.SegmentFetcher, logger, str.telemetry, hc),
+		ImpressionRecorder: workers.NewImpressionsWorker(logger, str.telemetry, api.ImpressionRecorder, str.impressions, cfg),
 	}
 }
 
@@ -48,7 +54,8 @@ func setupTasks(
 	return &synchronizer.SplitTasks{
 		SplitSyncTask:      tasks.NewFetchSplitsTask(workers.SplitFetcher, int(cfg.Splits.SyncPeriod.Seconds()), logger),
 		SegmentSyncTask:    tasks.NewFetchSegmentsTask(workers.SegmentFetcher, int(cfg.Segments.SyncPeriod.Seconds()), cfg.Segments.WorkerCount, cfg.Segments.QueueSize, logger),
-		ImpressionSyncTask: tss.NewImpressionSyncTask(api.ImpressionRecorder, str.impressions, logger, str.telemetry, &cfg.Impressions),
+		ImpressionSyncTask: tasks.NewRecordImpressionsTask(workers.ImpressionRecorder, int(impCfg.SyncPeriod.Seconds()), logger, 5000),
+		//ImpressionSyncTask: tss.NewImpressionSyncTask(workers.ImpressionRecorder, logger, cfg.Impressions),
 		ImpressionsCountSyncTask: tasks.NewRecordImpressionsCountTask(
 			impressionscount.NewRecorderSingle(impComponents.counter, api.ImpressionRecorder, md, logger, str.telemetry),
 			logger,
