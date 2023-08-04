@@ -22,6 +22,10 @@ import (
 	"github.com/splitio/splitd/splitio"
 )
 
+const (
+	impressionsFullNotif = "IMPRESSIONS_FULL"
+)
+
 type Attributes = map[string]interface{}
 
 type Interface interface {
@@ -30,14 +34,15 @@ type Interface interface {
 }
 
 type Impl struct {
-	logger logging.LoggerInterface
-	ev     evaluator.Interface
-	sm     synchronizer.Manager
-	ss     synchronizer.Synchronizer
-	is     *storage.ImpressionsStorage
-	iq     provisional.ImpressionManager
-	cfg    sdkConf.Config
-	status chan int
+	logger        logging.LoggerInterface
+	ev            evaluator.Interface
+	sm            synchronizer.Manager
+	ss            synchronizer.Synchronizer
+	is            *storage.ImpressionsStorage
+	iq            provisional.ImpressionManager
+	cfg           sdkConf.Config
+	status        chan int
+	queueFullChan chan string
 }
 
 func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, error) {
@@ -52,10 +57,12 @@ func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, 
 	}
 
 	hc := &application.Dummy{}
+
+	queueFullChan := make(chan string, 1) // Only one item so that we don't queue N flushes (which makes no sense) if we're getting hit too hard
 	splitApi := api.NewSplitAPI(apikey, *advCfg, logger, md)
-	workers := setupWorkers(logger, splitApi, stores, hc)
+	workers := setupWorkers(logger, splitApi, stores, hc, &c.Impressions)
 	tasks := setupTasks(c, stores, logger, workers, impc, md, splitApi)
-	sync := synchronizer.NewSynchronizer(*advCfg, *tasks, *workers, logger, nil, nil)
+	sync := synchronizer.NewSynchronizer(*advCfg, *tasks, *workers, logger, queueFullChan, nil)
 
 	status := make(chan int, 10)
 	manager, err := synchronizer.NewSynchronizerManager(sync, logger, *advCfg, splitApi.AuthClient, stores.splits, status, stores.telemetry, md, nil, hc)
@@ -71,13 +78,14 @@ func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, 
 	}
 
 	return &Impl{
-		logger: logger,
-		sm:     manager,
-		ss:     sync,
-		ev:     evaluator.NewEvaluator(stores.splits, stores.segments, engine.NewEngine(logger), logger),
-		is:     stores.impressions,
-		iq:     impc.manager,
-		cfg:    *c,
+		logger:        logger,
+		sm:            manager,
+		ss:            sync,
+		ev:            evaluator.NewEvaluator(stores.splits, stores.segments, engine.NewEngine(logger), logger),
+		is:            stores.impressions,
+		iq:            impc.manager,
+		cfg:           *c,
+		queueFullChan: queueFullChan,
 	}, nil
 }
 
@@ -88,11 +96,7 @@ func (i *Impl) Treatment(cfg *types.ClientConfig, key string, bk *string, featur
 		return nil, fmt.Errorf("nil result")
 	}
 
-	imp, err := i.handleImpression(key, bk, feature, res, cfg.Metadata)
-	if err != nil {
-		i.logger.Error("error handling impression: ", err)
-	}
-
+	imp := i.handleImpression(key, bk, feature, res, cfg.Metadata)
 	return &Result{
 		Treatment:  res.Treatment,
 		Impression: imp,
@@ -107,27 +111,23 @@ func (i *Impl) Treatments(cfg *types.ClientConfig, key string, bk *string, featu
 	toRet := make(map[string]Result, len(res.Evaluations))
 	for _, feature := range features {
 
-        curr, ok := res.Evaluations[feature]
-        if !ok {
-            toRet[feature] = Result{Treatment: "control"}
-            continue
-        }
+		curr, ok := res.Evaluations[feature]
+		if !ok {
+			toRet[feature] = Result{Treatment: "control"}
+			continue
+		}
 
-		var err error
 		var eres Result
 		eres.Treatment = curr.Treatment
-		eres.Impression, err = i.handleImpression(key, bk, feature, &curr, cfg.Metadata)
+		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata)
 		eres.Config = curr.Config
-		if err != nil {
-			i.logger.Error("error handling impression: ", err)
-		}
 		toRet[feature] = eres
 	}
 
 	return toRet, nil
 }
 
-func (i *Impl) handleImpression(key string, bk *string, f string, r *evaluator.Result, cm types.ClientMetadata) (*dtos.Impression, error) {
+func (i *Impl) handleImpression(key string, bk *string, f string, r *evaluator.Result, cm types.ClientMetadata) *dtos.Impression {
 	var label string
 	if i.cfg.LabelsEnabled {
 		label = r.Label
@@ -146,10 +146,20 @@ func (i *Impl) handleImpression(key string, bk *string, f string, r *evaluator.R
 	shouldStore := i.iq.ProcessSingle(imp)
 	if shouldStore {
 		_, err := i.is.Push(cm, *imp)
-		return imp, err
+		if err != nil {
+			if err == storage.ErrQueueFull {
+				select {
+				case i.queueFullChan <- impressionsFullNotif:
+				default:
+					i.logger.Warning("impressions queue has filled up and is currently performing a flush. Current impression will bedropped")
+				}
+			} else {
+				i.logger.Error("error handling impression: ", err)
+			}
+		}
 	}
 
-	return imp, nil
+	return imp
 }
 
 func timeMillis() int64 {

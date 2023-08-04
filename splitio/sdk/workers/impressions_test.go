@@ -1,10 +1,9 @@
-package tasks
+package workers
 
 import (
 	"reflect"
 	"sort"
 	"testing"
-	"time"
 
 	"github.com/splitio/go-split-commons/v4/dtos"
 	"github.com/splitio/go-split-commons/v4/service"
@@ -22,7 +21,7 @@ func TestImpressionsTask(t *testing.T) {
 	logger := logging.NewLogger(nil)
 	rec := &RecorderMock{}
 
-	task := NewImpressionSyncTask(rec, is, logger, ts, &conf.Impressions{SyncPeriod: 1 * time.Second})
+	worker := NewImpressionsWorker(logger, ts, rec, is, &conf.Impressions{})
 
 	var emptyMap map[string]string
 	rec.On("Record", []dtos.ImpressionsDTO{{
@@ -39,8 +38,8 @@ func TestImpressionsTask(t *testing.T) {
 		Return(nil).
 		Once()
 
-    // ImpressionsDTO are built from the contents of a map so the ordering is undefined.
-    // to solve this, we sort the input by feature name (& provided an already sorted expected value)
+		// ImpressionsDTO are built from the contents of a map so the ordering is undefined.
+		// to solve this, we sort the input by feature name (& provided an already sorted expected value)
 	rec.On("Record",
 		mock.MatchedBy(func(imps []dtos.ImpressionsDTO) bool {
 			sort.Slice(imps, func(i, j int) bool { return imps[i].TestName < imps[j].TestName })
@@ -63,16 +62,13 @@ func TestImpressionsTask(t *testing.T) {
 	is.Push(types.ClientMetadata{ID: "i2", SdkVersion: "go-1.2.3"},
 		dtos.Impression{KeyName: "k2", FeatureName: "f2", Treatment: "off", Label: "l2", ChangeNumber: 456, Time: 123457})
 
-	task.Start()
-	time.Sleep(1500 * time.Millisecond)
-
+	worker.SynchronizeImpressions(5000)
 	is.Push(types.ClientMetadata{ID: "i3", SdkVersion: "python-1.2.3"},
 		dtos.Impression{KeyName: "k3", FeatureName: "f3", Treatment: "on", Label: "l3", ChangeNumber: 789, Time: 123458},
 		dtos.Impression{KeyName: "k3", FeatureName: "f4", Treatment: "on", Label: "l4", ChangeNumber: 890, Time: 123459},
 	)
 
-	time.Sleep(1500 * time.Millisecond)
-	task.Stop(true)
+	worker.SynchronizeImpressions(5000)
 
 	rec.AssertExpectations(t)
 }
