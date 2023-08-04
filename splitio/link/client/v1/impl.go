@@ -56,11 +56,11 @@ func (c *Impl) Treatment(key string, bucketingKey string, feature string, attrs 
 
 	resp, err := doRPC[protov1.ResponseWrapper[protov1.TreatmentPayload]](c, &rpc)
 	if err != nil {
-		return &types.Result{Treatment: Control}, fmt.Errorf("error executing rpc: %w", err)
+		return &types.Result{Treatment: Control}, fmt.Errorf("error executing treatment rpc: %w", err)
 	}
 
 	if resp.Status != protov1.ResultOk {
-		return &types.Result{Treatment: Control}, fmt.Errorf("server responded with error %d", resp.Status)
+		return &types.Result{Treatment: Control}, fmt.Errorf("server responded treatment rpc with error %d", resp.Status)
 	}
 
 	var imp *dtos.Impression
@@ -93,11 +93,11 @@ func (c *Impl) Treatments(key string, bucketingKey string, features []string, at
 
 	resp, err := doRPC[protov1.ResponseWrapper[protov1.TreatmentsPayload]](c, &rpc)
 	if err != nil {
-		return nil, fmt.Errorf("error executing rpc: %w", err)
+		return nil, fmt.Errorf("error executing treatments rpc: %w", err)
 	}
 
 	if resp.Status != protov1.ResultOk {
-		return nil, fmt.Errorf("server responded with error %d", resp.Status)
+		return nil, fmt.Errorf("server responded treatments rpc with error %d", resp.Status)
 	}
 
 	results := make(types.Results)
@@ -133,11 +133,11 @@ func (c *Impl) register(impressionsFeedback bool) error {
 
 	resp, err := doRPC[protov1.ResponseWrapper[protov1.RegisterPayload]](c, &rpc)
 	if err != nil {
-		return fmt.Errorf("error executing rpc: %w", err)
+		return fmt.Errorf("error executing register rpc: %w", err)
 	}
 
 	if resp.Status != protov1.ResultOk {
-		return fmt.Errorf("server responded with error %d", resp.Status)
+		return fmt.Errorf("server responded register rpc with error %d", resp.Status)
 	}
 
 	return nil
