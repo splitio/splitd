@@ -40,7 +40,7 @@ func NewImpressionsWorker(
 // FlushImpressions implements impression.ImpressionRecorder
 func (m *MultiMetaImpressionWorker) FlushImpressions(bulkSize int64) error {
 
-    // TODO(mredolatti): take `bulkSize` into account
+	// TODO(mredolatti): take `bulkSize` into account
 	var errs []error
 	if err := m.iq.RangeAndClear(func(md types.ClientMetadata, q *sss.LockingQueue[dtos.Impression]) {
 		extracted := make([]dtos.Impression, 0, q.Len())
@@ -54,31 +54,8 @@ func (m *MultiMetaImpressionWorker) FlushImpressions(bulkSize int64) error {
 			return // nothing to do here
 		}
 
-		tmp := make(map[string]*dtos.ImpressionsDTO)
-		for idx := range extracted {
-			forFeature, ok := tmp[extracted[idx].FeatureName]
-			if !ok {
-				forFeature = &dtos.ImpressionsDTO{TestName: extracted[idx].FeatureName}
-				tmp[extracted[idx].FeatureName] = forFeature
-			}
-
-			forFeature.KeyImpressions = append(forFeature.KeyImpressions, dtos.ImpressionDTO{
-				KeyName:      extracted[idx].KeyName,
-				Treatment:    extracted[idx].Treatment,
-				Time:         extracted[idx].Time,
-				ChangeNumber: extracted[idx].ChangeNumber,
-				Label:        extracted[idx].Label,
-				BucketingKey: extracted[idx].BucketingKey,
-				Pt:           extracted[idx].Pt,
-			})
-		}
-
-		payload := make([]dtos.ImpressionsDTO, 0, len(tmp))
-		for _, v := range tmp {
-			payload = append(payload, *v)
-		}
-
-		if err := m.llrec.Record(payload, dtos.Metadata{SDKVersion: md.SdkVersion}, nil); err != nil {
+		formatted := formatImpressions(extracted)
+		if err := m.llrec.Record(formatted, dtos.Metadata{SDKVersion: md.SdkVersion}, nil); err != nil {
 			errs = append(errs, err)
 		}
 	}); err != nil {
@@ -91,6 +68,34 @@ func (m *MultiMetaImpressionWorker) FlushImpressions(bulkSize int64) error {
 // SynchronizeImpressions implements impression.ImpressionRecorder
 func (m *MultiMetaImpressionWorker) SynchronizeImpressions(bulkSize int64) error {
 	return m.FlushImpressions(bulkSize)
+}
+
+func formatImpressions(imps []dtos.Impression) []dtos.ImpressionsDTO {
+	tmp := make(map[string]*dtos.ImpressionsDTO)
+	for idx := range imps {
+		forFeature, ok := tmp[imps[idx].FeatureName]
+		if !ok {
+			forFeature = &dtos.ImpressionsDTO{TestName: imps[idx].FeatureName}
+			tmp[imps[idx].FeatureName] = forFeature
+		}
+
+		forFeature.KeyImpressions = append(forFeature.KeyImpressions, dtos.ImpressionDTO{
+			KeyName:      imps[idx].KeyName,
+			Treatment:    imps[idx].Treatment,
+			Time:         imps[idx].Time,
+			ChangeNumber: imps[idx].ChangeNumber,
+			Label:        imps[idx].Label,
+			BucketingKey: imps[idx].BucketingKey,
+			Pt:           imps[idx].Pt,
+		})
+	}
+
+	formatted := make([]dtos.ImpressionsDTO, 0, len(tmp))
+	for _, v := range tmp {
+		formatted = append(formatted, *v)
+	}
+
+	return formatted
 }
 
 var _ impression.ImpressionRecorder = (*MultiMetaImpressionWorker)(nil)
