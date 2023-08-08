@@ -46,10 +46,10 @@ func TestListenErrors(t *testing.T) {
 
 func TestConsumerErrors(t *testing.T) {
 	co := DefaultConsumerOptions()
-	co.Consumer.Protocol = protocol.Version(123)
+    co.Transfer.ConnType = transfer.ConnType(123)
 	client, err := Consumer(logging.NewLogger(nil), &co)
 	assert.Nil(t, client)
-	assert.ErrorContains(t, err, "protocol")
+	assert.ErrorContains(t, err, "invalid listener type")
 
 	co = DefaultConsumerOptions()
 	co.Serialization = serializer.Mechanism(123)
