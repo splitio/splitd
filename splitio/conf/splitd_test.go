@@ -1,6 +1,10 @@
 package conf
 
 import (
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +15,45 @@ import (
 	"github.com/splitio/splitd/splitio/sdk/conf"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestConfig(t *testing.T) {
+	cfg := Config{SDK: SDK{Apikey: "someVeryLongApikey"}}
+	assert.Contains(t, cfg.String(), "somexxxxxxx")
+
+	_, filename, _, _ := runtime.Caller(0)
+	parts := strings.Split(filename, string(filepath.Separator))
+	dir := strings.Join(parts[:len(parts)-3], string(filepath.Separator))
+
+	cfg = Config{}
+	assert.Nil(t, cfg.parse(dir+string(filepath.Separator)+"splitd.yaml.tpl"))
+	assert.Equal(t, Config{
+		Logger: Logger{Level: ref("ERROR")},
+		SDK: SDK{
+			Apikey: "YOUR_API_KEY",
+			URLs: URLs{
+				Auth:      ref("https://auth.split.io"),
+				SDK:       ref("https://sdk.split.io/api"),
+				Events:    ref("https://events.split.io/api"),
+				Streaming: ref("https://streaming.split.io/sse"),
+				Telemetry: ref("https://telemetry.split.io/api/v1"),
+			},
+		},
+		Link: Link{
+			Type:          ref("unix-seqpacket"),
+			Address:       ref("/var/run/splitd.sock"),
+			Serialization: ref("msgpack"),
+		},
+	}, cfg)
+
+	assert.Error(t, cfg.parse("someNonexistantFile"))
+	assert.Error(t, cfg.parse(dir+string(filepath.Separator)+"Makefile"))
+
+	os.Setenv("SPLITD_CONF_FILE", dir+string(filepath.Separator)+"splitd.yaml.tpl")
+	newCfg, err := ReadConfig()
+	assert.Nil(t, err)
+	assert.NotNil(t, newCfg)
+
+}
 
 func TestLink(t *testing.T) {
 
