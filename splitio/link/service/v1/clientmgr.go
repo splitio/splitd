@@ -40,7 +40,7 @@ func NewClientManager(
 func (m *ClientManager) Manage() {
 	defer func() {
 		if r := recover(); r != nil {
-			m.logger.Error("CRITICAL - connection handlers are panicking: ", r)
+			m.logger.Error("CRITICAL - connection handler is panicking: ", r)
 		}
 	}()
 	err := m.handleClientInteractions()

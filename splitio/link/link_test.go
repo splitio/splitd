@@ -30,8 +30,15 @@ func TestOptions(t *testing.T) {
 
 func TestListenErrors(t *testing.T) {
 	lo := DefaultListenerOptions()
-	lo.Protocol = protocol.Version(123)
+	lo.Transfer.ConnType = transfer.ConnType(222)
 	acc, shutdown, err := Listen(logging.NewLogger(nil), &mocks.SDKMock{}, &lo)
+	assert.Nil(t, acc)
+	assert.Nil(t, shutdown)
+	assert.ErrorContains(t, err, "invalid conn type")
+
+	lo = DefaultListenerOptions()
+	lo.Protocol = protocol.Version(123)
+	acc, shutdown, err = Listen(logging.NewLogger(nil), &mocks.SDKMock{}, &lo)
 	assert.Nil(t, acc)
 	assert.Nil(t, shutdown)
 	assert.ErrorContains(t, err, "protocol")
@@ -49,7 +56,7 @@ func TestConsumerErrors(t *testing.T) {
     co.Transfer.ConnType = transfer.ConnType(123)
 	client, err := Consumer(logging.NewLogger(nil), &co)
 	assert.Nil(t, client)
-	assert.ErrorContains(t, err, "invalid listener type")
+	assert.ErrorContains(t, err, "invalid conn type")
 
 	co = DefaultConsumerOptions()
 	co.Serialization = serializer.Mechanism(123)

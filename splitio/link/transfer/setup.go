@@ -18,7 +18,7 @@ const (
 )
 
 var (
-	ErrInvalidConnType = errors.New("invalid listener type")
+	ErrInvalidConnType = errors.New("invalid conn type")
 )
 
 func NewAcceptor(logger logging.LoggerInterface, o *Options, listenerConfig *AcceptorConfig) (*Acceptor, error) {
