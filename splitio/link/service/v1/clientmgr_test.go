@@ -9,9 +9,9 @@ import (
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio/link/protocol"
 	v1 "github.com/splitio/splitd/splitio/link/protocol/v1"
+	proto1Mocks "github.com/splitio/splitd/splitio/link/protocol/v1/mocks"
 	serializerMocks "github.com/splitio/splitd/splitio/link/serializer/mocks"
 	transferMocks "github.com/splitio/splitd/splitio/link/transfer/mocks"
-	proto1Mocks "github.com/splitio/splitd/splitio/link/protocol/v1/mocks"
 	"github.com/splitio/splitd/splitio/sdk"
 	sdkMocks "github.com/splitio/splitd/splitio/sdk/mocks"
 	"github.com/splitio/splitd/splitio/sdk/types"
@@ -187,4 +187,106 @@ func TestConnectionFailureWhenReading(t *testing.T) {
 	rawConnMock.AssertNumberOfCalls(t, "Shutdown", 1)
 }
 
+func TestManagePanicRecovers(t *testing.T) {
+	rawConnMock := &transferMocks.RawConnMock{}
+	rawConnMock.On("ReceiveMessage").Panic("some panic")
+	rawConnMock.On("Shutdown", mock.Anything).Return(nil)
 
+	logger := &loggerMock{}
+	logger.On("Error", "CRITICAL - connection handler is panicking: ", "some panic").Once()
+
+	serializerMock := &serializerMocks.SerializerMock{}
+	sdkMock := &sdkMocks.SDKMock{}
+
+	cm := NewClientManager(rawConnMock, logger, sdkMock, serializerMock)
+	cm.Manage()
+	rawConnMock.AssertNumberOfCalls(t, "Shutdown", 1)
+
+	logger.AssertExpectations(t)
+}
+
+func TestFetchRPC(t *testing.T) {
+	// error reading from conn
+	someErr := errors.New("someConnErr")
+	rawConnMock := &transferMocks.RawConnMock{}
+	rawConnMock.On("ReceiveMessage").Return([]byte(nil), someErr)
+	rawConnMock.On("Shutdown", mock.Anything).Return(nil)
+	serializerMock := &serializerMocks.SerializerMock{}
+	logger := logging.NewLogger(nil)
+	cm := NewClientManager(rawConnMock, logger, nil, serializerMock)
+	rpc, err := cm.fetchRPC()
+	assert.Nil(t, rpc)
+	assert.ErrorContains(t, err, "someConnErr")
+
+	// error parsing message
+	someErr = errors.New("someSerializationErr")
+	rawConnMock = &transferMocks.RawConnMock{}
+	rawConnMock.On("ReceiveMessage").Return([]byte{}, nil)
+	rawConnMock.On("Shutdown", mock.Anything).Return(nil)
+	serializerMock = &serializerMocks.SerializerMock{}
+	serializerMock.On("Parse", mock.Anything, mock.Anything).Return(someErr)
+	cm = NewClientManager(rawConnMock, logger, nil, serializerMock)
+	rpc, err = cm.fetchRPC()
+	assert.Nil(t, rpc)
+	assert.ErrorContains(t, err, "someSerializationErr")
+}
+
+func TestSendResponse(t *testing.T) {
+	// error parsing message
+	someErr := errors.New("someSerializationErr")
+	rawConnMock := &transferMocks.RawConnMock{}
+	rawConnMock.On("Shutdown", mock.Anything).Return(nil)
+	serializerMock := &serializerMocks.SerializerMock{}
+	serializerMock.On("Serialize", mock.Anything).Return([]byte(nil), someErr)
+	logger := logging.NewLogger(nil)
+	cm := NewClientManager(rawConnMock, logger, nil, serializerMock)
+	err := cm.sendResponse(nil)
+	assert.ErrorContains(t, err, "someSerializationErr")
+
+	// error reading from conn
+	someErr = errors.New("someConnErr")
+	rawConnMock = &transferMocks.RawConnMock{}
+	rawConnMock.On("SendMessage", mock.Anything).Return(someErr)
+	rawConnMock.On("Shutdown", mock.Anything).Return(nil)
+	serializerMock = &serializerMocks.SerializerMock{}
+	serializerMock.On("Serialize", mock.Anything).Return([]byte{}, nil)
+	cm = NewClientManager(rawConnMock, logger, nil, serializerMock)
+	err = cm.sendResponse(nil)
+	assert.ErrorContains(t, err, "someConnErr")
+}
+
+func TestHandleRPCErrors(t *testing.T) {
+	logger := logging.NewLogger(nil)
+	cm := NewClientManager(nil, logger, nil, nil)
+	res, err := cm.handleRPC(&v1.RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: v1.OCTreatment})
+	assert.Nil(t, res)
+	assert.ErrorContains(t, err, "first call must be 'register'")
+
+	// register wrong args
+	res, err = cm.handleRPC(&v1.RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: v1.OCRegister, Args: []interface{}{1, "hola"}})
+	assert.Nil(t, res)
+	assert.ErrorContains(t, err, "error parsing register arguments")
+
+    // set the config to allow other rpcs to be handled
+    cm.clientConfig = &types.ClientConfig{ReturnImpressionData: true}
+
+	// treatment wrong args
+	res, err = cm.handleRPC(&v1.RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: v1.OCTreatment, Args: []interface{}{1, "hola"}})
+	assert.Nil(t, res)
+	assert.ErrorContains(t, err, "error parsing treatment arguments")
+
+	// register wrong args
+	res, err = cm.handleRPC(&v1.RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: v1.OCTreatments, Args: []interface{}{1, "hola"}})
+	assert.Nil(t, res)
+	assert.ErrorContains(t, err, "error parsing treatments arguments")
+}
+
+type loggerMock struct{ mock.Mock }
+
+func (m *loggerMock) Debug(msg ...interface{})   { m.Called(msg...) }
+func (m *loggerMock) Error(msg ...interface{})   { m.Called(msg...) }
+func (m *loggerMock) Info(msg ...interface{})    { m.Called(msg...) }
+func (m *loggerMock) Verbose(msg ...interface{}) { m.Called(msg...) }
+func (m *loggerMock) Warning(msg ...interface{}) { m.Called(msg...) }
+
+var _ logging.LoggerInterface = (*loggerMock)(nil)
