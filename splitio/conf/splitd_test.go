@@ -117,6 +117,22 @@ func TestSDK(t *testing.T) {
 			Streaming: ref("streamingURL"),
 			Telemetry: ref("telemetryURL"),
 		},
+		FeatureFlags: FeatureFlags{
+			SplitNotificationQueueSize:   ref(1),
+			SplitRefreshRateSeconds:      ref(2),
+			SegmentNotificationQueueSize: ref(3),
+			SegmentRefreshRateSeconds:    ref(4),
+			SegmentUpdateWorkers:         ref(5),
+			SegmentUpdateQueueSize:       ref(6),
+		},
+		Impressions: Impressions{
+			Mode:                    ref("optimized"),
+			RefreshRateSeconds:      ref(1),
+			CountRefreshRateSeconds: ref(2),
+			QueueSize:               ref(3),
+			ObserverSize:            ref(4),
+			Watermark:               ref(5),
+		},
 	}
 
 	expected := conf.DefaultConfig()
@@ -127,7 +143,17 @@ func TestSDK(t *testing.T) {
 	expected.URLs.Events = "eventsURL"
 	expected.URLs.Streaming = "streamingURL"
 	expected.URLs.Telemetry = "telemetryURL"
-
+	expected.Splits.UpdateBufferSize = 1
+	expected.Splits.SyncPeriod = 2 * time.Second
+    expected.Segments.UpdateBufferSize = 3
+    expected.Segments.SyncPeriod = 4 * time.Second
+    expected.Segments.WorkerCount = 5
+    expected.Segments.QueueSize = 6
+    expected.Impressions.Mode = "optimized"
+    expected.Impressions.SyncPeriod = 1 * time.Second
+    expected.Impressions.CountSyncPeriod = 2 * time.Second
+    expected.Impressions.QueueSize = 3
+    expected.Impressions.ObserverSize = 4
 	assert.Equal(t, expected, sdkCFG.ToSDKConf())
 }
 

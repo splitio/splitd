@@ -47,6 +47,12 @@ type Impl struct {
 
 func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, error) {
 
+	if warnings := c.Normalize(); len(warnings) > 0 {
+		for _, w := range warnings {
+			logger.Warning(w)
+		}
+	}
+
 	md := dtos.Metadata{SDKVersion: fmt.Sprintf("splitd-%s", splitio.Version)}
 	advCfg := c.ToAdvancedConfig()
 
