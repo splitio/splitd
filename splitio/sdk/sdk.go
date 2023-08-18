@@ -1,6 +1,7 @@
 package sdk
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -24,13 +25,19 @@ import (
 
 const (
 	impressionsFullNotif = "IMPRESSIONS_FULL"
+	eventsFullNotif      = "EVENTS_FULL"
+)
+
+var (
+	ErrEventsQueueFull = errors.New("events queue full")
 )
 
 type Attributes = map[string]interface{}
 
 type Interface interface {
-	Treatment(cfg *types.ClientConfig, Key string, BucketingKey *string, Feature string, attributes map[string]interface{}) (*Result, error)
-	Treatments(cfg *types.ClientConfig, Key string, BucketingKey *string, Features []string, attributes map[string]interface{}) (map[string]Result, error)
+	Treatment(cfg *types.ClientConfig, key string, bucketingKey *string, feature string, attributes map[string]interface{}) (*EvaluationResult, error)
+	Treatments(cfg *types.ClientConfig, key string, bucketingKey *string, features []string, attributes map[string]interface{}) (map[string]EvaluationResult, error)
+	Track(cfg *types.ClientConfig, key string, trafficType string, eventType string, value *float64, properties map[string]interface{}) error
 }
 
 type Impl struct {
@@ -39,6 +46,7 @@ type Impl struct {
 	sm            synchronizer.Manager
 	ss            synchronizer.Synchronizer
 	is            *storage.ImpressionsStorage
+	es            *storage.EventsStorage
 	iq            provisional.ImpressionManager
 	cfg           sdkConf.Config
 	status        chan int
@@ -64,9 +72,9 @@ func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, 
 
 	hc := &application.Dummy{}
 
-	queueFullChan := make(chan string, 1) // Only one item so that we don't queue N flushes (which makes no sense) if we're getting hit too hard
+	queueFullChan := make(chan string, 2)
 	splitApi := api.NewSplitAPI(apikey, *advCfg, logger, md)
-	workers := setupWorkers(logger, splitApi, stores, hc, &c.Impressions)
+	workers := setupWorkers(logger, splitApi, stores, hc, c)
 	tasks := setupTasks(c, stores, logger, workers, impc, md, splitApi)
 	sync := synchronizer.NewSynchronizer(*advCfg, *tasks, *workers, logger, queueFullChan, nil)
 
@@ -89,6 +97,7 @@ func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, 
 		ss:            sync,
 		ev:            evaluator.NewEvaluator(stores.splits, stores.segments, engine.NewEngine(logger), logger),
 		is:            stores.impressions,
+		es:            stores.events,
 		iq:            impc.manager,
 		cfg:           *c,
 		queueFullChan: queueFullChan,
@@ -96,14 +105,14 @@ func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, 
 }
 
 // Treatment implements Interface
-func (i *Impl) Treatment(cfg *types.ClientConfig, key string, bk *string, feature string, attributes Attributes) (*Result, error) {
+func (i *Impl) Treatment(cfg *types.ClientConfig, key string, bk *string, feature string, attributes Attributes) (*EvaluationResult, error) {
 	res := i.ev.EvaluateFeature(key, bk, feature, attributes)
 	if res == nil {
 		return nil, fmt.Errorf("nil result")
 	}
 
 	imp := i.handleImpression(key, bk, feature, res, cfg.Metadata)
-	return &Result{
+	return &EvaluationResult{
 		Treatment:  res.Treatment,
 		Impression: imp,
 		Config:     res.Config,
@@ -111,19 +120,19 @@ func (i *Impl) Treatment(cfg *types.ClientConfig, key string, bk *string, featur
 }
 
 // Treatment implements Interface
-func (i *Impl) Treatments(cfg *types.ClientConfig, key string, bk *string, features []string, attributes Attributes) (map[string]Result, error) {
+func (i *Impl) Treatments(cfg *types.ClientConfig, key string, bk *string, features []string, attributes Attributes) (map[string]EvaluationResult, error) {
 
 	res := i.ev.EvaluateFeatures(key, bk, features, attributes)
-	toRet := make(map[string]Result, len(res.Evaluations))
+	toRet := make(map[string]EvaluationResult, len(res.Evaluations))
 	for _, feature := range features {
 
 		curr, ok := res.Evaluations[feature]
 		if !ok {
-			toRet[feature] = Result{Treatment: "control"}
+			toRet[feature] = EvaluationResult{Treatment: "control"}
 			continue
 		}
 
-		var eres Result
+		var eres EvaluationResult
 		eres.Treatment = curr.Treatment
 		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata)
 		eres.Config = curr.Config
@@ -131,6 +140,35 @@ func (i *Impl) Treatments(cfg *types.ClientConfig, key string, bk *string, featu
 	}
 
 	return toRet, nil
+}
+
+func (i *Impl) Track(cfg *types.ClientConfig, key string, trafficType string, eventType string, value *float64, properties map[string]interface{}) error {
+
+	// TODO(mredolatti): validate traffic type & truncate properties if needed
+
+	event := &dtos.EventDTO{
+		Key:             key,
+		TrafficTypeName: trafficType,
+		EventTypeID:     eventType,
+		Value:           value,
+		Timestamp:       timeMillis(),
+		Properties:      properties,
+	}
+
+	_, err := i.es.Push(cfg.Metadata, *event)
+	if err != nil {
+		if err == storage.ErrQueueFull {
+			select {
+			case i.queueFullChan <- eventsFullNotif:
+			default:
+				i.logger.Warning("events queue has filled up and is currently performing a flush. Current event will be dropped")
+			}
+			return ErrEventsQueueFull
+		}
+		i.logger.Error("error handling event: ", err)
+		return err
+	}
+	return nil
 }
 
 func (i *Impl) handleImpression(key string, bk *string, f string, r *evaluator.Result, cm types.ClientMetadata) *dtos.Impression {

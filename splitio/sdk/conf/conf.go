@@ -17,6 +17,7 @@ type Config struct {
 	Splits           Splits
 	Segments         Segments
 	Impressions      Impressions
+	Events           Events
 	URLs             URLs
 }
 
@@ -38,6 +39,12 @@ type Impressions struct {
 	QueueSize       int
 	SyncPeriod      time.Duration
 	CountSyncPeriod time.Duration
+	PostConcurrency int
+}
+
+type Events struct {
+	QueueSize       int
+	SyncPeriod      time.Duration
 	PostConcurrency int
 }
 
@@ -93,6 +100,11 @@ func DefaultConfig() *Config {
 			CountSyncPeriod: 60 * time.Minute,
 			PostConcurrency: 1,
 		},
+        Events: Events{
+            QueueSize: 8192,
+            SyncPeriod: 1*time.Minute,
+            PostConcurrency: 1,
+        },
 		URLs: URLs{
 			Auth:      "https://auth.split.io",
 			SDK:       "https://sdk.split.io/api",

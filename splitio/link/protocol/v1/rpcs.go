@@ -206,7 +206,6 @@ const (
 	TrackArgEventTypeIdx   int = 2
 	TrackArgValueIdx       int = 3
 	TrackArgPropertiesIdx  int = 4
-	TrackArgTimestampIdx   int = 5
 )
 
 type TrackArgs struct {
@@ -215,18 +214,17 @@ type TrackArgs struct {
 	EventType   string                 `msgpack:"e"`
 	Value       *float64               `msgpack:"v"`
 	Properties  map[string]interface{} `msgpack:"p"`
-	Timestamp   int64                  `msgpack:"m"`
 }
 
 func (r TrackArgs) Encode() []interface{} {
-	return []interface{}{r.Key, r.TrafficType, r.EventType, r.Value, r.Properties, r.Timestamp}
+	return []interface{}{r.Key, r.TrafficType, r.EventType, r.Value, r.Properties}
 }
 
 func (t *TrackArgs) PopulateFromRPC(rpc *RPC) error {
 	if rpc.OpCode != OCTrack {
 		return RPCParseError{Code: PECOpCodeMismatch}
 	}
-	if len(rpc.Args) != 6 {
+	if len(rpc.Args) != 5 {
 		return RPCParseError{Code: PECWrongArgCount}
 	}
 
@@ -255,11 +253,6 @@ func (t *TrackArgs) PopulateFromRPC(rpc *RPC) error {
 
 	if t.Properties, err = getOptional[map[string]interface{}](rpc.Args[TrackArgPropertiesIdx]); err != nil {
 		return RPCParseError{Code: PECInvalidArgType, Data: int64(TrackArgPropertiesIdx)}
-	}
-
-	if t.Timestamp, ok = rpc.Args[TrackArgTimestampIdx].(int64); !ok {
-		return RPCParseError{Code: PECInvalidArgType, Data: int64(TrackArgTimestampIdx)}
-
 	}
 
 	return nil

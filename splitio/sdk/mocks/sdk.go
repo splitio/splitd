@@ -17,9 +17,9 @@ func (m *SDKMock) Treatment(
 	bucketingKey *string,
 	feature string,
 	attributes map[string]interface{},
-) (*sdk.Result, error) {
+) (*sdk.EvaluationResult, error) {
 	args := m.Called(md, key, bucketingKey, feature, attributes)
-	return args.Get(0).(*sdk.Result), nil
+	return args.Get(0).(*sdk.EvaluationResult), args.Error(1)
 }
 
 // Treatments implements sdk.Interface
@@ -29,10 +29,15 @@ func (m *SDKMock) Treatments(
 	bucketingKey *string,
 	features []string,
 	attributes map[string]interface{},
-) (map[string]sdk.Result, error) {
+) (map[string]sdk.EvaluationResult, error) {
 	args := m.Called(md, key, bucketingKey, features, attributes)
-	return args.Get(0).(map[string]sdk.Result), nil
+	return args.Get(0).(map[string]sdk.EvaluationResult), args.Error(1)
 }
 
+// Track implements sdk.Interface
+func (m *SDKMock) Track(cfg *types.ClientConfig, key string, trafficType string, eventType string, value *float64, properties map[string]interface{}) error {
+    args := m.Called(cfg, key, trafficType, eventType, value, properties)
+    return args.Error(0)
+}
 
 var _ sdk.Interface = (*SDKMock)(nil)

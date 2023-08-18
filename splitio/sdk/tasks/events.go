@@ -8,22 +8,22 @@ import (
 )
 
 const (
-    defaultImpressionsBulkSize = 5000
+    defaultEventsBulkSize = 5000
 )
 
-func NewImpressionSyncTask(
-	worker *workers.MultiMetaImpressionWorker,
+func NewEventsSyncTask(
+	worker *workers.MultiMetaEventsWorker,
 	logger logging.LoggerInterface,
 	cfg *sdkconf.Impressions,
 ) *asynctask.AsyncTask {
 
 	// TODO(mredolatti): pass a proper bulk size (currently ignored, everything is flushed)
 	return asynctask.NewAsyncTask(
-		"impressions-sender",
-		func(logging.LoggerInterface) error { worker.SynchronizeImpressions(defaultImpressionsBulkSize); return nil },
+		"events-sender",
+		func(logging.LoggerInterface) error { worker.SynchronizeEvents(defaultEventsBulkSize); return nil },
 		int(cfg.SyncPeriod.Seconds()),
 		nil,
-		func(logging.LoggerInterface) { worker.SynchronizeImpressions(defaultImpressionsBulkSize) },
+		func(logging.LoggerInterface) { worker.SynchronizeEvents(defaultEventsBulkSize) },
 		logger,
 	)
 }

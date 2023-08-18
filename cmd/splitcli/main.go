@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/splitio/go-toolkit/v5/logging"
@@ -67,7 +68,20 @@ func executeCall(c types.ClientInterface, a *conf.CliArgs) (string, error) {
 	case "treatment":
 		res, err := c.Treatment(a.Key, a.BucketingKey, a.Feature, a.Attributes)
 		return res.Treatment, err
-	case "treatments", "treatmentWithConfig", "treatmentsWithConfig", "track":
+	case "treatments":
+		res, err := c.Treatments(a.Key, a.BucketingKey, a.Features, a.Attributes)
+		var sb strings.Builder
+		for _, result := range res {
+			if sb.Len() == 0 { // first item doesn't require a leading ','
+				sb.WriteString(result.Treatment)
+			} else {
+				sb.WriteString("," + result.Treatment)
+			}
+		}
+		return sb.String(), err
+	case "track":
+        return "", c.Track(a.Key, a.TrafficType, a.EventType, a.EventVal, nil)
+	case "treatmentWithConfig", "treatmentsWithConfig":
 		return "", fmt.Errorf("method '%s' is not yet implemented", a.Method)
 	default:
 		return "", fmt.Errorf("unknwon method '%s'", a.Method)
