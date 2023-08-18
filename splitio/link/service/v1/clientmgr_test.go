@@ -49,7 +49,7 @@ func TestRegisterAndTreatmentHappyPath(t *testing.T) {
 	sdkMock := &sdkMocks.SDKMock{}
 	sdkMock.
 		On("Treatment", &types.ClientConfig{Metadata: types.ClientMetadata{ID: "someID", SdkVersion: "some_sdk-1.2.3"}}, "key", (*string)(nil), "someFeature", map[string]interface{}(nil)).
-		Return(&sdk.Result{Treatment: "on"}, nil).Once()
+		Return(&sdk.EvaluationResult{Treatment: "on"}, nil).Once()
 
 	logger := logging.NewLogger(nil)
 	cm := NewClientManager(rawConnMock, logger, sdkMock, serializerMock)
@@ -83,7 +83,7 @@ func TestRegisterAndTreatmentsHappyPath(t *testing.T) {
 			Args:    []interface{}{"key", nil, []interface{}{"feat1", "feat2", "feat3"}, map[string]interface{}(nil)},
 		}
 	}).Once()
-	serializerMock.On("Serialize", proto1Mocks.NewTreatmentsResp(true, []sdk.Result{
+	serializerMock.On("Serialize", proto1Mocks.NewTreatmentsResp(true, []sdk.EvaluationResult{
 		{Treatment: "on"}, {Treatment: "off"}, {Treatment: "control"},
 	})).Return([]byte("successPayload"), nil).Once()
 
@@ -96,7 +96,7 @@ func TestRegisterAndTreatmentsHappyPath(t *testing.T) {
 			(*string)(nil),
 			[]string{"feat1", "feat2", "feat3"},
 			map[string]interface{}(nil),
-		).Return(map[string]sdk.Result{
+		).Return(map[string]sdk.EvaluationResult{
 		"feat1": {Treatment: "on"},
 		"feat2": {Treatment: "off"},
 		"feat3": {Treatment: "control"},
@@ -142,7 +142,7 @@ func TestRegisterWithImpsAndTreatmentHappyPath(t *testing.T) {
 		On("Treatment",
 			&types.ClientConfig{Metadata: types.ClientMetadata{ID: "someID", SdkVersion: "some_sdk-1.2.3"}, ReturnImpressionData: true},
 			"key", (*string)(nil), "someFeature", map[string]interface{}(nil)).
-		Return(&sdk.Result{Treatment: "on", Impression: &dtos.Impression{Label: "l1", Time: 1234556}}, nil).Once()
+		Return(&sdk.EvaluationResult{Treatment: "on", Impression: &dtos.Impression{Label: "l1", Time: 1234556}}, nil).Once()
 
 	logger := logging.NewLogger(nil)
 	cm := NewClientManager(rawConnMock, logger, sdkMock, serializerMock)
@@ -194,6 +194,7 @@ func TestManagePanicRecovers(t *testing.T) {
 
 	logger := &loggerMock{}
 	logger.On("Error", "CRITICAL - connection handler is panicking: ", "some panic").Once()
+	logger.On("Error", mock.AnythingOfType("string")).Once()
 
 	serializerMock := &serializerMocks.SerializerMock{}
 	sdkMock := &sdkMocks.SDKMock{}

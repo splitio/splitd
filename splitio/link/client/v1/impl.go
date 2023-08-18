@@ -2,8 +2,6 @@ package v1
 
 import (
 	"fmt"
-	"os"
-	"strconv"
 
 	"github.com/splitio/go-split-commons/v4/dtos"
 	"github.com/splitio/go-toolkit/v5/logging"
@@ -26,7 +24,7 @@ type Impl struct {
 	listenerFeedback bool
 }
 
-func New(logger logging.LoggerInterface, conn transfer.RawConn, serializer serializer.Interface, listenerFeedback bool) (*Impl, error) {
+func New(id string, logger logging.LoggerInterface, conn transfer.RawConn, serializer serializer.Interface, listenerFeedback bool) (*Impl, error) {
 	i := &Impl{
 		logger:           logger,
 		conn:             conn,
@@ -34,7 +32,7 @@ func New(logger logging.LoggerInterface, conn transfer.RawConn, serializer seria
 		listenerFeedback: listenerFeedback,
 	}
 
-	if err := i.register(listenerFeedback); err != nil {
+	if err := i.register(id, listenerFeedback); err != nil {
 		i.conn.Shutdown()
 		return nil, fmt.Errorf("error during client registration: %w", err)
 	}
@@ -120,7 +118,28 @@ func (c *Impl) Treatments(key string, bucketingKey string, features []string, at
 	return results, nil
 }
 
-func (c *Impl) register(impressionsFeedback bool) error {
+// Track implements types.ClientInterface
+func (c *Impl) Track(key string, trafficType string, eventType string, value *float64, properties map[string]interface{}) error {
+
+	rpc := protov1.RPC{
+		RPCBase: protocol.RPCBase{Version: protocol.V1},
+		OpCode:  protov1.OCTrack,
+		Args:    protov1.TrackArgs{Key: key, TrafficType: trafficType, EventType: eventType, Value: value, Properties: properties}.Encode(),
+	}
+
+	resp, err := doRPC[protov1.ResponseWrapper[protov1.TrackPayload]](c, &rpc)
+	if err != nil {
+		return fmt.Errorf("error executing treatment rpc: %w", err)
+	}
+
+	if resp.Status != protov1.ResultOk {
+		return fmt.Errorf("server responded treatment rpc with error %d", resp.Status)
+	}
+
+	return nil
+}
+
+func (c *Impl) register(id string, impressionsFeedback bool) error {
 	var flags protov1.RegisterFlags
 	if impressionsFeedback {
 		flags |= 1 << protov1.RegisterFlagReturnImpressionData
@@ -128,7 +147,7 @@ func (c *Impl) register(impressionsFeedback bool) error {
 	rpc := protov1.RPC{
 		RPCBase: protocol.RPCBase{Version: protocol.V1},
 		OpCode:  protov1.OCRegister,
-		Args:    protov1.RegisterArgs{ID: strconv.Itoa(os.Getpid()), SDKVersion: fmt.Sprintf("splitd-%s", splitio.Version), Flags: flags}.Encode(),
+		Args:    protov1.RegisterArgs{ID: id, SDKVersion: fmt.Sprintf("splitd-%s", splitio.Version), Flags: flags}.Encode(),
 	}
 
 	resp, err := doRPC[protov1.ResponseWrapper[protov1.RegisterPayload]](c, &rpc)

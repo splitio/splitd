@@ -24,7 +24,7 @@ func TestClientGetTreatmentNoImpression(t *testing.T) {
 	rawConnMock.On("ReceiveMessage").Return([]byte("treatmentResult"), nil).Once()
 
 	serializerMock := &serializerMocks.SerializerMock{}
-	serializerMock.On("Serialize", proto1Mocks.NewRegisterRPC(false)).Return([]byte("registrationMessage"), nil).Once()
+	serializerMock.On("Serialize", proto1Mocks.NewRegisterRPC("some", false)).Return([]byte("registrationMessage"), nil).Once()
 	serializerMock.On("Parse", []byte("registrationSuccess"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args.Get(1).(*v1.ResponseWrapper[v1.RegisterPayload]) = v1.ResponseWrapper[v1.RegisterPayload]{Status: v1.ResultOk}
 	}).Once()
@@ -37,7 +37,7 @@ func TestClientGetTreatmentNoImpression(t *testing.T) {
 			Payload: v1.TreatmentPayload{Treatment: "on"},
 		}
 	}).Once()
-	client, err := New(logger, rawConnMock, serializerMock, false)
+	client, err := New("some", logger, rawConnMock, serializerMock, false)
 	assert.NotNil(t, client)
 	assert.Nil(t, err)
 
@@ -58,7 +58,7 @@ func TestClientGetTreatmentWithImpression(t *testing.T) {
 	rawConnMock.On("ReceiveMessage").Return([]byte("treatmentResult"), nil).Once()
 
 	serializerMock := &serializerMocks.SerializerMock{}
-	serializerMock.On("Serialize", proto1Mocks.NewRegisterRPC(true)).Return([]byte("registrationMessage"), nil).Once()
+	serializerMock.On("Serialize", proto1Mocks.NewRegisterRPC("some", true)).Return([]byte("registrationMessage"), nil).Once()
 	serializerMock.On("Parse", []byte("registrationSuccess"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args.Get(1).(*v1.ResponseWrapper[v1.RegisterPayload]) = v1.ResponseWrapper[v1.RegisterPayload]{Status: v1.ResultOk}
 	}).Once()
@@ -74,7 +74,7 @@ func TestClientGetTreatmentWithImpression(t *testing.T) {
 			},
 		}
 	}).Once()
-	client, err := New(logger, rawConnMock, serializerMock, true)
+	client, err := New("some", logger, rawConnMock, serializerMock, true)
 	assert.NotNil(t, client)
 	assert.Nil(t, err)
 
@@ -104,7 +104,7 @@ func TestClientGetTreatmentsNoImpression(t *testing.T) {
 	rawConnMock.On("ReceiveMessage").Return([]byte("treatmentsResult"), nil).Once()
 
 	serializerMock := &serializerMocks.SerializerMock{}
-	serializerMock.On("Serialize", proto1Mocks.NewRegisterRPC(false)).Return([]byte("registrationMessage"), nil).Once()
+	serializerMock.On("Serialize", proto1Mocks.NewRegisterRPC("some", false)).Return([]byte("registrationMessage"), nil).Once()
 	serializerMock.On("Parse", []byte("registrationSuccess"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args.Get(1).(*v1.ResponseWrapper[v1.RegisterPayload]) = v1.ResponseWrapper[v1.RegisterPayload]{Status: v1.ResultOk}
 	}).Once()
@@ -116,7 +116,7 @@ func TestClientGetTreatmentsNoImpression(t *testing.T) {
 			Status:  v1.ResultOk,
 			Payload: v1.TreatmentsPayload{Results: []v1.TreatmentPayload{{Treatment: "on"}, {Treatment: "off"}, {Treatment: "na"}}}}
 	}).Once()
-	client, err := New(logger, rawConnMock, serializerMock, false)
+	client, err := New("some", logger, rawConnMock, serializerMock, false)
 	assert.NotNil(t, client)
 	assert.Nil(t, err)
 
@@ -142,7 +142,7 @@ func TestClientGetTreatmentsWithImpression(t *testing.T) {
 	rawConnMock.On("ReceiveMessage").Return([]byte("treatmentsResult"), nil).Once()
 
 	serializerMock := &serializerMocks.SerializerMock{}
-	serializerMock.On("Serialize", proto1Mocks.NewRegisterRPC(true)).Return([]byte("registrationMessage"), nil).Once()
+	serializerMock.On("Serialize", proto1Mocks.NewRegisterRPC("some", true)).Return([]byte("registrationMessage"), nil).Once()
 	serializerMock.On("Parse", []byte("registrationSuccess"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args.Get(1).(*v1.ResponseWrapper[v1.RegisterPayload]) = v1.ResponseWrapper[v1.RegisterPayload]{Status: v1.ResultOk}
 	}).Once()
@@ -158,7 +158,7 @@ func TestClientGetTreatmentsWithImpression(t *testing.T) {
 				{Treatment: "na", ListenerData: &v1.ListenerExtraData{Label: "l3", Timestamp: 3, ChangeNumber: 7}},
 			}}}
 	}).Once()
-	client, err := New(logger, rawConnMock, serializerMock, true)
+	client, err := New("some", logger, rawConnMock, serializerMock, true)
 	assert.NotNil(t, client)
 	assert.Nil(t, err)
 

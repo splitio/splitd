@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/splitio/go-split-commons/v4/dtos"
 	"github.com/splitio/go-split-commons/v4/service"
@@ -12,6 +13,7 @@ import (
 	"github.com/splitio/splitd/splitio/sdk/conf"
 	sss "github.com/splitio/splitd/splitio/sdk/storage"
 	"github.com/splitio/splitd/splitio/sdk/types"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -71,6 +73,48 @@ func TestImpressionsTask(t *testing.T) {
 	worker.SynchronizeImpressions(5000)
 
 	rec.AssertExpectations(t)
+}
+
+func TestImpressionsTaskNoParallelism(t *testing.T) {
+
+	// to test this, we set up a Recorder that sleeps for 1 second and returns (no err).
+	// we one call to `SyncrhonizeImpressions()` wait for 500ms, and fire another one.
+	// the second one should finish immediately, (becase it does nothing). The second one
+	// should finish after 2 seconds
+
+	is, _ := sss.NewImpressionsQueue(100)
+	ts, _ := inmemory.NewTelemetryStorage()
+	logger := logging.NewLogger(nil)
+	rec := &RecorderMock{}
+
+	worker := NewImpressionsWorker(logger, ts, rec, is, &conf.Impressions{})
+
+	rec.On("Record", mock.Anything, mock.Anything, mock.Anything).Run(func(mock.Arguments) { time.Sleep(1 * time.Second) }).Return(nil).Twice()
+
+	is.Push(types.ClientMetadata{ID: "i1", SdkVersion: "php-1.2.3"},
+		dtos.Impression{KeyName: "k1", FeatureName: "f1", Treatment: "on", Label: "l1", ChangeNumber: 123, Time: 123456})
+	is.Push(types.ClientMetadata{ID: "i2", SdkVersion: "go-1.2.3"},
+		dtos.Impression{KeyName: "k2", FeatureName: "f2", Treatment: "off", Label: "l2", ChangeNumber: 456, Time: 123457})
+
+	done := make(chan struct{})
+
+	go func() {
+		worker.SynchronizeImpressions(5000)
+		done <- struct{}{}
+	}()
+
+	time.Sleep(500 * time.Millisecond)
+	assert.Nil(t, worker.SynchronizeImpressions(5000))
+
+	// 2nd call has finished, assert that the first one hasn't:
+	select {
+	case <-done: // first call has finished, fail the test
+		assert.Fail(t, "first call shouldn't have finished yet")
+	default:
+	}
+
+	<-done // blocking wait for 1st to finish
+
 }
 
 type RecorderMock struct {

@@ -2,8 +2,6 @@ package mocks
 
 import (
 	"fmt"
-	"os"
-	"strconv"
 
 	"github.com/splitio/splitd/splitio"
 	"github.com/splitio/splitd/splitio/link/protocol"
@@ -11,7 +9,7 @@ import (
 	"github.com/splitio/splitd/splitio/sdk"
 )
 
-func NewRegisterRPC(listener bool) *v1.RPC {
+func NewRegisterRPC(id string, listener bool) *v1.RPC {
 	var flags v1.RegisterFlags
 	if listener {
 		flags = 1 << v1.RegisterFlagReturnImpressionData
@@ -19,7 +17,7 @@ func NewRegisterRPC(listener bool) *v1.RPC {
 	return &v1.RPC{
 		RPCBase: protocol.RPCBase{Version: protocol.V1},
 		OpCode:  v1.OCRegister,
-		Args:    []interface{}{strconv.Itoa(os.Getpid()), fmt.Sprintf("splitd-%s", splitio.Version), flags},
+		Args:    []interface{}{id, fmt.Sprintf("splitd-%s", splitio.Version), flags},
 	}
 }
 
@@ -64,7 +62,7 @@ func NewTreatmentResp(ok bool, treatment string, ilData *v1.ListenerExtraData) *
 	}
 }
 
-func NewTreatmentsResp(ok bool, data []sdk.Result) *v1.ResponseWrapper[v1.TreatmentsPayload] {
+func NewTreatmentsResp(ok bool, data []sdk.EvaluationResult) *v1.ResponseWrapper[v1.TreatmentsPayload] {
 	res := v1.ResultOk
 	if !ok {
 		res = v1.ResultInternalError

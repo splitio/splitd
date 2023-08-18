@@ -174,37 +174,28 @@ func TestTrackRPCParsing(t *testing.T) {
 	)
 	assert.Equal(t,
 		RPCParseError{Code: PECInvalidArgType, Data: int64(TrackArgKeyIdx)},
-		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCTrack, Args: []interface{}{nil, nil, nil, 123, 123, nil}}),
+		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCTrack, Args: []interface{}{nil, nil, nil, 123, 123}}),
 	)
 	assert.Equal(t,
 		RPCParseError{Code: PECInvalidArgType, Data: int64(TrackArgTrafficTypeIdx)},
-		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCTrack, Args: []interface{}{"key", nil, nil, "asd", 123, nil}}),
+		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCTrack, Args: []interface{}{"key", nil, nil, "asd", 123}}),
 	)
 	assert.Equal(t,
 		RPCParseError{Code: PECInvalidArgType, Data: int64(TrackArgEventTypeIdx)},
-		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCTrack, Args: []interface{}{"key", "tt", nil, "asd", 123, nil}}),
+		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCTrack, Args: []interface{}{"key", "tt", nil, "asd", 123}}),
 	)
 	assert.Equal(t,
 		RPCParseError{Code: PECInvalidArgType, Data: int64(TrackArgValueIdx)},
-		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCTrack, Args: []interface{}{"key", "tt", "et", "asd", 123, nil}}))
+		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCTrack, Args: []interface{}{"key", "tt", "et", "asd", 123}}))
 
 	assert.Equal(t,
 		RPCParseError{Code: PECInvalidArgType, Data: int64(TrackArgPropertiesIdx)},
-		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCTrack, Args: []interface{}{"key", "tt", "et", 2.8, 123, nil}}))
+		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCTrack, Args: []interface{}{"key", "tt", "et", 2.8, 123}}))
 
-	assert.Equal(t,
-		RPCParseError{Code: PECInvalidArgType, Data: int64(TrackArgTimestampIdx)},
-		r.PopulateFromRPC(&RPC{
-			RPCBase: protocol.RPCBase{Version: protocol.V1},
-			OpCode:  OCTrack,
-			Args:    []interface{}{"key", "tt", "et", 2.8, map[string]interface{}{"a": 1}, nil},
-		}))
-
-	now := time.Now()
 	err := r.PopulateFromRPC(&RPC{
 		RPCBase: protocol.RPCBase{Version: protocol.V1},
 		OpCode:  OCTrack,
-		Args:    []interface{}{"key", "tt", "et", 2.8, map[string]interface{}{"a": int64(1)}, now.UnixMilli()},
+		Args:    []interface{}{"key", "tt", "et", 2.8, map[string]interface{}{"a": int64(1)}},
 	})
 	assert.Nil(t, err)
 	assert.Equal(t, "key", r.Key)
@@ -212,13 +203,12 @@ func TestTrackRPCParsing(t *testing.T) {
 	assert.Equal(t, "et", r.EventType)
 	assert.Equal(t, ref(float64(2.8)), r.Value)
 	assert.Equal(t, map[string]interface{}{"a": int64(1)}, r.Properties)
-	assert.Equal(t, now.UnixMilli(), r.Timestamp)
 
 	// nil properties
 	err = r.PopulateFromRPC(&RPC{
 		RPCBase: protocol.RPCBase{Version: protocol.V1},
 		OpCode:  OCTrack,
-		Args:    []interface{}{"key", "tt", "et", 2.8, nil, now.UnixMilli()},
+		Args:    []interface{}{"key", "tt", "et", 2.8, nil},
 	})
 	assert.Nil(t, err)
 	assert.Equal(t, "key", r.Key)
@@ -226,14 +216,13 @@ func TestTrackRPCParsing(t *testing.T) {
 	assert.Equal(t, "et", r.EventType)
 	assert.Equal(t, ref(float64(2.8)), r.Value)
 	assert.Nil(t, r.Properties)
-	assert.Equal(t, now.UnixMilli(), r.Timestamp)
 
 	// nil value
 	r = TrackArgs{}
 	err = r.PopulateFromRPC(&RPC{
 		RPCBase: protocol.RPCBase{Version: protocol.V1},
 		OpCode:  OCTrack,
-		Args:    []interface{}{"key", "tt", "et", nil, map[string]interface{}{"a": int64(1)}, now.UnixMilli()},
+		Args:    []interface{}{"key", "tt", "et", nil, map[string]interface{}{"a": int64(1)}},
 	})
 	assert.Nil(t, err)
 	assert.Equal(t, "key", r.Key)
@@ -241,7 +230,6 @@ func TestTrackRPCParsing(t *testing.T) {
 	assert.Equal(t, "et", r.EventType)
 	assert.Nil(t, r.Value)
 	assert.Equal(t, map[string]interface{}{"a": int64(1)}, r.Properties)
-	assert.Equal(t, now.UnixMilli(), r.Timestamp)
 
 }
 
@@ -320,7 +308,6 @@ func TestRPCEncoding(t *testing.T) {
 		EventType:   "someEventType",
 		Value:       ref(123.),
 		Properties:  map[string]interface{}{"a": 1},
-		Timestamp:   123456,
 	}
 	encodedTrA := tra.Encode()
     assert.Equal(t, tra.Key, encodedTrA[TrackArgKeyIdx].(string))
@@ -328,8 +315,6 @@ func TestRPCEncoding(t *testing.T) {
     assert.Equal(t, tra.EventType, encodedTrA[TrackArgEventTypeIdx].(string))
     assert.Equal(t, *tra.Value, *encodedTrA[TrackArgValueIdx].(*float64))
     assert.Equal(t, tra.Properties, encodedTrA[TrackArgPropertiesIdx].(map[string]interface{}))
-    assert.Equal(t, tra.Timestamp, encodedTrA[TrackArgTimestampIdx].(int64))
-
 }
 
 func ref[T any](t T) *T {
