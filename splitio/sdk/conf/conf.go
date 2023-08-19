@@ -117,12 +117,7 @@ func DefaultConfig() *Config {
 
 func (c *Config) Normalize() []string {
 	var warnings []string
-	if c.Impressions.Mode != defaultImpressionsMode {
-		warnings = append(warnings, "only `optimized` impressions mode supported currently. ignoring user config")
-		c.Impressions.Mode = defaultImpressionsMode
-	}
-
-	if c.Impressions.SyncPeriod < minimumImpressionsRefreshRate {
+	if c.Impressions.Mode == "optimized" && c.Impressions.SyncPeriod < minimumImpressionsRefreshRate {
 		warnings = append(warnings, "minimum impressions refresh rate is 30 min. ignoring user config")
 		c.Impressions.SyncPeriod = minimumImpressionsRefreshRate
 	}

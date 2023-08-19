@@ -9,16 +9,10 @@ import (
 
 func TestSDKConf(t *testing.T) {
 	dc := DefaultConfig()
-	dc.Impressions.Mode = "debug"
 	dc.Impressions.SyncPeriod = 1 * time.Minute
 	warns := dc.Normalize()
-	assert.Equal(t, warns, []string{
-		"only `optimized` impressions mode supported currently. ignoring user config",
-		"minimum impressions refresh rate is 30 min. ignoring user config",
-	})
-	assert.Equal(t, "optimized", dc.Impressions.Mode)
+	assert.Equal(t, warns, []string{"minimum impressions refresh rate is 30 min. ignoring user config"})
 	assert.Equal(t, 30*time.Minute, dc.Impressions.SyncPeriod)
-
 
 	adv := dc.ToAdvancedConfig()
 	assert.Equal(t, 30, adv.HTTPTimeout)

@@ -34,7 +34,7 @@ type TreatmentsWithConfigPayload struct {
 }
 
 type TrackPayload struct {
-    Success bool
+    Success bool `msgpack:"s"`
 }
 
 type ListenerExtraData struct {

@@ -38,7 +38,7 @@ func setupWorkers(
 		SplitFetcher:       split.NewSplitFetcher(str.splits, api.SplitFetcher, logger, str.telemetry, hc),
 		SegmentFetcher:     segment.NewSegmentFetcher(str.splits, str.segments, api.SegmentFetcher, logger, str.telemetry, hc),
 		ImpressionRecorder: workers.NewImpressionsWorker(logger, str.telemetry, api.ImpressionRecorder, str.impressions, &cfg.Impressions),
-        EventRecorder: workers.NewEventsWorker(logger, str.telemetry, api.EventRecorder, str.events, &cfg.Events),
+		EventRecorder:      workers.NewEventsWorker(logger, str.telemetry, api.EventRecorder, str.events, &cfg.Events),
 	}
 }
 
@@ -53,21 +53,32 @@ func setupTasks(
 ) *synchronizer.SplitTasks {
 	impCfg := cfg.Impressions
 	evCfg := cfg.Events
-	return &synchronizer.SplitTasks{
-		SplitSyncTask:      tasks.NewFetchSplitsTask(workers.SplitFetcher, int(cfg.Splits.SyncPeriod.Seconds()), logger),
-		SegmentSyncTask:    tasks.NewFetchSegmentsTask(workers.SegmentFetcher, int(cfg.Segments.SyncPeriod.Seconds()), cfg.Segments.WorkerCount, cfg.Segments.QueueSize, logger),
-		ImpressionSyncTask: tasks.NewRecordImpressionsTask(workers.ImpressionRecorder, int(impCfg.SyncPeriod.Seconds()), logger, 5000),
-		ImpressionsCountSyncTask: tasks.NewRecordImpressionsCountTask(
-			impressionscount.NewRecorderSingle(impComponents.counter, api.ImpressionRecorder, md, logger, str.telemetry),
+	tg := &synchronizer.SplitTasks{
+		SplitSyncTask: tasks.NewFetchSplitsTask(workers.SplitFetcher, int(cfg.Splits.SyncPeriod.Seconds()), logger),
+		SegmentSyncTask: tasks.NewFetchSegmentsTask(
+			workers.SegmentFetcher,
+			int(cfg.Segments.SyncPeriod.Seconds()),
+			cfg.Segments.WorkerCount,
+			cfg.Segments.QueueSize,
 			logger,
-			int(impCfg.CountSyncPeriod.Seconds()),
 		),
+		ImpressionSyncTask:    tasks.NewRecordImpressionsTask(workers.ImpressionRecorder, int(impCfg.SyncPeriod.Seconds()), logger, 5000),
 		EventSyncTask:         tasks.NewRecordEventsTask(workers.EventRecorder, 5000, int(evCfg.SyncPeriod.Seconds()), logger),
 		TelemetrySyncTask:     &NoOpTask{},
 		UniqueKeysTask:        &NoOpTask{},
 		CleanFilterTask:       &NoOpTask{},
 		ImpsCountConsumerTask: &NoOpTask{},
 	}
+
+	if impCfg.Mode == "optimized" {
+		tg.ImpressionsCountSyncTask = tasks.NewRecordImpressionsCountTask(
+			impressionscount.NewRecorderSingle(impComponents.counter, api.ImpressionRecorder, md, logger, str.telemetry),
+			logger,
+			int(impCfg.CountSyncPeriod.Seconds()),
+		)
+	}
+
+	return tg
 }
 
 type impComponents struct {
