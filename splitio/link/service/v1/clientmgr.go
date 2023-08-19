@@ -42,7 +42,7 @@ func (m *ClientManager) Manage() {
 	defer func() {
 		if r := recover(); r != nil {
 			m.logger.Error("CRITICAL - connection handler is panicking: ", r)
-            m.logger.Error(string(debug.Stack()))
+			m.logger.Error(string(debug.Stack()))
 		}
 	}()
 	err := m.handleClientInteractions()
@@ -133,12 +133,12 @@ func (m *ClientManager) handleRPC(rpc *protov1.RPC) (interface{}, error) {
 			return nil, fmt.Errorf("error parsing treatments arguments: %w", err)
 		}
 		return m.handleGetTreatments(&args)
-    case protov1.OCTrack:
-        var args protov1.TrackArgs
-        if err := args.PopulateFromRPC(rpc); err != nil {
-            return nil, fmt.Errorf("error parsing track argumentts: %w", err)
-        }
-        return m.handleTrack(&args)
+	case protov1.OCTrack:
+		var args protov1.TrackArgs
+		if err := args.PopulateFromRPC(rpc); err != nil {
+			return nil, fmt.Errorf("error parsing track argumentts: %w", err)
+		}
+		return m.handleTrack(&args)
 
 	}
 	return nil, fmt.Errorf("RPC not implemented")
@@ -217,10 +217,8 @@ func (m *ClientManager) handleTrack(args *protov1.TrackArgs) (interface{}, error
 
 	response := &protov1.ResponseWrapper[protov1.TrackPayload]{
 		Status:  protov1.ResultOk,
-        Payload: protov1.TrackPayload{Success: err != nil}, // can only be events queue full at this point
+		Payload: protov1.TrackPayload{Success: err == nil}, // if err != nil it can only be ErrEventsQueueFull at this point
 	}
 
 	return response, nil
 }
-
-
