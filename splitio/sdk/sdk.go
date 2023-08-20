@@ -51,6 +51,7 @@ type Impl struct {
 	cfg           sdkConf.Config
 	status        chan int
 	queueFullChan chan string
+	validator     Validator
 }
 
 func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, error) {
@@ -101,6 +102,7 @@ func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, 
 		iq:            impc.manager,
 		cfg:           *c,
 		queueFullChan: queueFullChan,
+		validator:     Validator{logger},
 	}, nil
 }
 
@@ -146,6 +148,11 @@ func (i *Impl) Track(cfg *types.ClientConfig, key string, trafficType string, ev
 
 	// TODO(mredolatti): validate traffic type & truncate properties if needed
 
+    properties, _, err  := i.validator.validateTrackProperties(properties)
+    if err != nil {
+        return err
+    }
+
 	event := &dtos.EventDTO{
 		Key:             key,
 		TrafficTypeName: trafficType,
@@ -155,7 +162,9 @@ func (i *Impl) Track(cfg *types.ClientConfig, key string, trafficType string, ev
 		Properties:      properties,
 	}
 
-	_, err := i.es.Push(cfg.Metadata, *event)
+	fmt.Printf("EVENTO GENERADO: %+v\n", event)
+
+    _, err = i.es.Push(cfg.Metadata, *event)
 	if err != nil {
 		if err == storage.ErrQueueFull {
 			select {
