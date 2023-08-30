@@ -47,6 +47,35 @@ func TestClientGetTreatmentNoImpression(t *testing.T) {
 	assert.Nil(t, res.Impression)
 }
 
+func TestTrack(t *testing.T) {
+
+	logger := logging.NewLogger(nil)
+
+	rawConnMock := &transferMocks.RawConnMock{}
+	rawConnMock.On("SendMessage", []byte("registrationMessage")).Return(nil).Once()
+	rawConnMock.On("ReceiveMessage").Return([]byte("registrationSuccess"), nil).Once()
+	rawConnMock.On("SendMessage", []byte("trackMessage")).Return(nil).Once()
+	rawConnMock.On("ReceiveMessage").Return([]byte("trackResult"), nil).Once()
+
+	serializerMock := &serializerMocks.SerializerMock{}
+	serializerMock.On("Serialize", proto1Mocks.NewRegisterRPC("some", false)).Return([]byte("registrationMessage"), nil).Once()
+	serializerMock.On("Parse", []byte("registrationSuccess"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(1).(*v1.ResponseWrapper[v1.RegisterPayload]) = v1.ResponseWrapper[v1.RegisterPayload]{Status: v1.ResultOk}
+	}).Once()
+
+	serializerMock.On("Serialize", proto1Mocks.NewTrackRPC("key1", "user", "checkin", ref(2.74), map[string]interface{}{"p1": 123})).
+		Return([]byte("trackMessage"), nil).Once()
+	serializerMock.On("Parse", []byte("trackResult"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(1).(*v1.ResponseWrapper[v1.TrackPayload]) = *proto1Mocks.NewTrackResp(true)
+	}).Once()
+	client, err := New("some", logger, rawConnMock, serializerMock, false)
+	assert.NotNil(t, client)
+	assert.Nil(t, err)
+
+	err = client.Track("key1", "user", "checkin", ref(2.74), map[string]interface{}{"p1": 123})
+	assert.Nil(t, err)
+}
+
 func TestClientGetTreatmentWithImpression(t *testing.T) {
 
 	logger := logging.NewLogger(nil)

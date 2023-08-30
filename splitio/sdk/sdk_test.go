@@ -2,6 +2,7 @@ package sdk
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -9,8 +10,10 @@ import (
 	"github.com/splitio/go-split-commons/v4/dtos"
 	"github.com/splitio/go-split-commons/v4/provisional"
 	"github.com/splitio/go-split-commons/v4/service"
+	scstorage "github.com/splitio/go-split-commons/v4/storage"
 	"github.com/splitio/go-split-commons/v4/storage/inmemory"
 	"github.com/splitio/go-split-commons/v4/synchronizer"
+	"github.com/splitio/go-toolkit/v5/datastructures/set"
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio/sdk/conf"
 	"github.com/splitio/splitd/splitio/sdk/storage"
@@ -279,6 +282,116 @@ func TestImpressionsQueueFull(t *testing.T) {
 	assert.Equal(t, 1, totalSize) // assert no more impressions in queue
 }
 
+func TestTrack(t *testing.T) {
+
+	es, _ := storage.NewEventsQueue(1000)
+	logger := logging.NewLogger(nil)
+
+	ss := &SplitStorageMock{}
+	ss.On("TrafficTypeExists", "user").Return(true)
+
+	client := &Impl{
+		logger:    logging.NewLogger(nil),
+		es:        es,
+		cfg:       conf.Config{LabelsEnabled: false},
+		validator: Validator{logger, ss},
+	}
+
+	md := types.ClientConfig{Metadata: types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}}
+
+	err := client.Track(&md, "key1", "user", "checkin", ref(123.4), map[string]interface{}{"a": 123})
+	assert.Nil(t, err)
+
+	err = es.RangeAndClear(func(md types.ClientMetadata, st *storage.LockingQueue[dtos.EventDTO]) {
+		assert.Equal(t, types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}, md)
+		assert.Equal(t, 1, st.Len())
+
+		var evs []dtos.EventDTO
+		n, err := st.Pop(1, &evs)
+		assert.Nil(t, nil)
+		assert.Equal(t, 1, n)
+		assert.Equal(t, 1, len(evs))
+		assertEventEq(t, &dtos.EventDTO{
+			Key:             "key1",
+			TrafficTypeName: "user",
+			EventTypeID:     "checkin",
+			Value:           ref(123.4),
+			Properties:      map[string]interface{}{"a": 123},
+		}, &evs[0])
+		n, err = st.Pop(1, &evs)
+		assert.ErrorIs(t, err, storage.ErrQueueEmpty)
+
+	})
+	assert.Nil(t, err)
+
+	err = client.Track(&md, "key1", "", "checkin", ref(123.4), map[string]interface{}{"a": 123})
+	assert.ErrorIs(t, err, ErrEmtpyTrafficType)
+
+	err = client.Track(&md, "key1", "user", "checkin", ref(123.4), map[string]interface{}{"a": strings.Repeat("qwertyui", 100000)})
+	assert.ErrorIs(t, err, ErrEventTooBig)
+
+}
+
+func TestTrackEventsFlush(t *testing.T) {
+
+	es, _ := storage.NewEventsQueue(4)
+	logger := logging.NewLogger(nil)
+
+	ss := &SplitStorageMock{}
+	ss.On("TrafficTypeExists", "user").Return(true)
+
+	client := &Impl{
+		logger:        logging.NewLogger(nil),
+		queueFullChan: make(chan string, 2),
+		es:            es,
+		cfg:           conf.Config{LabelsEnabled: false},
+		validator:     Validator{logger, ss},
+	}
+
+	md := types.ClientConfig{Metadata: types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}}
+
+	err := client.Track(&md, "key1", "user", "checkin", ref(123.4), map[string]interface{}{"a": 123})
+	assert.Nil(t, err)
+	err = client.Track(&md, "key2", "user", "checkin", ref(123.4), map[string]interface{}{"a": 123})
+	assert.Nil(t, err)
+	err = client.Track(&md, "key3", "user", "checkin", ref(123.4), map[string]interface{}{"a": 123})
+	assert.Nil(t, err)
+	err = client.Track(&md, "key4", "user", "checkin", ref(123.4), map[string]interface{}{"a": 123})
+	assert.ErrorIs(t, err, ErrEventsQueueFull)
+
+	assert.Equal(t, "EVENTS_FULL", <-client.queueFullChan)
+	/*
+		err = es.RangeAndClear(func(md types.ClientMetadata, st *storage.LockingQueue[dtos.EventDTO]) {
+			assert.Equal(t, types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}, md)
+			assert.Equal(t, 1, st.Len())
+
+			var evs []dtos.EventDTO
+			n, err := st.Pop(1, &evs)
+			assert.Nil(t, nil)
+			assert.Equal(t, 1, n)
+			assert.Equal(t, 1, len(evs))
+			assertEventEq(t, &dtos.EventDTO{
+				Key:             "key1",
+				TrafficTypeName: "user",
+				EventTypeID:     "checkin",
+				Value:           ref(123.4),
+				Properties:      map[string]interface{}{"a": 123},
+			}, &evs[0])
+			n, err = st.Pop(1, &evs)
+			assert.ErrorIs(t, err, storage.ErrQueueEmpty)
+
+		})
+		assert.Nil(t, err)
+
+		err = client.Track(&md, "key1", "", "checkin", ref(123.4), map[string]interface{}{"a": 123})
+		assert.ErrorIs(t, err, ErrEmtpyTrafficType)
+
+		err = client.Track(&md, "key1", "user", "checkin", ref(123.4), map[string]interface{}{"a": strings.Repeat("qwertyui", 100000)})
+		assert.ErrorIs(t, err, ErrEventTooBig)
+	*/
+
+}
+
 func assertImpEq(t *testing.T, i1, i2 *dtos.Impression) {
 	t.Helper()
 	assert.Equal(t, i1.KeyName, i2.KeyName)
@@ -287,6 +400,15 @@ func assertImpEq(t *testing.T, i1, i2 *dtos.Impression) {
 	assert.Equal(t, i1.Treatment, i2.Treatment)
 	assert.Equal(t, i1.Label, i2.Label)
 	assert.Equal(t, i1.ChangeNumber, i2.ChangeNumber)
+}
+
+func assertEventEq(t *testing.T, e1, e2 *dtos.EventDTO) {
+	t.Helper()
+	assert.Equal(t, e1.Key, e2.Key)
+	assert.Equal(t, e1.TrafficTypeName, e2.TrafficTypeName)
+	assert.Equal(t, e1.EventTypeID, e2.EventTypeID)
+	assert.Equal(t, e1.Value, e2.Value)
+	assert.Equal(t, e1.Properties, e2.Properties)
 }
 
 // mocks
@@ -339,6 +461,28 @@ func (m *ImpressionRecorderMock) RecordImpressionsCount(pf dtos.ImpressionsCount
 	return args.Error(0)
 }
 
+type SplitStorageMock struct{ mock.Mock }
+
+func (m *SplitStorageMock) All() []dtos.SplitDTO                           { panic("unimplemented") }
+func (m *SplitStorageMock) ChangeNumber() (int64, error)                   { panic("unimplemented") }
+func (m *SplitStorageMock) FetchMany([]string) map[string]*dtos.SplitDTO   { panic("unimplemented") }
+func (m *SplitStorageMock) KillLocally(string, string, int64)              { panic("unimplemented") }
+func (m *SplitStorageMock) SegmentNames() *set.ThreadUnsafeSet             { panic("unimplemented") }
+func (m *SplitStorageMock) SetChangeNumber(changeNumber int64) error       { panic("unimplemented") }
+func (m *SplitStorageMock) Split(splitName string) *dtos.SplitDTO          { panic("unimplemented") }
+func (m *SplitStorageMock) SplitNames() []string                           { panic("unimplemented") }
+func (m *SplitStorageMock) Update([]dtos.SplitDTO, []dtos.SplitDTO, int64) { panic("unimplemented") }
+
+func (m *SplitStorageMock) TrafficTypeExists(trafficType string) bool {
+	args := m.Called(trafficType)
+	return args.Bool(0)
+}
+
+func ref[T any](t T) *T {
+	return &t
+}
+
+var _ scstorage.SplitStorage = (*SplitStorageMock)(nil)
 var _ evaluator.Interface = (*EvaluatorMock)(nil)
 var _ provisional.ImpressionManager = (*ImpressionManagerMock)(nil)
 var _ service.ImpressionsRecorder = (*ImpressionRecorderMock)(nil)
