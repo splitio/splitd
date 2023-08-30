@@ -217,7 +217,14 @@ type TrackArgs struct {
 }
 
 func (r TrackArgs) Encode() []interface{} {
-	return []interface{}{r.Key, r.TrafficType, r.EventType, r.Value, r.Properties}
+	asInterface := make([]interface{}, 0, 5)
+	asInterface = append(asInterface, r.Key, r.TrafficType, r.EventType)
+	if r.Value == nil {
+		asInterface = append(asInterface, nil)
+	}
+	asInterface = append(asInterface, *r.Value)
+	asInterface = append(asInterface, r.Properties)
+	return asInterface
 }
 
 func (t *TrackArgs) PopulateFromRPC(rpc *RPC) error {

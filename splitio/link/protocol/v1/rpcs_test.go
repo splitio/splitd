@@ -313,7 +313,7 @@ func TestRPCEncoding(t *testing.T) {
     assert.Equal(t, tra.Key, encodedTrA[TrackArgKeyIdx].(string))
     assert.Equal(t, tra.TrafficType, encodedTrA[TrackArgTrafficTypeIdx].(string))
     assert.Equal(t, tra.EventType, encodedTrA[TrackArgEventTypeIdx].(string))
-    assert.Equal(t, *tra.Value, *encodedTrA[TrackArgValueIdx].(*float64))
+    assert.Equal(t, *tra.Value, encodedTrA[TrackArgValueIdx].(float64))
     assert.Equal(t, tra.Properties, encodedTrA[TrackArgPropertiesIdx].(map[string]interface{}))
 }
 

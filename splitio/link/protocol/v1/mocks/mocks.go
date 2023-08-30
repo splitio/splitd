@@ -37,6 +37,14 @@ func NewTreatmentsRPC(key string, bucketing string, features []string, attrs map
 	}
 }
 
+func NewTrackRPC(key string, trafficType string, eventType string, eventVal *float64, props map[string]interface{}) *v1.RPC {
+	return &v1.RPC{
+		RPCBase: protocol.RPCBase{Version: protocol.V1},
+		OpCode:  v1.OCTrack,
+		Args:    []interface{}{key, trafficType, eventType, nilOrVal(eventVal), props},
+	}
+}
+
 func NewRegisterResp(ok bool) *v1.ResponseWrapper[v1.RegisterPayload] {
 	res := v1.ResultOk
 	if !ok {
@@ -85,4 +93,22 @@ func NewTreatmentsResp(ok bool, data []sdk.EvaluationResult) *v1.ResponseWrapper
 		Status:  res,
 		Payload: v1.TreatmentsPayload{Results: payload},
 	}
+}
+
+func NewTrackResp(ok bool) *v1.ResponseWrapper[v1.TrackPayload] {
+	res := v1.ResultOk
+	if !ok {
+		res = v1.ResultInternalError
+	}
+	return &v1.ResponseWrapper[v1.TrackPayload]{
+		Status:  res,
+		Payload: v1.TrackPayload{Success: ok},
+	}
+}
+
+func nilOrVal(v *float64) interface{} {
+	if v == nil {
+		return nil
+	}
+	return *v
 }

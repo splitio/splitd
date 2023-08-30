@@ -102,7 +102,7 @@ func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, 
 		iq:            impc.manager,
 		cfg:           *c,
 		queueFullChan: queueFullChan,
-		validator:     Validator{logger},
+		validator:     Validator{logger: logger, splits: stores.splits},
 	}, nil
 }
 
@@ -147,11 +147,15 @@ func (i *Impl) Treatments(cfg *types.ClientConfig, key string, bk *string, featu
 func (i *Impl) Track(cfg *types.ClientConfig, key string, trafficType string, eventType string, value *float64, properties map[string]interface{}) error {
 
 	// TODO(mredolatti): validate traffic type & truncate properties if needed
+	trafficType, err := i.validator.validateTrafficType(trafficType)
+	if err != nil {
+		return err
+	}
 
-    properties, _, err  := i.validator.validateTrackProperties(properties)
-    if err != nil {
-        return err
-    }
+	properties, _, err = i.validator.validateTrackProperties(properties)
+	if err != nil {
+		return err
+	}
 
 	event := &dtos.EventDTO{
 		Key:             key,
@@ -162,9 +166,7 @@ func (i *Impl) Track(cfg *types.ClientConfig, key string, trafficType string, ev
 		Properties:      properties,
 	}
 
-	fmt.Printf("EVENTO GENERADO: %+v\n", event)
-
-    _, err = i.es.Push(cfg.Metadata, *event)
+	_, err = i.es.Push(cfg.Metadata, *event)
 	if err != nil {
 		if err == storage.ErrQueueFull {
 			select {
