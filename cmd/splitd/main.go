@@ -15,25 +15,27 @@ import (
 
 func main() {
 
-    printHeader()
+	printHeader()
 
 	cfg, err := conf.ReadConfig()
 	if err != nil {
 		fmt.Println("error reading config: ", err.Error())
 		os.Exit(1)
 	}
-    handleFlags(cfg)
+	handleFlags(cfg)
 
-	logger := logging.NewLogger(cfg.Logger.ToLoggerOptions())
+	loggerCfg, err := cfg.Logger.ToLoggerOptions()
+	exitOnErr("logging setup", err)
+	logger := logging.NewLogger(loggerCfg)
 
 	splitSDK, err := sdk.New(logger, cfg.SDK.Apikey, cfg.SDK.ToSDKConf())
-    exitOnErr("sdk initialization", err)
+	exitOnErr("sdk initialization", err)
 
-    linkCFG, err := cfg.Link.ToListenerOpts()
-    exitOnErr("link config", err)
+	linkCFG, err := cfg.Link.ToListenerOpts()
+	exitOnErr("link config", err)
 
 	errc, lShutdown, err := link.Listen(logger, splitSDK, linkCFG)
-    exitOnErr("rpc listener setup", err)
+	exitOnErr("rpc listener setup", err)
 
 	shutdown := util.NewShutdownHandler()
 	shutdown.RegisterHook(func() {
@@ -46,26 +48,26 @@ func main() {
 
 	// Wait for connection to end (either gracefully of because of an error)
 	err = <-errc
-    exitOnErr("shutdown: ", err)
+	exitOnErr("shutdown: ", err)
 }
 
 func printHeader() {
-    fmt.Println(splitio.ASCILogo)
-    fmt.Printf("Splitd Agent - Version %s. (2023)\n\n", splitio.Version)
+	fmt.Println(splitio.ASCILogo)
+	fmt.Printf("Splitd Agent - Version %s. (2023)\n\n", splitio.Version)
 }
 
 func handleFlags(cfg *conf.Config) {
-    printConf := flag.Bool("outputConfig", false, "print config (with partially obfuscated apikey)")
-    flag.Parse()
-    if *printConf {
-        fmt.Printf("\nConfig: %s\n", cfg)
-        os.Exit(0)
-    }
+	printConf := flag.Bool("outputConfig", false, "print config (with partially obfuscated apikey)")
+	flag.Parse()
+	if *printConf {
+		fmt.Printf("\nConfig: %s\n", cfg)
+		os.Exit(0)
+	}
 }
 
 func exitOnErr(ctxStr string, err error) {
 	if err != nil {
-        fmt.Printf("%s: startup error: %s\n", ctxStr, err.Error())
+		fmt.Printf("%s: startup error: %s\n", ctxStr, err.Error())
 		os.Exit(1)
 	}
 

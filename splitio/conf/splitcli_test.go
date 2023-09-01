@@ -39,7 +39,7 @@ func TestCliConfig(t *testing.T) {
 	assert.Equal(t, []string{"someFeature1", "someFeature2"}, parsed.Features)
 	assert.Equal(t, "someTrafficType", parsed.TrafficType)
 	assert.Equal(t, "someEventType", parsed.EventType)
-	assert.Equal(t, 0.123, parsed.EventVal)
+	assert.Equal(t, ref(float64(0.123)), parsed.EventVal)
 	assert.Equal(t, map[string]interface{}{"some": "attribute"}, parsed.Attributes)
 
 	// test bad buffer size
@@ -63,32 +63,32 @@ func TestCliConfig(t *testing.T) {
 }
 
 func TestLinkOptions(t *testing.T) {
-    // test defaults
-    os.Args = os.Args[:1]
+	// test defaults
+	os.Args = os.Args[:1]
 	parsed, err := ParseCliArgs()
 	assert.Nil(t, err)
 	lo, err := parsed.LinkOpts()
 	assert.Nil(t, err)
 	assert.Equal(t, link.DefaultConsumerOptions(), *lo)
 
-    // test bad protocol
-    os.Args = []string{os.Args[0], "-protocol=sarasa"}
+	// test bad protocol
+	os.Args = []string{os.Args[0], "-protocol=sarasa"}
 	parsed, err = ParseCliArgs()
 	assert.Nil(t, err)
 	lo, err = parsed.LinkOpts()
 	assert.NotNil(t, err)
 	assert.ErrorContains(t, err, "protocol")
 
-    // test bad conn type
-    os.Args = []string{os.Args[0], "-conn-type=sarasa"}
+	// test bad conn type
+	os.Args = []string{os.Args[0], "-conn-type=sarasa"}
 	parsed, err = ParseCliArgs()
 	assert.Nil(t, err)
 	lo, err = parsed.LinkOpts()
 	assert.NotNil(t, err)
 	assert.ErrorContains(t, err, "connection type")
 
-    // test bad serialization
-    os.Args = []string{os.Args[0], "-serialization=pinpin"}
+	// test bad serialization
+	os.Args = []string{os.Args[0], "-serialization=pinpin"}
 	parsed, err = ParseCliArgs()
 	assert.Nil(t, err)
 	lo, err = parsed.LinkOpts()

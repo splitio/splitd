@@ -14,6 +14,7 @@ import (
 )
 
 type CliArgs struct {
+	ID             string
 	LogLevel       string
 	Protocol       string
 	Serialization  string
@@ -31,13 +32,15 @@ type CliArgs struct {
 	Features     []string
 	TrafficType  string
 	EventType    string
-	EventVal     float64
+	EventVal     *float64
 	Attributes   map[string]interface{}
 }
 
 func (a *CliArgs) LinkOpts() (*link.ConsumerOptions, error) {
 
 	opts := link.DefaultConsumerOptions()
+	cc.SetIfNotEmpty(&opts.Consumer.ID, &a.ID)
+
 
 	var err error
 	if a.Protocol != "" {
@@ -45,13 +48,11 @@ func (a *CliArgs) LinkOpts() (*link.ConsumerOptions, error) {
 			return nil, fmt.Errorf("invalid protocol version %s", a.Protocol)
 		}
 	}
-
 	if a.ConnType != "" {
 		if opts.Transfer.ConnType, err = cc.ParseConnType(a.ConnType); err != nil {
 			return nil, fmt.Errorf("invalid connection type %s", a.ConnType)
 		}
 	}
-
 	if a.Serialization != "" {
 		if opts.Serialization, err = cc.ParseSerializer(a.Serialization); err != nil {
 			return nil, fmt.Errorf("invalid serialization %s", a.Serialization)
@@ -69,6 +70,7 @@ func (a *CliArgs) LinkOpts() (*link.ConsumerOptions, error) {
 func ParseCliArgs() (*CliArgs, error) {
 
 	cliFlags := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
+	id := cliFlags.String("id", "", "ID to use for internal event queuing separation. Defaults to app's pid")
 	p := cliFlags.String("protocol", "", "Protocol version [v1]")
 	s := cliFlags.String("serialization", "", "Client-Daemon communication serialization mechanism [msgpack]")
 	ll := cliFlags.String("log-level", "INFO", "log level [ERROR,WARNING,INFO,DEBUG]")
@@ -89,9 +91,13 @@ func ParseCliArgs() (*CliArgs, error) {
 		return nil, fmt.Errorf("error parsing arguments: %w", err)
 	}
 
-	val, err := strconv.ParseFloat(*ev, 64)
-	if *ev != "" && err != nil {
-		return nil, fmt.Errorf("error parsing event value")
+	var eventVal *float64
+	if *ev != "" {
+		val, err := strconv.ParseFloat(*ev, 64)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing event value")
+		}
+		eventVal = &val
 	}
 
 	if *at == "" {
@@ -103,20 +109,21 @@ func ParseCliArgs() (*CliArgs, error) {
 	}
 
 	return &CliArgs{
-        Serialization: *s,
-		Protocol:     *p,
-		LogLevel:     *ll,
-		ConnType:     *ct,
-		ConnAddr:     *ca,
-		BufSize:      *bs,
-		Method:       *m,
-		Key:          *k,
-		BucketingKey: *bk,
-		Feature:      *f,
-		Features:     strings.Split(*fs, ","),
-		TrafficType:  *tt,
-		EventType:    *et,
-		EventVal:     val,
-		Attributes:   attrs,
+		ID:            *id,
+		Serialization: *s,
+		Protocol:      *p,
+		LogLevel:      *ll,
+		ConnType:      *ct,
+		ConnAddr:      *ca,
+		BufSize:       *bs,
+		Method:        *m,
+		Key:           *k,
+		BucketingKey:  *bk,
+		Feature:       *f,
+		Features:      strings.Split(*fs, ","),
+		TrafficType:   *tt,
+		EventType:     *et,
+		EventVal:      eventVal,
+		Attributes:    attrs,
 	}, nil
 }
