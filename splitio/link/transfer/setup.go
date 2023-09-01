@@ -39,7 +39,7 @@ func NewAcceptor(logger logging.LoggerInterface, o *Options, listenerConfig *Acc
 	return newAcceptor(address, connFactory, logger, listenerConfig), nil
 }
 
-func NewClientConn(o *Options) (RawConn, error) {
+func NewClientConn(logger logging.LoggerInterface, o *Options) (RawConn, error) {
 
 	var address net.Addr
 	var framer framing.Interface
@@ -64,7 +64,6 @@ func NewClientConn(o *Options) (RawConn, error) {
 type Options struct {
 	ConnType     ConnType
 	Address      string
-	Logger       logging.LoggerInterface
 	BufferSize   int
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
@@ -74,7 +73,6 @@ func DefaultOpts() Options {
 	return Options{
 		ConnType:     ConnTypeUnixSeqPacket,
 		Address:      "/var/run/splitd.sock",
-		Logger:       logging.NewLogger(nil),
 		BufferSize:   1024,
 		ReadTimeout:  1 * time.Second,
 		WriteTimeout: 1 * time.Second,
