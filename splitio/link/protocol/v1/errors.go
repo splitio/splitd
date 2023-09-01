@@ -1,14 +1,7 @@
 package v1
 
 import (
-	"errors"
 	"strconv"
-)
-
-var (
-	ErrInternal          = errors.New("internal agent error")
-	ErrOpcodeArgMismatch = errors.New("opcode doesn't match arguments type")
-	ErrIncorrectArgCount = errors.New("invalid argument count")
 )
 
 type RPCParseErrorCode int
