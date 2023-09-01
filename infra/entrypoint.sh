@@ -34,6 +34,10 @@ accum=$(yq '.sdk.apikey = env(SPLITD_APIKEY) | .link.address = env(SPLITD_LINK_A
 # logger configs
 [ ! -z ${SPLITD_LOG_LEVEL+x} ] 		        && accum=$(echo "${accum}" | yq '.logging.level = env(SPLITD_LOG_LEVEL)')
 # @}
+
+# Ensure that the socket-file is read-writable by anyone
+umask 000
+
 # Output final config and start daemon
 echo "${accum}" > ${SPLITD_CFG_OUTPUT}
 exec env SPLITD_CONF_FILE="${SPLITD_CFG_OUTPUT}" "${SPLITD_EXEC}" $@
