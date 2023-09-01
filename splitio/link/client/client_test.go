@@ -1,6 +1,8 @@
 package client
 
 import (
+	"os"
+	"strconv"
 	"testing"
 
 	"github.com/splitio/go-toolkit/v5/logging"
@@ -36,4 +38,11 @@ func TestClientUnknownProtocol(t *testing.T) {
 	c, err := New(logger, connMock, serializeMock, Options{Protocol: protocol.Version(252), ImpressionsFeedback: false})
 	assert.Nil(t, c)
 	assert.ErrorContains(t, err, "unknown protocol")
+}
+
+func TestDefaultOpts(t *testing.T) {
+    do := DefaultOptions()
+    assert.Equal(t, strconv.Itoa(os.Getpid()), do.ID)
+    assert.Equal(t, false, do.ImpressionsFeedback)
+    assert.Equal(t, protocol.V1, do.Protocol)
 }

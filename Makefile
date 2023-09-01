@@ -9,6 +9,8 @@ SHELL = /usr/bin/env bash -o pipefail
 PLATFORM ?=
 PLATFORM_STR := $(if $(PLATFORM),--platform=$(PLATFORM),)
 
+COVERAGE_FILE ?= coverage.out
+
 VERSION	:= $(shell cat splitio/version.go | grep 'const Version' | sed 's/const Version = //' | tr -d '"')
 GO_FILES := $(shell find . -name "*.go") go.sum
 
@@ -35,7 +37,11 @@ test: unit-tests entrypoint-test
 
 ## run go unit tests
 unit-tests:
-	$(GO) test ./... -count=1 -race -coverprofile=coverage.out
+	$(GO) test ./... -count=1 -race -coverprofile=$(COVERAGE_FILE)
+
+## display unit test coverage derived from last test run (use `make test display-coverage` for up-to-date results)
+display-coverage: coverage.out
+	go tool cover -html=coverage.out
 
 ## run bash entrypoint tests
 entrypoint-test: splitd # requires splitd binary to generate a config and validate env var forwarding
@@ -58,6 +64,8 @@ images_release: # entrypoints
 
 ## build release for binaires
 binaries_release: splitd-linux-amd64-$(VERSION).bin splitd-darwin-amd64-$(VERSION).bin splitd-linux-arm-$(VERSION).bin splitd-darwin-arm-$(VERSION).bin
+
+$(COVERAGE_FILE): unit-tests
 
 splitd-linux-amd64-$(VERSION).bin: $(GO_FILES)
 	GOARCH=amd64 GOOS=linux $(GO) build -o $@ cmd/splitd/main.go
