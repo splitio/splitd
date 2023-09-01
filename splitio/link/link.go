@@ -61,24 +61,24 @@ type ListenerOptions struct {
 }
 
 func DefaultListenerOptions() ListenerOptions {
-    return ListenerOptions{
-        Transfer: transfer.DefaultOpts(),
-        Acceptor: transfer.DefaultAcceptorConfig(),
-        Serialization: serializer.MsgPack,
-        Protocol: protocol.V1,
-    }
+	return ListenerOptions{
+		Transfer:      transfer.DefaultOpts(),
+		Acceptor:      transfer.DefaultAcceptorConfig(),
+		Serialization: serializer.MsgPack,
+		Protocol:      protocol.V1,
+	}
 }
 
 type ConsumerOptions struct {
-	Transfer           transfer.Options
-	Consumer           client.Options
-	Serialization      serializer.Mechanism
+	Transfer      transfer.Options
+	Consumer      client.Options
+	Serialization serializer.Mechanism
 }
 
 func DefaultConsumerOptions() ConsumerOptions {
-    return ConsumerOptions{
-        Transfer: transfer.DefaultOpts(),
-        Consumer: client.DefaultOptions(),
-        Serialization: serializer.MsgPack,
-    }
+	return ConsumerOptions{
+		Transfer:      transfer.DefaultOpts(),
+		Consumer:      client.DefaultOptions(),
+		Serialization: serializer.MsgPack,
+	}
 }

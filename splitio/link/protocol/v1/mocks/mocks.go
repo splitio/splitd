@@ -2,8 +2,6 @@ package mocks
 
 import (
 	"fmt"
-	"os"
-	"strconv"
 
 	"github.com/splitio/splitd/splitio"
 	"github.com/splitio/splitd/splitio/link/protocol"
@@ -11,7 +9,7 @@ import (
 	"github.com/splitio/splitd/splitio/sdk"
 )
 
-func NewRegisterRPC(listener bool) *v1.RPC {
+func NewRegisterRPC(id string, listener bool) *v1.RPC {
 	var flags v1.RegisterFlags
 	if listener {
 		flags = 1 << v1.RegisterFlagReturnImpressionData
@@ -19,7 +17,7 @@ func NewRegisterRPC(listener bool) *v1.RPC {
 	return &v1.RPC{
 		RPCBase: protocol.RPCBase{Version: protocol.V1},
 		OpCode:  v1.OCRegister,
-		Args:    []interface{}{strconv.Itoa(os.Getpid()), fmt.Sprintf("splitd-%s", splitio.Version), flags},
+		Args:    []interface{}{id, fmt.Sprintf("splitd-%s", splitio.Version), flags},
 	}
 }
 
@@ -36,6 +34,14 @@ func NewTreatmentsRPC(key string, bucketing string, features []string, attrs map
 		RPCBase: protocol.RPCBase{Version: protocol.V1},
 		OpCode:  v1.OCTreatments,
 		Args:    []interface{}{key, bucketing, features, attrs},
+	}
+}
+
+func NewTrackRPC(key string, trafficType string, eventType string, eventVal *float64, props map[string]interface{}) *v1.RPC {
+	return &v1.RPC{
+		RPCBase: protocol.RPCBase{Version: protocol.V1},
+		OpCode:  v1.OCTrack,
+		Args:    []interface{}{key, trafficType, eventType, nilOrVal(eventVal), props},
 	}
 }
 
@@ -64,7 +70,7 @@ func NewTreatmentResp(ok bool, treatment string, ilData *v1.ListenerExtraData) *
 	}
 }
 
-func NewTreatmentsResp(ok bool, data []sdk.Result) *v1.ResponseWrapper[v1.TreatmentsPayload] {
+func NewTreatmentsResp(ok bool, data []sdk.EvaluationResult) *v1.ResponseWrapper[v1.TreatmentsPayload] {
 	res := v1.ResultOk
 	if !ok {
 		res = v1.ResultInternalError
@@ -87,4 +93,22 @@ func NewTreatmentsResp(ok bool, data []sdk.Result) *v1.ResponseWrapper[v1.Treatm
 		Status:  res,
 		Payload: v1.TreatmentsPayload{Results: payload},
 	}
+}
+
+func NewTrackResp(ok bool) *v1.ResponseWrapper[v1.TrackPayload] {
+	res := v1.ResultOk
+	if !ok {
+		res = v1.ResultInternalError
+	}
+	return &v1.ResponseWrapper[v1.TrackPayload]{
+		Status:  res,
+		Payload: v1.TrackPayload{Success: ok},
+	}
+}
+
+func nilOrVal(v *float64) interface{} {
+	if v == nil {
+		return nil
+	}
+	return *v
 }

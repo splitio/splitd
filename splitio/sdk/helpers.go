@@ -31,13 +31,14 @@ func setupWorkers(
 	api *api.SplitAPI,
 	str *storages,
 	hc application.MonitorProducerInterface,
-	cfg *sdkConf.Impressions,
+	cfg *sdkConf.Config,
 
 ) *synchronizer.Workers {
 	return &synchronizer.Workers{
 		SplitFetcher:       split.NewSplitFetcher(str.splits, api.SplitFetcher, logger, str.telemetry, hc),
 		SegmentFetcher:     segment.NewSegmentFetcher(str.splits, str.segments, api.SegmentFetcher, logger, str.telemetry, hc),
-		ImpressionRecorder: workers.NewImpressionsWorker(logger, str.telemetry, api.ImpressionRecorder, str.impressions, cfg),
+		ImpressionRecorder: workers.NewImpressionsWorker(logger, str.telemetry, api.ImpressionRecorder, str.impressions, &cfg.Impressions),
+		EventRecorder:      workers.NewEventsWorker(logger, str.telemetry, api.EventRecorder, str.events, &cfg.Events),
 	}
 }
 
@@ -51,22 +52,33 @@ func setupTasks(
 	api *api.SplitAPI,
 ) *synchronizer.SplitTasks {
 	impCfg := cfg.Impressions
-	return &synchronizer.SplitTasks{
-		SplitSyncTask:      tasks.NewFetchSplitsTask(workers.SplitFetcher, int(cfg.Splits.SyncPeriod.Seconds()), logger),
-		SegmentSyncTask:    tasks.NewFetchSegmentsTask(workers.SegmentFetcher, int(cfg.Segments.SyncPeriod.Seconds()), cfg.Segments.WorkerCount, cfg.Segments.QueueSize, logger),
-		ImpressionSyncTask: tasks.NewRecordImpressionsTask(workers.ImpressionRecorder, int(impCfg.SyncPeriod.Seconds()), logger, 5000),
-		//ImpressionSyncTask: tss.NewImpressionSyncTask(workers.ImpressionRecorder, logger, cfg.Impressions),
-		ImpressionsCountSyncTask: tasks.NewRecordImpressionsCountTask(
-			impressionscount.NewRecorderSingle(impComponents.counter, api.ImpressionRecorder, md, logger, str.telemetry),
+	evCfg := cfg.Events
+	tg := &synchronizer.SplitTasks{
+		SplitSyncTask: tasks.NewFetchSplitsTask(workers.SplitFetcher, int(cfg.Splits.SyncPeriod.Seconds()), logger),
+		SegmentSyncTask: tasks.NewFetchSegmentsTask(
+			workers.SegmentFetcher,
+			int(cfg.Segments.SyncPeriod.Seconds()),
+			cfg.Segments.WorkerCount,
+			cfg.Segments.QueueSize,
 			logger,
-			int(impCfg.CountSyncPeriod.Seconds()),
 		),
+		ImpressionSyncTask:    tasks.NewRecordImpressionsTask(workers.ImpressionRecorder, int(impCfg.SyncPeriod.Seconds()), logger, 5000),
+		EventSyncTask:         tasks.NewRecordEventsTask(workers.EventRecorder, 5000, int(evCfg.SyncPeriod.Seconds()), logger),
 		TelemetrySyncTask:     &NoOpTask{},
-		EventSyncTask:         &NoOpTask{},
 		UniqueKeysTask:        &NoOpTask{},
 		CleanFilterTask:       &NoOpTask{},
 		ImpsCountConsumerTask: &NoOpTask{},
 	}
+
+	if impCfg.Mode == "optimized" {
+		tg.ImpressionsCountSyncTask = tasks.NewRecordImpressionsCountTask(
+			impressionscount.NewRecorderSingle(impComponents.counter, api.ImpressionRecorder, md, logger, str.telemetry),
+			logger,
+			int(impCfg.CountSyncPeriod.Seconds()),
+		)
+	}
+
+	return tg
 }
 
 type impComponents struct {
@@ -103,16 +115,19 @@ type storages struct {
 	segments    storage.SegmentStorage
 	telemetry   storage.TelemetryStorage
 	impressions *sss.ImpressionsStorage
+	events      *sss.EventsStorage
 }
 
 func setupStorages(cfg *sdkConf.Config) *storages {
 	ts, _ := inmemory.NewTelemetryStorage()
 	iq, _ := sss.NewImpressionsQueue(cfg.Impressions.QueueSize)
+	eq, _ := sss.NewEventsQueue(cfg.Events.QueueSize)
 
 	return &storages{
 		splits:      mutexmap.NewMMSplitStorage(),
 		segments:    mutexmap.NewMMSegmentStorage(),
 		impressions: iq,
+		events:      eq,
 		telemetry:   ts,
 	}
 }
