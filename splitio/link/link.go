@@ -45,7 +45,7 @@ func Consumer(logger logging.LoggerInterface, opts *ConsumerOptions) (types.Clie
 		return nil, fmt.Errorf("error building serializer")
 	}
 
-	conn, err := transfer.NewClientConn(&opts.Transfer)
+	conn, err := transfer.NewClientConn(logger, &opts.Transfer)
 	if err != nil {
 		return nil, fmt.Errorf("errpr creating connection: %w", err)
 	}

@@ -59,7 +59,7 @@ func TestAcceptor(t *testing.T) {
 	clientOpts.Address = serverSockFN
 	clientOpts.ConnType = ConnTypeUnixStream
 
-	client1, err := NewClientConn(&clientOpts)
+	client1, err := NewClientConn(logger, &clientOpts)
 	assert.Nil(t, err)
 	assert.NotNil(t, client1)
 	err = client1.SendMessage([]byte("some"))
@@ -68,7 +68,7 @@ func TestAcceptor(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, []byte("thing"), recv)
 
-	client2, err := NewClientConn(&clientOpts)
+	client2, err := NewClientConn(logger, &clientOpts)
 	assert.Nil(t, err)
 	err = client2.SendMessage([]byte("some"))
 	assert.Nil(t, err) // write doesn't fail. instead causes the transition of the socket to EOF state
