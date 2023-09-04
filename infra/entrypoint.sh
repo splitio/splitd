@@ -17,13 +17,34 @@ accum=$(yq '.sdk.apikey = env(SPLITD_APIKEY) | .link.address = env(SPLITD_LINK_A
 # Generate a new yaml file by substituting values on the template with user-provided env-vars
 # @{
 # sdk configs
-[ ! -z ${SPLITD_AUTH_URL+x} ]		    && accum=$(echo "${accum}" | yq '.sdk.urls.auth = env(SPLITD_AUTH_URL)')
-[ ! -z ${SPLITD_SDK_URL+x} ] 		    && accum=$(echo "${accum}" | yq '.sdk.urls.sdk = env(SPLITD_SDK_URL)')
-[ ! -z ${SPLITD_EVENTS_URL+x} ] 	    && accum=$(echo "${accum}" | yq '.sdk.urls.events = env(SPLITD_EVENTS_URL)')
-[ ! -z ${SPLITD_TELEMETRY_URL+x} ] 	    && accum=$(echo "${accum}" | yq '.sdk.urls.telemetry = env(SPLITD_TELEMETRY_URL)')
-[ ! -z ${SPLITD_STREAMING_URL+x} ] 	    && accum=$(echo "${accum}" | yq '.sdk.urls.streaming = env(SPLITD_STREAMING_URL)')
-[ ! -z ${SPLITD_STREAMING_ENABLED+x} ]  && accum=$(echo "${accum}" | yq '.sdk.streamingEnabled = env(SPLITD_STREAMING_ENABLED)')
-[ ! -z ${SPLITD_LABELS_ENABLED+x} ]     && accum=$(echo "${accum}" | yq '.sdk.labelsEnabled = env(SPLITD_LABELS_ENABLED)')
+[ ! -z ${SPLITD_AUTH_URL+x} ]		                    && accum=$(echo "${accum}" | yq '.sdk.urls.auth = env(SPLITD_AUTH_URL)')
+[ ! -z ${SPLITD_SDK_URL+x} ] 		                    && accum=$(echo "${accum}" | yq '.sdk.urls.sdk = env(SPLITD_SDK_URL)')
+[ ! -z ${SPLITD_EVENTS_URL+x} ] 	                    && accum=$(echo "${accum}" | yq '.sdk.urls.events = env(SPLITD_EVENTS_URL)')
+[ ! -z ${SPLITD_TELEMETRY_URL+x} ] 	                    && accum=$(echo "${accum}" | yq '.sdk.urls.telemetry = env(SPLITD_TELEMETRY_URL)')
+[ ! -z ${SPLITD_STREAMING_URL+x} ] 	                    && accum=$(echo "${accum}" | yq '.sdk.urls.streaming = env(SPLITD_STREAMING_URL)')
+[ ! -z ${SPLITD_STREAMING_ENABLED+x} ]                  && accum=$(echo "${accum}" | yq '.sdk.streamingEnabled = env(SPLITD_STREAMING_ENABLED)')
+[ ! -z ${SPLITD_LABELS_ENABLED+x} ]                     && accum=$(echo "${accum}" | yq '.sdk.labelsEnabled = env(SPLITD_LABELS_ENABLED)')
+[ ! -z ${SPLITD_FEATURE_FLAGS_SPLIT_REFRESH_SECS+x} ]   && accum=$(\
+    echo "${accum}" | yq '.sdk.featureFlags.splitRefreshSeconds = env(SPLITD_FEATURE_FLAGS_SPLIT_REFRESH_SECS)')
+[ ! -z ${SPLITD_FEATURE_FLAGS_SPLIT_QUEUE_SIZE+x} ]     && accum=$(\
+    echo "${accum}" | yq '.sdk.featureFlags.splitNotificationQueueSize = env(SPLITD_FEATURE_FLAGS_SPLIT_QUEUE_SIZE)')
+[ ! -z ${SPLITD_FEATURE_FLAGS_SEGMENT_REFRESH_SECS+x} ] && accum=$(\
+    echo "${accum}" | yq '.sdk.featureFlags.segmentRefreshSeconds = env(SPLITD_FEATURE_FLAGS_SEGMENT_REFRESH_SECS)')
+[ ! -z ${SPLITD_FEATURE_FLAGS_SEGMENT_QUEUE_SIZE+x} ]   && accum=$(\
+    echo "${accum}" | yq '.sdk.featureFlags.segmentNotificationQueueSize = env(SPLITD_FEATURE_FLAGS_SEGMENT_QUEUE_SIZE)')
+[ ! -z ${SPLITD_FEATURE_FLAGS_SEGMENT_WORKER_COUNT+x} ] && accum=$(\
+    echo "${accum}" | yq '.sdk.featureFlags.segmentUpdateWorkers = env(SPLITD_FEATURE_FLAGS_SEGMENT_WORKER_COUNT)')
+[ ! -z ${SPLITD_FEATURE_FLAGS_SEGMENT_SYNC_BUFFER+x} ]  && accum=$(\
+    echo "${accum}" | yq '.sdk.featureFlags.segmentUpdateQueueSize = env(SPLITD_FEATURE_FLAGS_SEGMENT_SYNC_BUFFER)')
+[ ! -z ${SPLITD_IMPRESSIONS_MODE+x} ]                   && accum=$(echo "${accum}" | yq '.sdk.impressions.mode = env(SPLITD_IMPRESSIONS_MODE)')
+[ ! -z ${SPLITD_IMPRESSIONS_REFRESH_SECS+x} ]           && accum=$(echo "${accum}" | yq '.sdk.impressions.refreshRateSeconds = env(SPLITD_IMPRESSIONS_REFRESH_SECS)')
+[ ! -z ${SPLITD_IMPRESSIONS_QUEUE_SIZE+x} ]             && accum=$(echo "${accum}" | yq '.sdk.impressions.queueSize = env(SPLITD_IMPRESSIONS_QUEUE_SIZE)')
+[ ! -z ${SPLITD_IMPRESSIONS_COUNT_REFRESH_SECS+x} ]     && accum=$(\
+    echo "${accum}" | yq '.sdk.impressions.countRefreshRateSeconds = env(SPLITD_IMPRESSIONS_COUNT_REFRESH_SECS)')
+[ ! -z ${SPLITD_IMPRESSIONS_OBSERVER_SIZE+x} ]          && accum=$(echo "${accum}" | yq '.sdk.impressions.observerSize = env(SPLITD_IMPRESSIONS_OBSERVER_SIZE)')
+[ ! -z ${SPLITD_EVENTS_REFRESH_SECS+x} ]                && accum=$(echo "${accum}" | yq '.sdk.events.refreshRateSeconds = env(SPLITD_EVENTS_REFRESH_SECS)')
+[ ! -z ${SPLITD_EVENTS_QUEUE_SIZE+x} ]                  && accum=$(echo "${accum}" | yq '.sdk.events.queueSize = env(SPLITD_EVENTS_QUEUE_SIZE)')
+
 # link configs
 [ ! -z ${SPLITD_LINK_TYPE+x} ] 		        && accum=$(echo "${accum}" | yq '.link.type = env(SPLITD_LINK_TYPE)')
 [ ! -z ${SPLITD_LINK_SERIALIZATION+x} ]     && accum=$(echo "${accum}" | yq '.link.serialization = env(SPLITD_LINK_SERIALIZATION)')
@@ -31,8 +52,10 @@ accum=$(yq '.sdk.apikey = env(SPLITD_APIKEY) | .link.address = env(SPLITD_LINK_A
 [ ! -z ${SPLITD_LINK_READ_TIMEOUT_MS+x} ]   && accum=$(echo "${accum}" | yq '.link.readTimeoutMS = env(SPLITD_LINK_READ_TIMEOUT_MS)')
 [ ! -z ${SPLITD_LINK_WRITE_TIMEOUT_MS+x} ]  && accum=$(echo "${accum}" | yq '.link.writeTimeoutMS = env(SPLITD_LINK_WRITE_TIMEOUT_MS)')
 [ ! -z ${SPLITD_LINK_ACCEPT_TIMEOUT_MS+x} ] && accum=$(echo "${accum}" | yq '.link.acceptTimeoutMS = env(SPLITD_LINK_ACCEPT_TIMEOUT_MS)')
+
 # logger configs
-[ ! -z ${SPLITD_LOG_LEVEL+x} ] 		        && accum=$(echo "${accum}" | yq '.logging.level = env(SPLITD_LOG_LEVEL)')
+[ ! -z ${SPLITD_LOG_LEVEL+x} ]  && accum=$(echo "${accum}" | yq '.logging.level = env(SPLITD_LOG_LEVEL)')
+[ ! -z ${SPLITD_LOG_OUTPUT+x} ] && accum=$(echo "${accum}" | yq '.logging.output = env(SPLITD_LOG_OUTPUT)')
 # @}
 
 # Ensure that the socket-file is read-writable by anyone

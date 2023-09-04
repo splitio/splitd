@@ -14,6 +14,8 @@ COVERAGE_FILE ?= coverage.out
 VERSION	:= $(shell cat splitio/version.go | grep 'const Version' | sed 's/const Version = //' | tr -d '"')
 GO_FILES := $(shell find . -name "*.go") go.sum
 
+CONFIG_TEMPLATE ?= splitd.yaml.tpl
+
 default: help
 
 ## generate go.sum from go.mod
@@ -30,7 +32,9 @@ clean:
 		splitd-darwin-arm-$(VERSION).bin
 
 ## build binaries for this platform
-build: splitd splitcli
+build: splitd splitcli sdhelper
+
+
 
 ## run all tests
 test: unit-tests entrypoint-test
@@ -54,6 +58,13 @@ splitd: $(GO_FILES)
 ## build splitcli for local machine
 splitcli: $(GO_FILES)
 	go build -o splitcli cmd/splitcli/main.go
+
+## regenerate config file template with defaults
+$(CONFIG_TEMPLATE): $(SOURCES) sdhelper
+	./sdhelper -command="gen-config-template" > $(CONFIG_TEMPLATE)
+## build splitd helper (for code/doc generation purposes only)
+sdhelper: $(GO_FILES)
+	go build -o sdhelper cmd/sdhelper/main.go
 
 ## build docker images for sidecar
 images_release: # entrypoints

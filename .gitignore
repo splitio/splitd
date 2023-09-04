@@ -16,6 +16,7 @@
 
 /splitd
 /splitcli
+/sdhelper
 /splitd.yaml
 testcfg
 shared
