@@ -17,7 +17,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const defaultConfigFN = "/etc/splitd.yaml"
+const (
+	defaultConfigFN   = "/etc/splitd.yaml"
+	apikeyPlaceHolder = "<server-side-apitoken>"
+	defaultLogLevel   = "error"
+	defaultLogOutput  = "/dev/stdout"
+)
 
 type Config struct {
 	Logger Logger `yaml:"logging"`
@@ -49,6 +54,12 @@ func (c *Config) parse(fn string) error {
 	return nil
 }
 
+func (c *Config) PopulateWithDefaults() {
+	c.SDK.PopulateWithDefaults()
+	c.Link.PopulateWithDefaults()
+	c.Logger.PopulateWithDefaults()
+}
+
 type Link struct {
 	Type                 *string `yaml:"type"`
 	Address              *string `yaml:"address"`
@@ -59,6 +70,19 @@ type Link struct {
 	Serialization        *string `yaml:"serialization"`
 	BufferSize           *int    `yaml:"bufferSize"`
 	Protocol             *string `yaml:"protocol"`
+}
+
+func (l *Link) PopulateWithDefaults() {
+	linkOpts := link.DefaultListenerOptions()
+	l.Address = ref(linkOpts.Transfer.Address)
+	l.Type = ref(linkOpts.Transfer.ConnType.String())
+	l.ReadTimeoutMS = ref(int(linkOpts.Transfer.ReadTimeout.Milliseconds()))
+	l.WriteTimeoutMS = ref(int(linkOpts.Transfer.WriteTimeout.Milliseconds()))
+	l.AcceptTimeoutMS = ref(int(linkOpts.Acceptor.AcceptTimeout.Milliseconds()))
+	l.BufferSize = ref(linkOpts.Transfer.BufferSize)
+	l.MaxSimultaneousConns = ref(linkOpts.Acceptor.MaxSimultaneousConnections)
+	l.Protocol = ref(linkOpts.Protocol.String())
+	l.Serialization = ref(linkOpts.Serialization.String())
 }
 
 func (l *Link) ToListenerOpts() (*link.ListenerOptions, error) {
@@ -101,6 +125,18 @@ type SDK struct {
 	URLs             URLs         `yaml:"urls"`
 	FeatureFlags     FeatureFlags `yaml:"featureFlags"`
 	Impressions      Impressions  `yaml:"impressions"`
+	Events           Events       `yank:"events"`
+}
+
+func (s *SDK) PopulateWithDefaults() {
+	cfg := sdkConf.DefaultConfig()
+	s.Apikey = apikeyPlaceHolder
+	s.LabelsEnabled = ref(cfg.LabelsEnabled)
+	s.StreamingEnabled = ref(cfg.StreamingEnabled)
+	s.URLs.PopulateWithDefaults()
+	s.FeatureFlags.PopulateWithDefaults()
+	s.Impressions.PopulateWithDefaults()
+	s.Events.PopulateWithDefaults()
 }
 
 type FeatureFlags struct {
@@ -108,8 +144,18 @@ type FeatureFlags struct {
 	SplitRefreshRateSeconds      *int `yaml:"splitRefreshSeconds"`
 	SegmentNotificationQueueSize *int `yaml:"segmentNotificationQueueSize"`
 	SegmentRefreshRateSeconds    *int `yaml:"segmentRefreshSeconds"`
-	SegmentUpdateWorkers         *int `yaml:"segmentUpdateWorkers"`
-	SegmentUpdateQueueSize       *int `yaml:"segmentUpdateQueueSize"`
+	SegmentWorkerCount           *int `yaml:"segmentUpdateWorkers"`
+	SegmentWorkerBufferSize      *int `yaml:"segmentUpdateQueueSize"`
+}
+
+func (f *FeatureFlags) PopulateWithDefaults() {
+	ffOpts := sdkConf.DefaultConfig()
+	f.SegmentNotificationQueueSize = ref(ffOpts.Segments.UpdateBufferSize)
+	f.SegmentRefreshRateSeconds = ref(int(ffOpts.Segments.SyncPeriod.Seconds()))
+	f.SegmentWorkerBufferSize = ref(ffOpts.Segments.QueueSize)
+	f.SegmentWorkerCount = ref(ffOpts.Segments.WorkerCount)
+	f.SplitNotificationQueueSize = ref(ffOpts.Splits.UpdateBufferSize)
+	f.SplitRefreshRateSeconds = ref(int(ffOpts.Splits.SyncPeriod.Seconds()))
 }
 
 type Impressions struct {
@@ -118,7 +164,28 @@ type Impressions struct {
 	CountRefreshRateSeconds *int    `yaml:"countRefreshRateSeconds"`
 	QueueSize               *int    `yaml:"queueSize"`
 	ObserverSize            *int    `yaml:"observerSize"`
-	Watermark               *int    `yaml:"watermark"`
+	Watermark               *int    `yaml:"watermark,omitempty"` // TODO(mredolatti) remove omitempty when fully implemented
+}
+
+func (i *Impressions) PopulateWithDefaults() {
+	cfg := sdkConf.DefaultConfig().Impressions
+	i.CountRefreshRateSeconds = ref(int(cfg.CountSyncPeriod.Seconds()))
+	i.Mode = ref(cfg.Mode)
+	i.ObserverSize = ref(cfg.ObserverSize)
+	i.RefreshRateSeconds = ref(int(cfg.SyncPeriod.Seconds()))
+	i.QueueSize = ref(cfg.QueueSize)
+}
+
+type Events struct {
+	RefreshRateSeconds *int `yaml:"refreshRateSeconds"`
+	QueueSize          *int `yaml:"queueSize"`
+	Watermark          *int `yaml:"watermark,omitempty"` // TODO(mredolatti) remove omitempty when fully implemented
+}
+
+func (e *Events) PopulateWithDefaults() {
+	cfg := sdkConf.DefaultConfig().Events
+	e.RefreshRateSeconds = ref(int(cfg.SyncPeriod.Seconds()))
+	e.QueueSize = ref(cfg.QueueSize)
 }
 
 func (s *SDK) ToSDKConf() *sdkConf.Config {
@@ -129,14 +196,16 @@ func (s *SDK) ToSDKConf() *sdkConf.Config {
 	cc.SetIfNotEmpty(&cfg.Splits.UpdateBufferSize, s.FeatureFlags.SplitNotificationQueueSize)
 	cc.MapIfNotNil(&cfg.Splits.SyncPeriod, s.FeatureFlags.SplitRefreshRateSeconds, durationFromSeconds)
 	cc.SetIfNotEmpty(&cfg.Segments.UpdateBufferSize, s.FeatureFlags.SegmentNotificationQueueSize)
-	cc.SetIfNotEmpty(&cfg.Segments.QueueSize, s.FeatureFlags.SegmentUpdateQueueSize)
-	cc.SetIfNotEmpty(&cfg.Segments.WorkerCount, s.FeatureFlags.SegmentUpdateWorkers)
+	cc.SetIfNotEmpty(&cfg.Segments.QueueSize, s.FeatureFlags.SegmentWorkerBufferSize)
+	cc.SetIfNotEmpty(&cfg.Segments.WorkerCount, s.FeatureFlags.SegmentWorkerCount)
 	cc.MapIfNotNil(&cfg.Segments.SyncPeriod, s.FeatureFlags.SegmentRefreshRateSeconds, durationFromSeconds)
 	cc.SetIfNotEmpty(&cfg.Impressions.Mode, s.Impressions.Mode)
 	cc.SetIfNotEmpty(&cfg.Impressions.ObserverSize, s.Impressions.ObserverSize)
 	cc.SetIfNotEmpty(&cfg.Impressions.QueueSize, s.Impressions.QueueSize)
 	cc.MapIfNotNil(&cfg.Impressions.SyncPeriod, s.Impressions.RefreshRateSeconds, durationFromSeconds)
 	cc.MapIfNotNil(&cfg.Impressions.CountSyncPeriod, s.Impressions.CountRefreshRateSeconds, durationFromSeconds)
+	cc.SetIfNotEmpty(&cfg.Events.QueueSize, s.Events.QueueSize)
+	cc.MapIfNotNil(&cfg.Events.SyncPeriod, s.Events.RefreshRateSeconds, durationFromSeconds)
 	s.URLs.updateSDKConfURLs(&cfg.URLs)
 	return cfg
 }
@@ -157,11 +226,25 @@ func (u *URLs) updateSDKConfURLs(dst *sdkConf.URLs) {
 	cc.SetIfNotNil(&dst.Telemetry, u.Telemetry)
 }
 
+func (u *URLs) PopulateWithDefaults() {
+	cfg := sdkConf.DefaultConfig().URLs
+	u.Auth = ref(cfg.Auth)
+	u.Events = ref(cfg.Events)
+	u.SDK = ref(cfg.SDK)
+	u.Streaming = ref(cfg.Streaming)
+	u.Telemetry = ref(cfg.Telemetry)
+}
+
 type Logger struct {
 	Level                   *string `yaml:"level"`
-	Output                  *string `yaml:"file"`
+	Output                  *string `yaml:"output"`
 	RotationMaxFiles        *int    `yaml:"rotationMaxFiles"`
 	RotationMaxBytesPerFile *int    `yaml:"rotationMaxBytesPerFile"`
+}
+
+func (l *Logger) PopulateWithDefaults() {
+	l.Level = ref(defaultLogLevel)
+	l.Output = ref(defaultLogOutput)
 }
 
 func (l *Logger) ToLoggerOptions() (*logging.LoggerOptions, error) {
@@ -196,4 +279,8 @@ func ReadConfig() (*Config, error) {
 
 	var c Config
 	return &c, c.parse(cfgFN)
+}
+
+func ref[T any](v T) *T {
+	return &v
 }

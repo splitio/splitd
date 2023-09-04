@@ -122,8 +122,8 @@ func TestSDK(t *testing.T) {
 			SplitRefreshRateSeconds:      ref(2),
 			SegmentNotificationQueueSize: ref(3),
 			SegmentRefreshRateSeconds:    ref(4),
-			SegmentUpdateWorkers:         ref(5),
-			SegmentUpdateQueueSize:       ref(6),
+			SegmentWorkerCount:           ref(5),
+			SegmentWorkerBufferSize:      ref(6),
 		},
 		Impressions: Impressions{
 			Mode:                    ref("optimized"),
@@ -145,18 +145,56 @@ func TestSDK(t *testing.T) {
 	expected.URLs.Telemetry = "telemetryURL"
 	expected.Splits.UpdateBufferSize = 1
 	expected.Splits.SyncPeriod = 2 * time.Second
-    expected.Segments.UpdateBufferSize = 3
-    expected.Segments.SyncPeriod = 4 * time.Second
-    expected.Segments.WorkerCount = 5
-    expected.Segments.QueueSize = 6
-    expected.Impressions.Mode = "optimized"
-    expected.Impressions.SyncPeriod = 1 * time.Second
-    expected.Impressions.CountSyncPeriod = 2 * time.Second
-    expected.Impressions.QueueSize = 3
-    expected.Impressions.ObserverSize = 4
+	expected.Segments.UpdateBufferSize = 3
+	expected.Segments.SyncPeriod = 4 * time.Second
+	expected.Segments.WorkerCount = 5
+	expected.Segments.QueueSize = 6
+	expected.Impressions.Mode = "optimized"
+	expected.Impressions.SyncPeriod = 1 * time.Second
+	expected.Impressions.CountSyncPeriod = 2 * time.Second
+	expected.Impressions.QueueSize = 3
+	expected.Impressions.ObserverSize = 4
 	assert.Equal(t, expected, sdkCFG.ToSDKConf())
 }
 
-func ref[T any](v T) *T {
-	return &v
+func TestDefaultConf(t *testing.T) {
+	var c Config
+	c.PopulateWithDefaults()
+
+	sdkConf := conf.DefaultConfig()
+	assert.Equal(t, apikeyPlaceHolder, c.SDK.Apikey)
+	assert.Equal(t, sdkConf.LabelsEnabled, *c.SDK.LabelsEnabled)
+	assert.Equal(t, sdkConf.StreamingEnabled, *c.SDK.StreamingEnabled)
+	assert.Equal(t, sdkConf.URLs.Auth, *c.SDK.URLs.Auth)
+	assert.Equal(t, sdkConf.URLs.SDK, *c.SDK.URLs.SDK)
+	assert.Equal(t, sdkConf.URLs.Events, *c.SDK.URLs.Events)
+	assert.Equal(t, sdkConf.URLs.Telemetry, *c.SDK.URLs.Telemetry)
+	assert.Equal(t, sdkConf.URLs.Streaming, *c.SDK.URLs.Streaming)
+	assert.Equal(t, sdkConf.Splits.SyncPeriod.Seconds(), float64(*c.SDK.FeatureFlags.SplitRefreshRateSeconds))
+	assert.Equal(t, sdkConf.Splits.UpdateBufferSize, int(*c.SDK.FeatureFlags.SplitNotificationQueueSize))
+	assert.Equal(t, sdkConf.Segments.SyncPeriod.Seconds(), float64(*c.SDK.FeatureFlags.SegmentRefreshRateSeconds))
+	assert.Equal(t, sdkConf.Segments.UpdateBufferSize, *c.SDK.FeatureFlags.SegmentNotificationQueueSize)
+	assert.Equal(t, sdkConf.Segments.QueueSize, *c.SDK.FeatureFlags.SegmentWorkerBufferSize)
+	assert.Equal(t, sdkConf.Segments.WorkerCount, *c.SDK.FeatureFlags.SegmentWorkerCount)
+	assert.Equal(t, sdkConf.Impressions.Mode, *c.SDK.Impressions.Mode)
+	assert.Equal(t, sdkConf.Impressions.ObserverSize, *c.SDK.Impressions.ObserverSize)
+	assert.Equal(t, sdkConf.Impressions.QueueSize, *c.SDK.Impressions.QueueSize)
+	assert.Equal(t, sdkConf.Impressions.CountSyncPeriod.Seconds(), float64(*c.SDK.Impressions.CountRefreshRateSeconds))
+	assert.Equal(t, sdkConf.Impressions.SyncPeriod.Seconds(), float64(*c.SDK.Impressions.RefreshRateSeconds))
+	assert.Equal(t, sdkConf.Events.QueueSize, *c.SDK.Events.QueueSize)
+	assert.Equal(t, sdkConf.Events.SyncPeriod.Seconds(), float64(*c.SDK.Events.RefreshRateSeconds))
+
+	linkConf := link.DefaultListenerOptions()
+	assert.Equal(t, linkConf.Protocol.String(), *c.Link.Protocol)
+	assert.Equal(t, linkConf.Serialization.String(), *c.Link.Serialization)
+	assert.Equal(t, linkConf.Transfer.ConnType.String(), *c.Link.Type)
+	assert.Equal(t, linkConf.Transfer.Address, *c.Link.Address)
+	assert.Equal(t, linkConf.Transfer.BufferSize, *c.Link.BufferSize)
+	assert.Equal(t, linkConf.Transfer.ReadTimeout.Milliseconds(), int64(*c.Link.ReadTimeoutMS))
+	assert.Equal(t, linkConf.Transfer.WriteTimeout.Milliseconds(), int64(*c.Link.WriteTimeoutMS))
+	assert.Equal(t, linkConf.Acceptor.AcceptTimeout.Milliseconds(), int64(*c.Link.AcceptTimeoutMS))
+	assert.Equal(t, linkConf.Acceptor.MaxSimultaneousConnections, *c.Link.MaxSimultaneousConns)
+
+	assert.Equal(t, defaultLogLevel, *c.Logger.Level)
+	assert.Equal(t, defaultLogOutput, *c.Logger.Output)
 }

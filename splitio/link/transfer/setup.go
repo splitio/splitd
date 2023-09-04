@@ -12,6 +12,17 @@ import (
 
 type ConnType int
 
+func (c ConnType) String() string {
+	switch c {
+	case ConnTypeUnixSeqPacket:
+		return "unix-seqpacket"
+	case ConnTypeUnixStream:
+		return "unix-stream"
+	default:
+		return "invalid-socket-type"
+	}
+}
+
 const (
 	ConnTypeUnixSeqPacket ConnType = 1
 	ConnTypeUnixStream    ConnType = 2
