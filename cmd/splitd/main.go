@@ -41,8 +41,9 @@ func main() {
 	shutdown.RegisterHook(func() {
 		err := lShutdown()
 		if err != nil {
-			logger.Error(err)
+			logger.Error("error shutting down listener: ", err.Error())
 		}
+		splitSDK.Shutdown() // evict pending impressions & events
 	})
 	defer shutdown.Wait()
 
@@ -53,7 +54,7 @@ func main() {
 
 func printHeader() {
 	fmt.Println(splitio.ASCILogo)
-	fmt.Printf("Splitd Agent - Version %s. (2023)\n\n", splitio.Version)
+	fmt.Printf("Splitd Agent - Version %s - build [%s] (2023)\n\n", splitio.Version, splitio.CommitSHA)
 }
 
 func handleFlags(cfg *conf.Config) {

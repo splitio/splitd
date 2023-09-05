@@ -36,8 +36,13 @@ func (m *SDKMock) Treatments(
 
 // Track implements sdk.Interface
 func (m *SDKMock) Track(cfg *types.ClientConfig, key string, trafficType string, eventType string, value *float64, properties map[string]interface{}) error {
-    args := m.Called(cfg, key, trafficType, eventType, value, properties)
-    return args.Error(0)
+	args := m.Called(cfg, key, trafficType, eventType, value, properties)
+	return args.Error(0)
+}
+
+func (m *SDKMock) Shutdown() error {
+	args := m.Called()
+	return args.Error(0)
 }
 
 var _ sdk.Interface = (*SDKMock)(nil)

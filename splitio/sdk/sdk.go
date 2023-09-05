@@ -38,6 +38,7 @@ type Interface interface {
 	Treatment(cfg *types.ClientConfig, key string, bucketingKey *string, feature string, attributes map[string]interface{}) (*EvaluationResult, error)
 	Treatments(cfg *types.ClientConfig, key string, bucketingKey *string, features []string, attributes map[string]interface{}) (map[string]EvaluationResult, error)
 	Track(cfg *types.ClientConfig, key string, trafficType string, eventType string, value *float64, properties map[string]interface{}) error
+	Shutdown() error
 }
 
 type Impl struct {
@@ -179,6 +180,11 @@ func (i *Impl) Track(cfg *types.ClientConfig, key string, trafficType string, ev
 		i.logger.Error("error handling event: ", err)
 		return err
 	}
+	return nil
+}
+
+func (i *Impl) Shutdown() error {
+	i.sm.Stop()
 	return nil
 }
 
