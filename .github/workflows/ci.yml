@@ -78,6 +78,7 @@ jobs:
         if: ${{ github.event_name == 'push' }}
         with:
           name: splitd-${{ env.VERSION }}
+          tag_name: v${{ env.VERSION }}
           files: |
             splitd-darwin-amd64-${{ env.VERSION }}.bin
             splitd-darwin-arm-${{ env.VERSION }}.bin
