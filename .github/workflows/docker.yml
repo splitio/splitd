@@ -3,11 +3,6 @@ name: docker
 on:
   push:
     branches:
-      - dev
-      - main
-  pull_request:
-    branches:
-      - dev
       - main
 
 concurrency:
@@ -28,13 +23,12 @@ jobs:
           password: ${{ secrets.ARTIFACTORY_DOCKER_PASS }}
 
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Docker build and push
         uses: docker/build-push-action@v4
         with:
           context: .
           file: "infra/sidecar.Dockerfile"
-          push: true
           push: ${{ github.event_name == 'push' }}
-          tags: splitio-docker.jfrog.io/${{ github.event.repository.name }}/sidecar:${{ github.sha }}
+          tags: splitio-docker.jfrog.io/splitd/sidecar:${{ github.sha }},splitio-docker.jfrog.io/splitd/sidecar:${{ env.VERSION }}
