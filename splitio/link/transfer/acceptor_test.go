@@ -14,17 +14,16 @@ import (
 )
 
 func TestAcceptor(t *testing.T) {
-    // This test sets up an acceptor with the following params:
-    // - a queue size of 1
-    // - a 100ms timeout for items in the waitqueue
-    // - a 300ms delay in the handler (so that by the time the 2nd client tries to connect, the first one is busy)
-    //
-    // 2 clients will try to connect and do some write & reads.
-    // First client will successfully connect and exchange some information
-    // Second client's server-end of the socket will be closed after the timeout
-    // The write not error out (though nothing is written), but will notice that the socket hasbeen remotely closed and update it's state
-    // The following read will report an EOF
-    
+	// This test sets up an acceptor with the following params:
+	// - a queue size of 1
+	// - a 100ms timeout for items in the waitqueue
+	// - a 300ms delay in the handler (so that by the time the 2nd client tries to connect, the first one is busy)
+	//
+	// 2 clients will try to connect and do some write & reads.
+	// First client will successfully connect and exchange some information
+	// Second client's server-end of the socket will be closed after the timeout
+	// The write not error out (though nothing is written), but will notice that the socket hasbeen remotely closed and update it's state
+	// The following read will report an EOF
 
 	logger := logging.NewLogger(nil)
 	dir, err := os.MkdirTemp(os.TempDir(), "acceptortest")
@@ -32,13 +31,14 @@ func TestAcceptor(t *testing.T) {
 
 	serverSockFN := path.Join(dir, "acctest.sock")
 
-	opts := defaultOpts()
-	opts.AcceptTimeout = 100 * time.Millisecond
-	opts.Logger = logger
-	opts.MaxSimultaneousConnections = 1
+	connOpts := DefaultOpts()
+
+	acceptorConfig := DefaultAcceptorConfig()
+	acceptorConfig.AcceptTimeout = 100 * time.Millisecond
+	acceptorConfig.MaxSimultaneousConnections = 1
 	acc := newAcceptor(&net.UnixAddr{Net: "unix", Name: serverSockFN}, func(c net.Conn) RawConn {
-        return newConnWrapper(c, &framing.LengthPrefixImpl{}, &opts)
-    }, &opts)
+		return newConnWrapper(c, &framing.LengthPrefixImpl{}, &connOpts)
+	}, logger, &acceptorConfig)
 
 	endc, err := acc.Start(func(c RawConn) {
 		message, err := c.ReceiveMessage()
@@ -55,7 +55,11 @@ func TestAcceptor(t *testing.T) {
 
 	time.Sleep(1 * time.Second) // to ensure server is started
 
-	client1, err := NewClientConn(WithType(ConnTypeUnixStream), WithAddress(serverSockFN))
+	clientOpts := DefaultOpts()
+	clientOpts.Address = serverSockFN
+	clientOpts.ConnType = ConnTypeUnixStream
+
+	client1, err := NewClientConn(logger, &clientOpts)
 	assert.Nil(t, err)
 	assert.NotNil(t, client1)
 	err = client1.SendMessage([]byte("some"))
@@ -64,11 +68,34 @@ func TestAcceptor(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, []byte("thing"), recv)
 
-	client2, err := NewClientConn(WithType(ConnTypeUnixStream), WithAddress(serverSockFN))
+	client2, err := NewClientConn(logger, &clientOpts)
 	assert.Nil(t, err)
 	err = client2.SendMessage([]byte("some"))
 	assert.Nil(t, err) // write doesn't fail. instead causes the transition of the socket to EOF state
 	recv, err = client1.ReceiveMessage()
 	assert.Nil(t, recv)
 	assert.ErrorIs(t, err, io.EOF)
+}
+
+func TestNewAcceptorInstantiation(t *testing.T) {
+	logger := logging.NewLogger(nil)
+
+	opts := DefaultOpts()
+	accCfg := DefaultAcceptorConfig()
+	acc, err := NewAcceptor(logger, &opts, &accCfg)
+	assert.Nil(t, err)
+
+	assert.Equal(t, opts.Address, acc.address.(*net.UnixAddr).Name)
+	assert.Equal(t, "unixpacket", acc.address.(*net.UnixAddr).Network())
+	assert.Nil(t, acc.Shutdown())
+
+	opts.Address = "/var/another/don/ga"
+	opts.ConnType = ConnTypeUnixStream
+	acc, err = NewAcceptor(logger, &opts, &accCfg)
+	assert.Nil(t, err)
+
+	assert.Equal(t, opts.Address, acc.address.(*net.UnixAddr).Name)
+	assert.Equal(t, "unix", acc.address.(*net.UnixAddr).Network())
+	assert.Nil(t, acc.Shutdown())
+
 }

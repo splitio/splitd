@@ -16,9 +16,16 @@
 
 /splitd
 /splitcli
+/sdhelper
 /splitd.yaml
 testcfg
 shared
 
 splitd.darwin.*
 splitd.linux.*
+
+# Sonarqube files
+.scannerwork
+
+# DS Store
+.DS_Store

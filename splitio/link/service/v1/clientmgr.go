@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime/debug"
 
 	"github.com/splitio/go-toolkit/v5/logging"
 
@@ -40,7 +41,8 @@ func NewClientManager(
 func (m *ClientManager) Manage() {
 	defer func() {
 		if r := recover(); r != nil {
-			m.logger.Error("CRITICAL - connection handlers are panicking: ", r)
+			m.logger.Error("CRITICAL - connection handler is panicking: ", r)
+			m.logger.Error(string(debug.Stack()))
 		}
 	}()
 	err := m.handleClientInteractions()
@@ -68,7 +70,6 @@ func (m *ClientManager) handleClientInteractions() error {
 
 		response, err := m.handleRPC(rpc)
 		if err != nil {
-			// TODO(mredolatti): see if this is recoverable
 			return fmt.Errorf("error handling RPC: %w", err)
 		}
 
@@ -96,13 +97,11 @@ func (m *ClientManager) sendResponse(response interface{}) error {
 	serialized, err := m.serializer.Serialize(response)
 
 	if err != nil {
-		// TODO(mredolatti): see if this is recoverable
 		return fmt.Errorf("error serializing response: %w", err)
 	}
 
 	err = m.cc.SendMessage(serialized)
 	if err != nil {
-		// TODO(mredolatti): see if this is recoverable
 		return fmt.Errorf("error sending response back to the client: %w", err)
 	}
 
@@ -134,6 +133,13 @@ func (m *ClientManager) handleRPC(rpc *protov1.RPC) (interface{}, error) {
 			return nil, fmt.Errorf("error parsing treatments arguments: %w", err)
 		}
 		return m.handleGetTreatments(&args)
+	case protov1.OCTrack:
+		var args protov1.TrackArgs
+		if err := args.PopulateFromRPC(rpc); err != nil {
+			return nil, fmt.Errorf("error parsing track argumentts: %w", err)
+		}
+		return m.handleTrack(&args)
+
 	}
 	return nil, fmt.Errorf("RPC not implemented")
 }
@@ -198,6 +204,20 @@ func (m *ClientManager) handleGetTreatments(args *protov1.TreatmentsArgs) (inter
 	response := &protov1.ResponseWrapper[protov1.TreatmentsPayload]{
 		Status:  protov1.ResultOk,
 		Payload: protov1.TreatmentsPayload{Results: results},
+	}
+
+	return response, nil
+}
+
+func (m *ClientManager) handleTrack(args *protov1.TrackArgs) (interface{}, error) {
+	err := m.splitSDK.Track(m.clientConfig, args.Key, args.TrafficType, args.EventType, args.Value, args.Properties)
+	if err != nil && !errors.Is(err, sdk.ErrEventsQueueFull) {
+		return &protov1.ResponseWrapper[protov1.TreatmentPayload]{Status: protov1.ResultInternalError}, err
+	}
+
+	response := &protov1.ResponseWrapper[protov1.TrackPayload]{
+		Status:  protov1.ResultOk,
+		Payload: protov1.TrackPayload{Success: err == nil}, // if err != nil it can only be ErrEventsQueueFull at this point
 	}
 
 	return response, nil
