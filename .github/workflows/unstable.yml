@@ -1,0 +1,34 @@
+name: unstable
+on:
+  push:
+    branches-ignore:
+      - main
+
+jobs:
+  push-docker-image:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to Artifactory
+        uses: docker/login-action@v2
+        with:
+          registry: splitio-docker-dev.jfrog.io
+          username: ${{ secrets.ARTIFACTORY_DOCKER_USER }}
+          password: ${{ secrets.ARTIFACTORY_DOCKER_PASS }}
+
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set VERSION env
+        run: echo "VERSION=$(cat splitio/version.go | grep 'Version =' | awk '{print $3}' | tr -d '"')" >> $GITHUB_ENV
+
+      - name: Get short hash
+        run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Docker Build and Push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: "infra/sidecar.Dockerfile"
+          push: true
+          tags: splitio-docker-dev.jfrog.io/splitd/sidecar:${{ env.SHORT_SHA }},splitio-docker-dev.jfrog.io/splitd/sidecar:${{ env.VERSION }}
