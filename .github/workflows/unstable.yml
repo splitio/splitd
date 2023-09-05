@@ -19,9 +19,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set VERSION env
-        run: echo "VERSION=$(cat splitio/version.go | grep 'Version =' | awk '{print $4}' | tr -d '"')" >> $GITHUB_ENV
-
       - name: Get short hash
         run: echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
