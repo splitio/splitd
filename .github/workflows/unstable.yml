@@ -17,7 +17,7 @@ jobs:
           password: ${{ secrets.ARTIFACTORY_DOCKER_PASS }}
 
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set VERSION env
         run: echo "VERSION=$(cat splitio/version.go | grep 'Version =' | awk '{print $4}' | tr -d '"')" >> $GITHUB_ENV
@@ -31,4 +31,4 @@ jobs:
           context: .
           file: "infra/sidecar.Dockerfile"
           push: true
-          tags: splitio-docker-dev.jfrog.io/splitd/sidecar:${{ env.SHORT_SHA }},splitio-docker-dev.jfrog.io/splitd/sidecar:${{ env.VERSION }}
+          tags: splitio-docker-dev.jfrog.io/splitd/sidecar:${{ env.SHORT_SHA }}
