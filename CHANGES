@@ -1,4 +1,5 @@
 1.0.1 (Sep 5, 2023):
 - Add support for .track
 - Fixed issue where impressions could take too long to evict even with the queue full
+- Fixed eviction on shutdown
 - Internal: bumped test covereage, bumped CI configuration & automated release logic, module configuration cleanup

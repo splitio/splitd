@@ -1,4 +1,4 @@
-.PHONY: clean build test sidecar_image unit-tests entrypoint-test
+.PHONY: clean build test sidecar_image unit-tests entrypoint-test splitio/commitsha.go
 
 # Setup defaults
 GO ?=go
@@ -9,12 +9,15 @@ SHELL = /usr/bin/env bash -o pipefail
 PLATFORM ?=
 PLATFORM_STR := $(if $(PLATFORM),--platform=$(PLATFORM),)
 
-COVERAGE_FILE ?= coverage.out
-
 VERSION	:= $(shell cat splitio/version.go | grep 'const Version' | sed 's/const Version = //' | tr -d '"')
-GO_FILES := $(shell find . -name "*.go") go.sum
+COMMIT_SHA := $(shell git rev-parse --short HEAD)
+COMMIT_SHA_FILE := splitio/commitsha.go
+
+GO_FILES := $(shell find . -name "*.go" -not -name "$(COMMIT_SHA_FILE)") go.sum
 
 CONFIG_TEMPLATE ?= splitd.yaml.tpl
+COVERAGE_FILE ?= coverage.out
+
 
 default: help
 
@@ -77,6 +80,11 @@ images_release: # entrypoints
 binaries_release: splitd-linux-amd64-$(VERSION).bin splitd-darwin-amd64-$(VERSION).bin splitd-linux-arm-$(VERSION).bin splitd-darwin-arm-$(VERSION).bin
 
 $(COVERAGE_FILE): unit-tests
+
+$(COMMIT_SHA_FILE):
+	@echo "package splitio" > $(COMMIT_SHA_FILE)
+	@echo "" >> $(COMMIT_SHA_FILE)
+	@echo "const CommitSHA = \"$(COMMIT_SHA)\"" >> $(COMMIT_SHA_FILE)
 
 splitd-linux-amd64-$(VERSION).bin: $(GO_FILES)
 	GOARCH=amd64 GOOS=linux $(GO) build -o $@ cmd/splitd/main.go
