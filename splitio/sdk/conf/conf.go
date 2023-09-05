@@ -6,23 +6,19 @@ import (
 	"github.com/splitio/go-split-commons/v4/conf"
 )
 
+const (
+	defaultImpressionsMode        = "optimized"
+	minimumImpressionsRefreshRate = 30 * time.Minute
+)
+
 type Config struct {
 	LabelsEnabled    bool
 	StreamingEnabled bool
 	Splits           Splits
 	Segments         Segments
 	Impressions      Impressions
+	Events           Events
 	URLs             URLs
-}
-
-func (c *Config) ParseOptions(options []Option) error {
-	for _, apply := range options {
-		err := apply(c)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 type Splits struct {
@@ -46,6 +42,12 @@ type Impressions struct {
 	PostConcurrency int
 }
 
+type Events struct {
+	QueueSize       int
+	SyncPeriod      time.Duration
+	PostConcurrency int
+}
+
 type URLs struct {
 	Auth      string
 	SDK       string
@@ -56,14 +58,23 @@ type URLs struct {
 
 func (c *Config) ToAdvancedConfig() *conf.AdvancedConfig {
 	d := conf.GetDefaultAdvancedConfig()
+
 	d.SplitsRefreshRate = int(c.Splits.SyncPeriod.Seconds())
+	d.SplitUpdateQueueSize = int64(c.Splits.UpdateBufferSize)
 	d.SegmentsRefreshRate = int(c.Segments.SyncPeriod.Seconds())
+	d.SegmentQueueSize = c.Segments.QueueSize
+	d.SegmentUpdateQueueSize = int64(c.Segments.UpdateBufferSize)
+	d.SegmentWorkers = c.Segments.WorkerCount
 	d.StreamingEnabled = c.StreamingEnabled
+
 	d.AuthServiceURL = c.URLs.Auth
 	d.SdkURL = c.URLs.SDK
 	d.EventsURL = c.URLs.Events
 	d.StreamingServiceURL = c.URLs.Streaming
 	d.TelemetryServiceURL = c.URLs.Telemetry
+
+	d.ImpressionsQueueSize = c.Impressions.QueueSize
+
 	return &d
 }
 
@@ -85,10 +96,15 @@ func DefaultConfig() *Config {
 			Mode:            "optimized",
 			ObserverSize:    500000,
 			QueueSize:       8192,
-			SyncPeriod:      5 * time.Second,
-			CountSyncPeriod: 5 * time.Second,
+			SyncPeriod:      30 * time.Minute,
+			CountSyncPeriod: 60 * time.Minute,
 			PostConcurrency: 1,
 		},
+        Events: Events{
+            QueueSize: 8192,
+            SyncPeriod: 1*time.Minute,
+            PostConcurrency: 1,
+        },
 		URLs: URLs{
 			Auth:      "https://auth.split.io",
 			SDK:       "https://sdk.split.io/api",
@@ -99,33 +115,12 @@ func DefaultConfig() *Config {
 	}
 }
 
-type Option func(c *Config) error
+func (c *Config) Normalize() []string {
+	var warnings []string
+	if c.Impressions.Mode == "optimized" && c.Impressions.SyncPeriod < minimumImpressionsRefreshRate {
+		warnings = append(warnings, "minimum impressions refresh rate is 30 min. ignoring user config")
+		c.Impressions.SyncPeriod = minimumImpressionsRefreshRate
+	}
 
-func WithLabelsEnabled(v bool) Option {
-	return func(c *Config) error { c.LabelsEnabled = v; return nil }
-}
-
-func WithStreamingEnabled(v bool) Option {
-	return func(c *Config) error { c.StreamingEnabled = v; return nil }
-}
-
-func WithAuthURL(v string) Option {
-	return func(c *Config) error { c.URLs.Auth = v; return nil }
-}
-
-func WithSDKURL(v string) Option {
-	return func(c *Config) error { c.URLs.SDK = v; return nil }
-}
-
-func WithEventsURL(v string) Option {
-	return func(c *Config) error { c.URLs.Events = v; return nil }
-}
-
-func WithStreamingURL(v string) Option {
-	return func(c *Config) error { c.URLs.Streaming = v; return nil }
-}
-
-
-func WithTelemetryURL(v string) Option {
-	return func(c *Config) error { c.URLs.Telemetry = v; return nil }
+	return warnings
 }

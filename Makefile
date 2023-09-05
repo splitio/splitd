@@ -1,13 +1,23 @@
-.PHONY: clean build test sidecar_image unit-tests entrypoint-test
+.PHONY: clean build test sidecar_image unit-tests entrypoint-test splitio/commitsha.go
 
 # Setup defaults
 GO ?=go
 DOCKER ?= docker
 SHELL = /usr/bin/env bash -o pipefail
-PLATFORM ?=
-VERSION	:= $(shell cat splitio/version.go | grep 'const Version' | sed 's/const Version = //' | tr -d '"')
 
-GO_FILES := $(shell find . -name "*.go") go.sum
+# setup platform specific docker image builds
+PLATFORM ?=
+PLATFORM_STR := $(if $(PLATFORM),--platform=$(PLATFORM),)
+
+VERSION	:= $(shell cat splitio/version.go | grep 'const Version' | sed 's/const Version = //' | tr -d '"')
+COMMIT_SHA := $(shell git rev-parse --short HEAD)
+COMMIT_SHA_FILE := splitio/commitsha.go
+
+GO_FILES := $(shell find . -name "*.go" -not -name "$(COMMIT_SHA_FILE)") go.sum
+
+CONFIG_TEMPLATE ?= splitd.yaml.tpl
+COVERAGE_FILE ?= coverage.out
+
 
 default: help
 
@@ -19,23 +29,29 @@ go.sum: go.mod
 clean:
 	rm -Rf splitcli \
 		splitd \
-		splitd.linux.amd64.$(VERSION).bin \
-		splitd.darwin.amd64.$(VERSION).bin \
-		splitd.linux.arm.$(VERSION).bin \
-		splitd.darwin.arm.$(VERSION).bin
+		splitd-linux-amd64-$(VERSION).bin \
+		splitd-darwin-amd64-$(VERSION).bin \
+		splitd-linux-arm-$(VERSION).bin \
+		splitd-darwin-arm-$(VERSION).bin
 
 ## build binaries for this platform
-build: splitd splitcli
+build: splitd splitcli sdhelper
+
+
 
 ## run all tests
 test: unit-tests entrypoint-test
 
 ## run go unit tests
 unit-tests:
-	$(GO) test ./... -count=1 -race
+	$(GO) test ./... -count=1 -race -coverprofile=$(COVERAGE_FILE)
+
+## display unit test coverage derived from last test run (use `make test display-coverage` for up-to-date results)
+display-coverage: coverage.out
+	go tool cover -html=coverage.out
 
 ## run bash entrypoint tests
-entrypoint-test:
+entrypoint-test: splitd # requires splitd binary to generate a config and validate env var forwarding
 	bash infra/test/test_entrypoint.sh
 
 ## build splitd for local machine
@@ -46,33 +62,41 @@ splitd: $(GO_FILES)
 splitcli: $(GO_FILES)
 	go build -o splitcli cmd/splitcli/main.go
 
+## regenerate config file template with defaults
+$(CONFIG_TEMPLATE): $(SOURCES) sdhelper
+	./sdhelper -command="gen-config-template" > $(CONFIG_TEMPLATE)
+## build splitd helper (for code/doc generation purposes only)
+sdhelper: $(GO_FILES)
+	go build -o sdhelper cmd/sdhelper/main.go
+
 ## build docker images for sidecar
 images_release: # entrypoints
-	$(DOCKER) build $(platform_str) -t splitsoftware/splitd-sidecar:latest -t splitsoftware/splitd-sidecar:$(VERSION) -f infra/sidecar.Dockerfile .
+	$(DOCKER) build $(PLATFORM_STR) -t splitsoftware/splitd-sidecar:latest -t splitsoftware/splitd-sidecar:$(VERSION) -f infra/sidecar.Dockerfile .
 	@echo "Image created. Make sure everything works ok, and then run the following commands to push them."
 	@echo "$(DOCKER) push splitsoftware/splitd-sidecar:latest"
 	@echo "$(DOCKER) push splitsoftware/splitd-sidecar:$(VERSION)"
 
 ## build release for binaires
-binaries_release: splitd.linux.amd64.$(VERSION).bin splitd.darwin.amd64.$(VERSION).bin splitd.linux.arm.$(VERSION).bin splitd.darwin.arm.$(VERSION).bin
+binaries_release: splitd-linux-amd64-$(VERSION).bin splitd-darwin-amd64-$(VERSION).bin splitd-linux-arm-$(VERSION).bin splitd-darwin-arm-$(VERSION).bin
 
+$(COVERAGE_FILE): unit-tests
 
-splitd.linux.amd64.$(VERSION).bin: $(GO_FILES)
+$(COMMIT_SHA_FILE):
+	@echo "package splitio" > $(COMMIT_SHA_FILE)
+	@echo "" >> $(COMMIT_SHA_FILE)
+	@echo "const CommitSHA = \"$(COMMIT_SHA)\"" >> $(COMMIT_SHA_FILE)
+
+splitd-linux-amd64-$(VERSION).bin: $(GO_FILES)
 	GOARCH=amd64 GOOS=linux $(GO) build -o $@ cmd/splitd/main.go
 
-splitd.darwin.amd64.$(VERSION).bin: $(GO_FILES)
+splitd-darwin-amd64-$(VERSION).bin: $(GO_FILES)
 	GOARCH=amd64 GOOS=darwin $(GO) build -o $@ cmd/splitd/main.go
 
-splitd.linux.arm.$(VERSION).bin: $(GO_FILES)
+splitd-linux-arm-$(VERSION).bin: $(GO_FILES)
 	GOARCH=arm64 GOOS=linux $(GO) build -o $@ cmd/splitd/main.go
 
-splitd.darwin.arm.$(VERSION).bin: $(GO_FILES)
+splitd-darwin-arm-$(VERSION).bin: $(GO_FILES)
 	GOARCH=arm64 GOOS=darwin $(GO) build -o $@ cmd/splitd/main.go
-
-binaries_release: splitd
-
-# helper macros
-platform_str = $(if $(PLATFORM),--platform=$(PLATFORM),)
 
 # Help target borrowed from: https://docs.cloudposse.com/reference/best-practices/make-best-practices/
 ## This help screen

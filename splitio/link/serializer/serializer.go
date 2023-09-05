@@ -3,6 +3,16 @@ package serializer
 import "fmt"
 
 type Mechanism int
+
+func (m Mechanism) String() string {
+	switch m {
+	case MsgPack:
+		return "msgpack"
+	default:
+		return "invalid-serialization"
+	}
+}
+
 const (
 	MsgPack Mechanism = 1
 )

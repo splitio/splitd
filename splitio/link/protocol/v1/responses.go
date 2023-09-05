@@ -33,6 +33,10 @@ type TreatmentsWithConfigPayload struct {
 	Results []TreatmentWithConfigPayload `msgpack:"r"`
 }
 
+type TrackPayload struct {
+    Success bool `msgpack:"s"`
+}
+
 type ListenerExtraData struct {
 	Label        string `msgpack:"l"`
 	Timestamp    int64  `msgpack:"m"`
@@ -44,5 +48,6 @@ type validPayloadsConstraint interface {
 		TreatmentsPayload |
 		TreatmentWithConfigPayload |
 		TreatmentsWithConfigPayload |
+		TrackPayload |
 		RegisterPayload
 }
