@@ -8,13 +8,10 @@ import (
 
 	"github.com/splitio/go-client/v6/splitio/engine/evaluator"
 	"github.com/splitio/go-split-commons/v4/dtos"
-	"github.com/splitio/go-split-commons/v4/provisional"
-	"github.com/splitio/go-split-commons/v4/service"
-	scstorage "github.com/splitio/go-split-commons/v4/storage"
 	"github.com/splitio/go-split-commons/v4/storage/inmemory"
 	"github.com/splitio/go-split-commons/v4/synchronizer"
-	"github.com/splitio/go-toolkit/v5/datastructures/set"
 	"github.com/splitio/go-toolkit/v5/logging"
+	"github.com/splitio/splitd/external/commons/mocks"
 	"github.com/splitio/splitd/splitio/sdk/conf"
 	"github.com/splitio/splitd/splitio/sdk/storage"
 	"github.com/splitio/splitd/splitio/sdk/types"
@@ -26,7 +23,7 @@ import (
 func TestTreatmentLabelsDisabled(t *testing.T) {
 	is, _ := storage.NewImpressionsQueue(100)
 
-	ev := &EvaluatorMock{}
+	ev := &mocks.EvaluatorMock{}
 	ev.On("EvaluateFeature", "key1", (*string)(nil), "f1", Attributes{"a": 1}).
 		Return(&evaluator.Result{Treatment: "on", Label: "label1", EvaluationTime: 1 * time.Millisecond, SplitChangeNumber: 123}).
 		Once()
@@ -38,7 +35,7 @@ func TestTreatmentLabelsDisabled(t *testing.T) {
 		Treatment:    "on",
 		ChangeNumber: 123,
 	}
-	im := &ImpressionManagerMock{}
+	im := &mocks.ImpressionManagerMock{}
 	im.On("ProcessSingle", mock.Anything).
 		// hay que hacer el assert aca en lugar del matcher por el timestamp
 		Run(func(a mock.Arguments) { assertImpEq(t, expectedImpression, a.Get(0).(*dtos.Impression)) }).
@@ -78,7 +75,7 @@ func TestTreatmentLabelsDisabled(t *testing.T) {
 func TestTreatmentLabelsEnabled(t *testing.T) {
 	is, _ := storage.NewImpressionsQueue(100)
 
-	ev := &EvaluatorMock{}
+	ev := &mocks.EvaluatorMock{}
 	ev.On("EvaluateFeature", "key1", (*string)(nil), "f1", Attributes{"a": 1}).
 		Return(&evaluator.Result{Treatment: "on", Label: "label1", EvaluationTime: 1 * time.Millisecond, SplitChangeNumber: 123}).
 		Once()
@@ -91,7 +88,7 @@ func TestTreatmentLabelsEnabled(t *testing.T) {
 		Label:        "label1",
 		ChangeNumber: 123,
 	}
-	im := &ImpressionManagerMock{}
+	im := &mocks.ImpressionManagerMock{}
 	im.On("ProcessSingle", mock.Anything).
 		Run(func(args mock.Arguments) {
 			// hay que hacer el assert aca en lugar del matcher por el timestamp
@@ -134,7 +131,7 @@ func TestTreatmentLabelsEnabled(t *testing.T) {
 func TestTreatments(t *testing.T) {
 	is, _ := storage.NewImpressionsQueue(100)
 
-	ev := &EvaluatorMock{}
+	ev := &mocks.EvaluatorMock{}
 	ev.On("EvaluateFeatures", "key1", (*string)(nil), []string{"f1", "f2", "f3"}, Attributes{"a": 1}).
 		Return(evaluator.Results{Evaluations: map[string]evaluator.Result{
 			"f1": {Treatment: "on", Label: "label1", EvaluationTime: 1 * time.Millisecond, SplitChangeNumber: 123},
@@ -148,7 +145,7 @@ func TestTreatments(t *testing.T) {
 		{KeyName: "key1", BucketingKey: "", FeatureName: "f2", Treatment: "on", Label: "label2", ChangeNumber: 124},
 		{KeyName: "key1", BucketingKey: "", FeatureName: "f3", Treatment: "on", Label: "label3", ChangeNumber: 125},
 	}
-	im := &ImpressionManagerMock{}
+	im := &mocks.ImpressionManagerMock{}
 	im.On("ProcessSingle", mock.Anything).
 		Run(func(args mock.Arguments) {
 			assertImpEq(t, &expectedImpressions[0], args.Get(0).(*dtos.Impression))
@@ -212,7 +209,7 @@ func TestImpressionsQueueFull(t *testing.T) {
 
 	logger := logging.NewLogger(nil)
 
-	impRecorder := &ImpressionRecorderMock{}
+	impRecorder := &mocks.ImpressionRecorderMock{}
 	impRecorder.On("Record", mock.Anything, mock.Anything, mock.Anything).Return(nil).Times(2)
 
 	// setup an impressions queue of 4, and a task with a large period for evicting, and a synchronizer
@@ -227,13 +224,13 @@ func TestImpressionsQueueFull(t *testing.T) {
 	sy.StartPeriodicDataRecording()
 	// @}
 
-	ev := &EvaluatorMock{}
+	ev := &mocks.EvaluatorMock{}
 	ev.On("EvaluateFeature", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(&evaluator.Result{Treatment: "on", Label: "label1", EvaluationTime: 1 * time.Millisecond, SplitChangeNumber: 123}).
 		Times(9)
 
 	expectedImpression := &dtos.Impression{KeyName: "key1", BucketingKey: "", FeatureName: "f1", Treatment: "on", Label: "label1", ChangeNumber: 123}
-	im := &ImpressionManagerMock{}
+	im := &mocks.ImpressionManagerMock{}
 	im.On("ProcessSingle", mock.Anything).
 		// hay que hacer el assert aca en lugar del matcher por el timestamp
 		Run(func(args mock.Arguments) { assertImpEq(t, expectedImpression, args.Get(0).(*dtos.Impression)) }).
@@ -287,7 +284,7 @@ func TestTrack(t *testing.T) {
 	es, _ := storage.NewEventsQueue(1000)
 	logger := logging.NewLogger(nil)
 
-	ss := &SplitStorageMock{}
+	ss := &mocks.SplitStorageMock{}
 	ss.On("TrafficTypeExists", "user").Return(true)
 
 	client := &Impl{
@@ -337,7 +334,7 @@ func TestTrackEventsFlush(t *testing.T) {
 	es, _ := storage.NewEventsQueue(4)
 	logger := logging.NewLogger(nil)
 
-	ss := &SplitStorageMock{}
+	ss := &mocks.SplitStorageMock{}
 	ss.On("TrafficTypeExists", "user").Return(true)
 
 	client := &Impl{
@@ -360,36 +357,101 @@ func TestTrackEventsFlush(t *testing.T) {
 	assert.ErrorIs(t, err, ErrEventsQueueFull)
 
 	assert.Equal(t, "EVENTS_FULL", <-client.queueFullChan)
-	/*
-		err = es.RangeAndClear(func(md types.ClientMetadata, st *storage.LockingQueue[dtos.EventDTO]) {
-			assert.Equal(t, types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}, md)
-			assert.Equal(t, 1, st.Len())
 
-			var evs []dtos.EventDTO
-			n, err := st.Pop(1, &evs)
-			assert.Nil(t, nil)
-			assert.Equal(t, 1, n)
-			assert.Equal(t, 1, len(evs))
-			assertEventEq(t, &dtos.EventDTO{
-				Key:             "key1",
-				TrafficTypeName: "user",
-				EventTypeID:     "checkin",
-				Value:           ref(123.4),
-				Properties:      map[string]interface{}{"a": 123},
-			}, &evs[0])
-			n, err = st.Pop(1, &evs)
-			assert.ErrorIs(t, err, storage.ErrQueueEmpty)
+	err = es.RangeAndClear(func(md types.ClientMetadata, st *storage.LockingQueue[dtos.EventDTO]) {
+		assert.Equal(t, types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}, md)
+		assert.Equal(t, 3, st.Len())
 
-		})
-		assert.Nil(t, err)
+		var evs []dtos.EventDTO
+		n, err := st.Pop(10, &evs)
+		assert.Nil(t, nil)
+		assert.Equal(t, 3, n)
+		assert.Equal(t, 3, len(evs))
 
-		err = client.Track(&md, "key1", "", "checkin", ref(123.4), map[string]interface{}{"a": 123})
-		assert.ErrorIs(t, err, ErrEmtpyTrafficType)
+		expectedEvent := dtos.EventDTO{
+			Key:             "key1",
+			TrafficTypeName: "user",
+			EventTypeID:     "checkin",
+			Value:           ref(123.4),
+			Properties:      map[string]interface{}{"a": 123},
+		}
 
-		err = client.Track(&md, "key1", "user", "checkin", ref(123.4), map[string]interface{}{"a": strings.Repeat("qwertyui", 100000)})
-		assert.ErrorIs(t, err, ErrEventTooBig)
-	*/
+		assertEventEq(t, &expectedEvent, &evs[0])
+		expectedEvent.Key = "key2"
+		assertEventEq(t, &expectedEvent, &evs[1])
+		expectedEvent.Key = "key3"
+		assertEventEq(t, &expectedEvent, &evs[2])
 
+		n, err = st.Pop(1, &evs)
+		assert.ErrorIs(t, err, storage.ErrQueueEmpty)
+
+	})
+	assert.Nil(t, err)
+
+	err = client.Track(&md, "key1", "", "checkin", ref(123.4), map[string]interface{}{"a": 123})
+	assert.ErrorIs(t, err, ErrEmtpyTrafficType)
+
+	err = client.Track(&md, "key1", "user", "checkin", ref(123.4), map[string]interface{}{"a": strings.Repeat("qwertyui", 100000)})
+	assert.ErrorIs(t, err, ErrEventTooBig)
+
+}
+
+func TestSplitNames(t *testing.T) {
+	var ss mocks.SplitStorageMock
+	ss.On("SplitNames").Return([]string{"split1", "split2"}).Once()
+
+	c := Impl{splitStorage: &ss}
+
+	names, err := c.SplitNames()
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"split1", "split2"}, names)
+}
+
+func TestSplits(t *testing.T) {
+	var ss mocks.SplitStorageMock
+	ss.On("All").Return([]dtos.SplitDTO{
+		{Name: "s1", TrafficTypeName: "tt1", ChangeNumber: 1, Conditions: []dtos.ConditionDTO{{Partitions: []dtos.PartitionDTO{{Treatment: "a"}, {Treatment: "b"}}}}},
+		{
+			Name:            "s2",
+			TrafficTypeName: "tt1",
+			ChangeNumber:    1,
+			Conditions:      []dtos.ConditionDTO{{Partitions: []dtos.PartitionDTO{{Treatment: "a"}, {Treatment: "b"}}}},
+			Configurations:  map[string]string{"a": "conf1", "b": "conf2"},
+		},
+	}).Once()
+
+	c := Impl{splitStorage: &ss}
+
+	splits, err := c.Splits()
+	assert.Nil(t, err)
+	assert.Equal(t, []SplitView{
+		{Name: "s1", TrafficType: "tt1", Killed: false, Treatments: []string{"a", "b"}, ChangeNumber: 1},
+		{Name: "s2", TrafficType: "tt1", Killed: false, Treatments: []string{"a", "b"}, ChangeNumber: 1, Configs: map[string]string{"a": "conf1", "b": "conf2"}},
+	}, splits)
+}
+
+func TestSplit(t *testing.T) {
+	var ss mocks.SplitStorageMock
+	ss.On("Split", "s2").Return(&dtos.SplitDTO{
+		Name:            "s2",
+		TrafficTypeName: "tt1",
+		ChangeNumber:    1,
+		Conditions:      []dtos.ConditionDTO{{Partitions: []dtos.PartitionDTO{{Treatment: "a"}, {Treatment: "b"}}}},
+		Configurations:  map[string]string{"a": "conf1", "b": "conf2"},
+	}).Once()
+
+	c := Impl{splitStorage: &ss}
+
+	split, err := c.Split("s2")
+	assert.Nil(t, err)
+	assert.Equal(t, &SplitView{
+		Name:         "s2",
+		TrafficType:  "tt1",
+		Killed:       false,
+		Treatments:   []string{"a", "b"},
+		ChangeNumber: 1,
+		Configs:      map[string]string{"a": "conf1", "b": "conf2"},
+	}, split)
 }
 
 func assertImpEq(t *testing.T, i1, i2 *dtos.Impression) {
@@ -411,78 +473,6 @@ func assertEventEq(t *testing.T, e1, e2 *dtos.EventDTO) {
 	assert.Equal(t, e1.Properties, e2.Properties)
 }
 
-// mocks
-
-type EvaluatorMock struct {
-	mock.Mock
-}
-
-// EvaluateFeature implements evaluator.Interface
-func (e *EvaluatorMock) EvaluateFeature(key string, bucketingKey *string, feature string, attributes map[string]interface{}) *evaluator.Result {
-	args := e.Called(key, bucketingKey, feature, attributes)
-	return args.Get(0).(*evaluator.Result)
-}
-
-// EvaluateFeatures implements evaluator.Interface
-func (e *EvaluatorMock) EvaluateFeatures(key string, bucketingKey *string, features []string, attributes map[string]interface{}) evaluator.Results {
-	args := e.Called(key, bucketingKey, features, attributes)
-	return args.Get(0).(evaluator.Results)
-}
-
-type ImpressionManagerMock struct {
-	mock.Mock
-}
-
-// ProcessImpressions implements provisional.ImpressionManager
-func (m *ImpressionManagerMock) ProcessImpressions(impressions []dtos.Impression) ([]dtos.Impression, []dtos.Impression) {
-	args := m.Called(impressions)
-	return args.Get(0).([]dtos.Impression), args.Get(1).([]dtos.Impression)
-}
-
-// ProcessSingle implements provisional.ImpressionManager
-func (m *ImpressionManagerMock) ProcessSingle(impression *dtos.Impression) bool {
-	args := m.Called(impression)
-	return args.Bool(0)
-}
-
-type ImpressionRecorderMock struct {
-	mock.Mock
-}
-
-// Record implements service.ImpressionsRecorder
-func (m *ImpressionRecorderMock) Record(impressions []dtos.ImpressionsDTO, metadata dtos.Metadata, extraHeaders map[string]string) error {
-	args := m.Called(impressions, metadata, extraHeaders)
-	return args.Error(0)
-}
-
-// RecordImpressionsCount implements service.ImpressionsRecorder
-func (m *ImpressionRecorderMock) RecordImpressionsCount(pf dtos.ImpressionsCountDTO, metadata dtos.Metadata) error {
-	args := m.Called(pf, metadata)
-	return args.Error(0)
-}
-
-type SplitStorageMock struct{ mock.Mock }
-
-func (m *SplitStorageMock) All() []dtos.SplitDTO                           { panic("unimplemented") }
-func (m *SplitStorageMock) ChangeNumber() (int64, error)                   { panic("unimplemented") }
-func (m *SplitStorageMock) FetchMany([]string) map[string]*dtos.SplitDTO   { panic("unimplemented") }
-func (m *SplitStorageMock) KillLocally(string, string, int64)              { panic("unimplemented") }
-func (m *SplitStorageMock) SegmentNames() *set.ThreadUnsafeSet             { panic("unimplemented") }
-func (m *SplitStorageMock) SetChangeNumber(changeNumber int64) error       { panic("unimplemented") }
-func (m *SplitStorageMock) Split(splitName string) *dtos.SplitDTO          { panic("unimplemented") }
-func (m *SplitStorageMock) SplitNames() []string                           { panic("unimplemented") }
-func (m *SplitStorageMock) Update([]dtos.SplitDTO, []dtos.SplitDTO, int64) { panic("unimplemented") }
-
-func (m *SplitStorageMock) TrafficTypeExists(trafficType string) bool {
-	args := m.Called(trafficType)
-	return args.Bool(0)
-}
-
 func ref[T any](t T) *T {
 	return &t
 }
-
-var _ scstorage.SplitStorage = (*SplitStorageMock)(nil)
-var _ evaluator.Interface = (*EvaluatorMock)(nil)
-var _ provisional.ImpressionManager = (*ImpressionManagerMock)(nil)
-var _ service.ImpressionsRecorder = (*ImpressionRecorderMock)(nil)

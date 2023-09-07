@@ -45,6 +45,22 @@ func NewTrackRPC(key string, trafficType string, eventType string, eventVal *flo
 	}
 }
 
+func NewSplitNamesRPC() *v1.RPC {
+	return &v1.RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: v1.OCSplitNames}
+}
+
+func NewSplitsRPC() *v1.RPC {
+	return &v1.RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: v1.OCSplits}
+}
+
+func NewSplitRPC(name string) *v1.RPC {
+	return &v1.RPC{
+		RPCBase: protocol.RPCBase{Version: protocol.V1},
+		OpCode:  v1.OCSplit,
+		Args:    []interface{}{name},
+	}
+}
+
 func NewRegisterResp(ok bool) *v1.ResponseWrapper[v1.RegisterPayload] {
 	res := v1.ResultOk
 	if !ok {
@@ -103,6 +119,36 @@ func NewTrackResp(ok bool) *v1.ResponseWrapper[v1.TrackPayload] {
 	return &v1.ResponseWrapper[v1.TrackPayload]{
 		Status:  res,
 		Payload: v1.TrackPayload{Success: ok},
+	}
+}
+
+func NewSplitNamesResp(ok bool, names []string) *v1.ResponseWrapper[v1.SplitNamesPayload] {
+	res := v1.ResultOk
+	if !ok {
+		res = v1.ResultInternalError
+	}
+	return &v1.ResponseWrapper[v1.SplitNamesPayload]{
+		Status:  res,
+		Payload: v1.SplitNamesPayload{Names: names},
+	}
+}
+
+func NewSplitResp(ok bool, split v1.SplitPayload) *v1.ResponseWrapper[v1.SplitPayload] {
+	res := v1.ResultOk
+	if !ok {
+		res = v1.ResultInternalError
+	}
+	return &v1.ResponseWrapper[v1.SplitPayload]{Status: res, Payload: split}
+}
+
+func NewSplitsResp(ok bool, splits []v1.SplitPayload) *v1.ResponseWrapper[v1.SplitsPayload] {
+	res := v1.ResultOk
+	if !ok {
+		res = v1.ResultInternalError
+	}
+	return &v1.ResponseWrapper[v1.SplitsPayload]{
+		Status:  res,
+		Payload: v1.SplitsPayload{Splits: splits},
 	}
 }
 
