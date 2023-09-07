@@ -17,6 +17,7 @@ import (
 	"github.com/splitio/go-split-commons/v4/healthcheck/application"
 	"github.com/splitio/go-split-commons/v4/provisional"
 	"github.com/splitio/go-split-commons/v4/service/api"
+	commonStorage "github.com/splitio/go-split-commons/v4/storage"
 	"github.com/splitio/go-split-commons/v4/synchronizer"
 	"github.com/splitio/go-toolkit/v5/common"
 	"github.com/splitio/go-toolkit/v5/logging"
@@ -30,6 +31,7 @@ const (
 
 var (
 	ErrEventsQueueFull = errors.New("events queue full")
+	ErrSplitNotFound   = errors.New("split not found")
 )
 
 type Attributes = map[string]interface{}
@@ -38,6 +40,9 @@ type Interface interface {
 	Treatment(cfg *types.ClientConfig, key string, bucketingKey *string, feature string, attributes map[string]interface{}) (*EvaluationResult, error)
 	Treatments(cfg *types.ClientConfig, key string, bucketingKey *string, features []string, attributes map[string]interface{}) (map[string]EvaluationResult, error)
 	Track(cfg *types.ClientConfig, key string, trafficType string, eventType string, value *float64, properties map[string]interface{}) error
+	SplitNames() ([]string, error)
+	Splits() ([]SplitView, error)
+	Split(name string) (*SplitView, error)
 	Shutdown() error
 }
 
@@ -49,6 +54,7 @@ type Impl struct {
 	is            *storage.ImpressionsStorage
 	es            *storage.EventsStorage
 	iq            provisional.ImpressionManager
+	splitStorage  commonStorage.SplitStorage
 	cfg           sdkConf.Config
 	status        chan int
 	queueFullChan chan string
@@ -101,6 +107,7 @@ func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, 
 		is:            stores.impressions,
 		es:            stores.events,
 		iq:            impc.manager,
+		splitStorage:  stores.splits,
 		cfg:           *c,
 		queueFullChan: queueFullChan,
 		validator:     Validator{logger: logger, splits: stores.splits},
@@ -183,6 +190,28 @@ func (i *Impl) Track(cfg *types.ClientConfig, key string, trafficType string, ev
 	return nil
 }
 
+func (i *Impl) Split(name string) (*SplitView, error) {
+	split := i.splitStorage.Split(name)
+	if split == nil {
+		return nil, ErrSplitNotFound
+	}
+
+	return splitToView(split), nil
+}
+
+func (i *Impl) SplitNames() ([]string, error) {
+	return i.splitStorage.SplitNames(), nil
+}
+
+func (i *Impl) Splits() ([]SplitView, error) {
+	splits := i.splitStorage.All()
+	asViews := make([]SplitView, 0, len(splits))
+	for idx := range splits {
+		asViews = append(asViews, *splitToView(&splits[idx]))
+	}
+	return asViews, nil
+}
+
 func (i *Impl) Shutdown() error {
 	i.sm.Stop()
 	return nil
@@ -221,6 +250,25 @@ func (i *Impl) handleImpression(key string, bk *string, f string, r *evaluator.R
 	}
 
 	return imp
+}
+
+func splitToView(s *dtos.SplitDTO) *SplitView {
+
+	var treatments []string
+	for _, c := range s.Conditions {
+		for _, p := range c.Partitions {
+			treatments = append(treatments, p.Treatment)
+		}
+	}
+
+	return &SplitView{
+		Name:         s.Name,
+		TrafficType:  s.TrafficTypeName,
+		Killed:       s.Killed,
+		ChangeNumber: s.ChangeNumber,
+		Configs:      s.Configurations,
+		Treatments:   treatments,
+	}
 }
 
 func timeMillis() int64 {

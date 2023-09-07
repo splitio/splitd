@@ -21,7 +21,36 @@ const (
 
 	// Track-related ops
 	OCTrack OpCode = 0x80
+
+	OCSplitNames OpCode = 0xA0
+	OCSplit      OpCode = 0xA1
+	OCSplits     OpCode = 0xA2
 )
+
+func (o OpCode) String() string {
+	switch o {
+	case OCRegister:
+		return "register"
+	case OCTreatment:
+		return "treatment"
+	case OCTreatments:
+		return "treatments"
+	case OCTreatmentWithConfig:
+		return "treatmentWithConfig"
+	case OCTreatmentsWithConfig:
+		return "treatmentsWithConfig"
+	case OCTrack:
+		return "track"
+	case OCSplitNames:
+		return "split-names"
+	case OCSplit:
+		return "split"
+	case OCSplits:
+		return "splits"
+	default:
+		return "unknown"
+	}
+}
 
 type RPC struct {
 	protocol.RPCBase
@@ -260,6 +289,71 @@ func (t *TrackArgs) PopulateFromRPC(rpc *RPC) error {
 
 	if t.Properties, err = getOptional[map[string]interface{}](rpc.Args[TrackArgPropertiesIdx]); err != nil {
 		return RPCParseError{Code: PECInvalidArgType, Data: int64(TrackArgPropertiesIdx)}
+	}
+
+	return nil
+}
+
+type SplitNamesArgs struct{}
+
+func (s SplitNamesArgs) Encode() []interface{} {
+	return nil
+}
+
+func (t *SplitNamesArgs) PopulateFromRPC(rpc *RPC) error {
+	if rpc.OpCode != OCSplitNames {
+		return RPCParseError{Code: PECOpCodeMismatch}
+	}
+
+	if len(rpc.Args) != 0 {
+		return RPCParseError{Code: PECWrongArgCount}
+	}
+
+	return nil
+}
+
+type SplitsArgs struct{}
+
+func (s SplitsArgs) Encode() []interface{} {
+	return nil
+}
+
+func (t *SplitsArgs) PopulateFromRPC(rpc *RPC) error {
+	if rpc.OpCode != OCSplits {
+		return RPCParseError{Code: PECOpCodeMismatch}
+	}
+
+	if len(rpc.Args) != 0 {
+		return RPCParseError{Code: PECWrongArgCount}
+	}
+
+	return nil
+}
+
+const (
+	SplitArgNameIdx int = 0
+)
+
+type SplitArgs struct {
+	Name string
+}
+
+func (s SplitArgs) Encode() []interface{} {
+	return []interface{}{s.Name}
+}
+
+func (t *SplitArgs) PopulateFromRPC(rpc *RPC) error {
+	if rpc.OpCode != OCSplit {
+		return RPCParseError{Code: PECOpCodeMismatch}
+	}
+
+	if len(rpc.Args) != 1 {
+		return RPCParseError{Code: PECWrongArgCount}
+	}
+
+	var ok bool
+	if t.Name, ok = rpc.Args[SplitArgNameIdx].(string); !ok {
+		return RPCParseError{Code: PECInvalidArgType, Data: int64(TrackArgKeyIdx)}
 	}
 
 	return nil

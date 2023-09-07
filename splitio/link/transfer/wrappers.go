@@ -34,10 +34,10 @@ func newConnWrapper(c net.Conn, f framing.Interface, o *Options) RawConn {
 	}
 
 	return &Impl{
-		conn:       c,
-		readBuffer: make([]byte, o.BufferSize),
-        readTimeout: o.ReadTimeout,
-        writeTimeout: o.WriteTimeout,
+		conn:         c,
+		readBuffer:   make([]byte, o.BufferSize),
+		readTimeout:  o.ReadTimeout,
+		writeTimeout: o.WriteTimeout,
 	}
 }
 

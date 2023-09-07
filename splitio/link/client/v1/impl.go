@@ -11,6 +11,7 @@ import (
 	protov1 "github.com/splitio/splitd/splitio/link/protocol/v1"
 	"github.com/splitio/splitd/splitio/link/serializer"
 	"github.com/splitio/splitd/splitio/link/transfer"
+	"github.com/splitio/splitd/splitio/sdk"
 )
 
 const (
@@ -139,6 +140,59 @@ func (c *Impl) Track(key string, trafficType string, eventType string, value *fl
 	return nil
 }
 
+func (c *Impl) SplitNames() ([]string, error) {
+	rpc := protov1.RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: protov1.OCSplitNames}
+	resp, err := doRPC[protov1.ResponseWrapper[protov1.SplitNamesPayload]](c, &rpc)
+	if err != nil {
+		return nil, fmt.Errorf("error executing treatment rpc: %w", err)
+	}
+
+	if resp.Status != protov1.ResultOk {
+		return nil, fmt.Errorf("server responded split-names rpc with error %d", resp.Status)
+	}
+
+	return resp.Payload.Names, nil
+}
+
+func (c *Impl) Split(name string) (*sdk.SplitView, error) { // TODO(mredolatti): use a local dto instead of package sdk's
+	rpc := protov1.RPC{
+		RPCBase: protocol.RPCBase{Version: protocol.V1},
+		OpCode:  protov1.OCSplit,
+		Args:    protov1.SplitArgs{Name: name}.Encode(),
+	}
+
+	resp, err := doRPC[protov1.ResponseWrapper[protov1.SplitPayload]](c, &rpc)
+	if err != nil {
+		return nil, fmt.Errorf("error executing treatment rpc: %w", err)
+	}
+
+	if resp.Status != protov1.ResultOk {
+		return nil, fmt.Errorf("server responded split-names rpc with error %d", resp.Status)
+	}
+
+	p := sdk.SplitView(resp.Payload)
+	return &p, nil
+}
+
+func (c *Impl) Splits() ([]sdk.SplitView, error) {
+	rpc := protov1.RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: protov1.OCSplits}
+	resp, err := doRPC[protov1.ResponseWrapper[protov1.SplitsPayload]](c, &rpc)
+	if err != nil {
+		return nil, fmt.Errorf("error executing treatment rpc: %w", err)
+	}
+
+	if resp.Status != protov1.ResultOk {
+		return nil, fmt.Errorf("server responded split-names rpc with error %d", resp.Status)
+	}
+
+	views := make([]sdk.SplitView, 0, len(resp.Payload.Splits))
+	for _, v := range resp.Payload.Splits {
+		views = append(views, sdk.SplitView(v))
+	}
+
+	return views, nil
+}
+
 func (c *Impl) register(id string, impressionsFeedback bool) error {
 	var flags protov1.RegisterFlags
 	if impressionsFeedback {
@@ -175,7 +229,7 @@ func doRPC[T any](c *Impl, rpc *protov1.RPC) (*T, error) {
 
 	resp, err := c.conn.ReceiveMessage()
 	if err != nil {
-		return nil, fmt.Errorf("error reading response from daeom: %w", err)
+		return nil, fmt.Errorf("error reading response from daemon: %w", err)
 	}
 
 	var response T

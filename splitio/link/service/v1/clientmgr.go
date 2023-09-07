@@ -136,9 +136,30 @@ func (m *ClientManager) handleRPC(rpc *protov1.RPC) (interface{}, error) {
 	case protov1.OCTrack:
 		var args protov1.TrackArgs
 		if err := args.PopulateFromRPC(rpc); err != nil {
-			return nil, fmt.Errorf("error parsing track argumentts: %w", err)
+			return nil, fmt.Errorf("error parsing track arguments: %w", err)
 		}
 		return m.handleTrack(&args)
+
+	case protov1.OCSplitNames:
+		var args protov1.SplitNamesArgs
+		if err := args.PopulateFromRPC(rpc); err != nil {
+			return nil, fmt.Errorf("error parsing track arguments: %w", err)
+		}
+		return m.handleSplitNames(&args)
+
+	case protov1.OCSplit:
+		var args protov1.SplitArgs
+		if err := args.PopulateFromRPC(rpc); err != nil {
+			return nil, fmt.Errorf("error parsing track arguments: %w", err)
+		}
+		return m.handleSplit(&args)
+
+	case protov1.OCSplits:
+		var args protov1.SplitsArgs
+		if err := args.PopulateFromRPC(rpc); err != nil {
+			return nil, fmt.Errorf("error parsing track arguments: %w", err)
+		}
+		return m.handleSplits(&args)
 
 	}
 	return nil, fmt.Errorf("RPC not implemented")
@@ -221,4 +242,63 @@ func (m *ClientManager) handleTrack(args *protov1.TrackArgs) (interface{}, error
 	}
 
 	return response, nil
+}
+
+func (m *ClientManager) handleSplitNames(args *protov1.SplitNamesArgs) (interface{}, error) {
+	names, err := m.splitSDK.SplitNames()
+	if err != nil {
+		return &protov1.ResponseWrapper[protov1.SplitNamesPayload]{Status: protov1.ResultInternalError}, err
+	}
+
+	response := &protov1.ResponseWrapper[protov1.SplitNamesPayload]{
+		Status:  protov1.ResultOk,
+		Payload: protov1.SplitNamesPayload{Names: names},
+	}
+
+	return response, nil
+}
+
+func (m *ClientManager) handleSplit(args *protov1.SplitArgs) (interface{}, error) {
+	view, err := m.splitSDK.Split(args.Name)
+	if err != nil {
+		return &protov1.ResponseWrapper[protov1.TreatmentPayload]{Status: protov1.ResultInternalError}, err
+	}
+
+	response := &protov1.ResponseWrapper[protov1.SplitPayload]{
+		Status:  protov1.ResultOk,
+		Payload: viewToPayload(view),
+	}
+
+	return response, nil
+}
+
+func (m *ClientManager) handleSplits(args *protov1.SplitsArgs) (interface{}, error) {
+	views, err := m.splitSDK.Splits()
+	if err != nil {
+		return &protov1.ResponseWrapper[protov1.SplitsPayload]{Status: protov1.ResultInternalError}, err
+	}
+
+	var p protov1.SplitsPayload
+	p.Splits = make([]protov1.SplitPayload, 0, len(views))
+	for _, view := range views {
+		p.Splits = append(p.Splits, viewToPayload(&view))
+	}
+
+	response := &protov1.ResponseWrapper[protov1.SplitsPayload]{
+		Status:  protov1.ResultOk,
+		Payload: p,
+	}
+
+	return response, nil
+}
+
+func viewToPayload(view *sdk.SplitView) protov1.SplitPayload {
+	return protov1.SplitPayload{
+		Name:         view.Name,
+		TrafficType:  view.TrafficType,
+		Killed:       view.Killed,
+		Treatments:   view.Treatments,
+		ChangeNumber: view.ChangeNumber,
+		Configs:      view.Configs,
+	}
 }

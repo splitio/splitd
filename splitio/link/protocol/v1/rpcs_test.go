@@ -233,6 +233,42 @@ func TestTrackRPCParsing(t *testing.T) {
 
 }
 
+func TestSplitNamesRPCProcessing(t *testing.T) {
+	var r SplitNamesArgs
+	assert.Equal(t,
+		RPCParseError{Code: PECOpCodeMismatch},
+		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCRegister, Args: nil}),
+	)
+	assert.Equal(t,
+		RPCParseError{Code: PECWrongArgCount},
+		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCSplitNames, Args: []interface{}{"asd"}}),
+	)
+
+	err := r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCSplitNames, Args: []interface{}{}})
+	assert.Nil(t, err)
+
+	err = r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCSplitNames, Args: nil})
+	assert.Nil(t, err)
+}
+
+func TestSplitsRPCProcessing(t *testing.T) {
+	var r SplitsArgs
+	assert.Equal(t,
+		RPCParseError{Code: PECOpCodeMismatch},
+		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCRegister, Args: nil}),
+	)
+	assert.Equal(t,
+		RPCParseError{Code: PECWrongArgCount},
+		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCSplits, Args: []interface{}{"asd"}}),
+	)
+
+	err := r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCSplits, Args: []interface{}{}})
+	assert.Nil(t, err)
+
+	err = r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCSplits, Args: nil})
+	assert.Nil(t, err)
+}
+
 func TestSanitizeAttributes(t *testing.T) {
 	now := time.Now()
 	attrs := map[string]interface{}{
@@ -310,11 +346,11 @@ func TestRPCEncoding(t *testing.T) {
 		Properties:  map[string]interface{}{"a": 1},
 	}
 	encodedTrA := tra.Encode()
-    assert.Equal(t, tra.Key, encodedTrA[TrackArgKeyIdx].(string))
-    assert.Equal(t, tra.TrafficType, encodedTrA[TrackArgTrafficTypeIdx].(string))
-    assert.Equal(t, tra.EventType, encodedTrA[TrackArgEventTypeIdx].(string))
-    assert.Equal(t, *tra.Value, encodedTrA[TrackArgValueIdx].(float64))
-    assert.Equal(t, tra.Properties, encodedTrA[TrackArgPropertiesIdx].(map[string]interface{}))
+	assert.Equal(t, tra.Key, encodedTrA[TrackArgKeyIdx].(string))
+	assert.Equal(t, tra.TrafficType, encodedTrA[TrackArgTrafficTypeIdx].(string))
+	assert.Equal(t, tra.EventType, encodedTrA[TrackArgEventTypeIdx].(string))
+	assert.Equal(t, *tra.Value, encodedTrA[TrackArgValueIdx].(float64))
+	assert.Equal(t, tra.Properties, encodedTrA[TrackArgPropertiesIdx].(map[string]interface{}))
 }
 
 func ref[T any](t T) *T {

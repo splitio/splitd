@@ -19,7 +19,17 @@ type Interface interface {
 	ReadFrame(reader io.Reader, readBuf []byte) (int, error)
 }
 
-type LengthPrefixImpl struct{}
+type LengthPrefixImpl struct {
+	lr io.LimitedReader
+	rw io.ReadWriter
+}
+
+func NewLengthPrefix(rw io.ReadWriter) *LengthPrefixImpl {
+	return &LengthPrefixImpl{
+		lr: io.LimitedReader{R: rw, N: 4},
+		rw: rw,
+	}
+}
 
 func (l *LengthPrefixImpl) WriteFrame(writer io.Writer, raw []byte) (int, error) {
 	size := len(raw)
@@ -30,9 +40,9 @@ func (l *LengthPrefixImpl) WriteFrame(writer io.Writer, raw []byte) (int, error)
 
 	sent := 0
 	for sent < framedSize {
-        n, err := writer.Write(framed[sent:])
+		n, err := writer.Write(framed[sent:])
 		if err != nil {
-            return n, fmt.Errorf("error writing message: %w", err)
+			return n, fmt.Errorf("error writing message: %w", err)
 		}
 		sent += n
 	}
@@ -57,15 +67,20 @@ func (l *LengthPrefixImpl) ReadFrame(reader io.Reader, readBuf []byte) (int, err
 		return 0, ErrInsufficientHeaderData
 	}
 
-    size := decodeSize(sizeb[:])
+	size := decodeSize(sizeb[:])
+	if bufSize := len(readBuf); int(size) > bufSize {
+		return 0, fmt.Errorf("read buffer is too small (%d bytes) to handle incoming message (%d bytes)", bufSize, size)
+	}
+
 	lr.N = int64(size)
+
 	read := 0
 	for read < int(size) {
 		n, err = lr.Read(readBuf[read:])
 		if err != nil {
 			return n, fmt.Errorf("error reading message: %w", err)
 		}
-        read += n
+		read += n
 	}
 
 	if read != int(size) {
@@ -77,7 +92,7 @@ func (l *LengthPrefixImpl) ReadFrame(reader io.Reader, readBuf []byte) (int, err
 
 func encodeSize(size int, target []byte) []byte {
 	target = binary.LittleEndian.AppendUint32(target, uint32(size))
-    return target
+	return target
 }
 func decodeSize(size []byte) uint32 {
 	return binary.LittleEndian.Uint32(size[:])
