@@ -47,7 +47,7 @@ func (m *SDKMock) Shutdown() error {
 
 // Split implements sdk.Interface
 func (m *SDKMock) Split(name string) (*sdk.SplitView, error) {
-	args := m.Called()
+	args := m.Called(name)
 	return args.Get(0).(*sdk.SplitView), args.Error(1)
 }
 
