@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -80,9 +81,27 @@ func executeCall(c types.ClientInterface, a *conf.CliArgs) (string, error) {
 		}
 		return sb.String(), err
 	case "track":
-        return "", c.Track(a.Key, a.TrafficType, a.EventType, a.EventVal, nil)
+		return "", c.Track(a.Key, a.TrafficType, a.EventType, a.EventVal, nil)
 	case "treatmentWithConfig", "treatmentsWithConfig":
 		return "", fmt.Errorf("method '%s' is not yet implemented", a.Method)
+	case "splitnames":
+		names, err := c.SplitNames()
+		return strings.Join(names, ","), err
+	case "split":
+		split, err := c.Split(a.Feature)
+		if err != nil {
+			return "", err
+		}
+		asJson, err := json.Marshal(split)
+		return string(asJson), err
+	case "splits":
+		splits, err := c.Splits()
+		fmt.Println(splits)
+		if err != nil {
+			return "", err
+		}
+		asJson, err := json.Marshal(splits)
+		return string(asJson), err
 	default:
 		return "", fmt.Errorf("unknwon method '%s'", a.Method)
 	}

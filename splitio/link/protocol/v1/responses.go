@@ -34,7 +34,24 @@ type TreatmentsWithConfigPayload struct {
 }
 
 type TrackPayload struct {
-    Success bool `msgpack:"s"`
+	Success bool `msgpack:"s"`
+}
+
+type SplitNamesPayload struct {
+	Names []string `msgpack:"n"`
+}
+
+type SplitPayload struct {
+	Name         string            `msgpack:"n"`
+	TrafficType  string            `msgpack:"t"`
+	Killed       bool              `msgpack:"k"`
+	Treatments   []string          `msgpack:"s"`
+	ChangeNumber int64             `msgpack:"c"`
+	Configs      map[string]string `msgpack:"f"`
+}
+
+type SplitsPayload struct {
+	Splits []SplitPayload `msgpack:"s"`
 }
 
 type ListenerExtraData struct {
@@ -49,5 +66,8 @@ type validPayloadsConstraint interface {
 		TreatmentWithConfigPayload |
 		TreatmentsWithConfigPayload |
 		TrackPayload |
+		SplitNamesPayload |
+		SplitPayload |
+		SplitsPayload |
 		RegisterPayload
 }
