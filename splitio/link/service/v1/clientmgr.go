@@ -42,7 +42,7 @@ func (m *ClientManager) Manage() {
 	defer func() {
 		if r := recover(); r != nil {
 			m.logger.Error("CRITICAL - connection handler is panicking: ", r)
-			m.logger.Error(string(debug.Stack()))
+			m.logger.Error(string(debug.Stack())) // debug.Stack() returns the panic's stack when called in a recover block
 		}
 	}()
 	err := m.handleClientInteractions()
@@ -52,12 +52,11 @@ func (m *ClientManager) Manage() {
 }
 
 func (m *ClientManager) handleClientInteractions() error {
-	defer m.cc.Shutdown()
 	for {
 		rpc, err := m.fetchRPC()
 		if err != nil {
 			if errors.Is(err, io.EOF) { // connection ended, no error
-				m.logger.Debug(fmt.Sprintf("connection remotely closed for metadata=%+v", m.clientConfig))
+				m.logger.Debug(fmt.Sprintf("connection remotely closed for metadata=%+v", m.clientConfig.Metadata))
 				return nil
 			} else if errors.Is(err, os.ErrDeadlineExceeded) { // we waited for an RPC, got none, try again.
 				m.logger.Debug(fmt.Sprintf("read timeout/no RPC fetched. restarting loop for metadata=%+v", m.clientConfig))

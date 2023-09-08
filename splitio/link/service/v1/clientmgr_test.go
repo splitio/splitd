@@ -26,7 +26,6 @@ func TestRegisterAndTreatmentHappyPath(t *testing.T) {
 	rawConnMock.On("ReceiveMessage").Return([]byte("treatmentMessage"), nil).Once()
 	rawConnMock.On("SendMessage", []byte("successPayload")).Return(nil).Once()
 	rawConnMock.On("ReceiveMessage").Return([]byte(nil), io.EOF).Once()
-	rawConnMock.On("Shutdown").Return(nil).Once()
 
 	serializerMock := &serializerMocks.SerializerMock{}
 	serializerMock.On("Parse", []byte("registrationMessage"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
@@ -55,7 +54,6 @@ func TestRegisterAndTreatmentHappyPath(t *testing.T) {
 	cm := NewClientManager(rawConnMock, logger, sdkMock, serializerMock)
 	err := cm.handleClientInteractions()
 	assert.Nil(t, err)
-	rawConnMock.AssertNumberOfCalls(t, "Shutdown", 1)
 }
 
 func TestRegisterAndTreatmentsHappyPath(t *testing.T) {
@@ -65,7 +63,6 @@ func TestRegisterAndTreatmentsHappyPath(t *testing.T) {
 	rawConnMock.On("ReceiveMessage").Return([]byte("treatmentsMessage"), nil).Once()
 	rawConnMock.On("SendMessage", []byte("successPayload")).Return(nil).Once()
 	rawConnMock.On("ReceiveMessage").Return([]byte(nil), io.EOF).Once()
-	rawConnMock.On("Shutdown").Return(nil).Once()
 
 	serializerMock := &serializerMocks.SerializerMock{}
 	serializerMock.On("Parse", []byte("registrationMessage"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
@@ -106,7 +103,6 @@ func TestRegisterAndTreatmentsHappyPath(t *testing.T) {
 	cm := NewClientManager(rawConnMock, logger, sdkMock, serializerMock)
 	err := cm.handleClientInteractions()
 	assert.Nil(t, err)
-	rawConnMock.AssertNumberOfCalls(t, "Shutdown", 1)
 }
 
 func TestRegisterWithImpsAndTreatmentHappyPath(t *testing.T) {
@@ -116,7 +112,6 @@ func TestRegisterWithImpsAndTreatmentHappyPath(t *testing.T) {
 	rawConnMock.On("ReceiveMessage").Return([]byte("treatmentMessage"), nil).Once()
 	rawConnMock.On("SendMessage", []byte("successPayload")).Return(nil).Once()
 	rawConnMock.On("ReceiveMessage").Return([]byte(nil), io.EOF).Once()
-	rawConnMock.On("Shutdown").Return(nil).Once()
 
 	serializerMock := &serializerMocks.SerializerMock{}
 	serializerMock.On("Parse", []byte("registrationMessage"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
@@ -148,7 +143,6 @@ func TestRegisterWithImpsAndTreatmentHappyPath(t *testing.T) {
 	cm := NewClientManager(rawConnMock, logger, sdkMock, serializerMock)
 	err := cm.handleClientInteractions()
 	assert.Nil(t, err)
-	rawConnMock.AssertNumberOfCalls(t, "Shutdown", 1)
 }
 
 func TestTrack(t *testing.T) {
@@ -158,7 +152,6 @@ func TestTrack(t *testing.T) {
 	rawConnMock.On("ReceiveMessage").Return([]byte("trackMessage"), nil).Once()
 	rawConnMock.On("SendMessage", []byte("successPayload")).Return(nil).Once()
 	rawConnMock.On("ReceiveMessage").Return([]byte(nil), io.EOF).Once()
-	rawConnMock.On("Shutdown").Return(nil).Once()
 
 	serializerMock := &serializerMocks.SerializerMock{}
 	serializerMock.On("Parse", []byte("registrationMessage"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
@@ -185,7 +178,6 @@ func TestTrack(t *testing.T) {
 	cm := NewClientManager(rawConnMock, logger, sdkMock, serializerMock)
 	err := cm.handleClientInteractions()
 	assert.Nil(t, err)
-	rawConnMock.AssertNumberOfCalls(t, "Shutdown", 1)
 }
 
 func TestSplitNames(t *testing.T) {
@@ -195,7 +187,6 @@ func TestSplitNames(t *testing.T) {
 	rawConnMock.On("ReceiveMessage").Return([]byte("splitNames"), nil).Once()
 	rawConnMock.On("SendMessage", []byte("successPayload")).Return(nil).Once()
 	rawConnMock.On("ReceiveMessage").Return([]byte(nil), io.EOF).Once()
-	rawConnMock.On("Shutdown").Return(nil).Once()
 
 	serializerMock := &serializerMocks.SerializerMock{}
 	serializerMock.On("Parse", []byte("registrationMessage"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
@@ -218,7 +209,6 @@ func TestSplitNames(t *testing.T) {
 	cm := NewClientManager(rawConnMock, logger, sdkMock, serializerMock)
 	err := cm.handleClientInteractions()
 	assert.Nil(t, err)
-	rawConnMock.AssertNumberOfCalls(t, "Shutdown", 1)
 }
 
 func TestSplits(t *testing.T) {
@@ -228,7 +218,6 @@ func TestSplits(t *testing.T) {
 	rawConnMock.On("ReceiveMessage").Return([]byte("splits"), nil).Once()
 	rawConnMock.On("SendMessage", []byte("successPayload")).Return(nil).Once()
 	rawConnMock.On("ReceiveMessage").Return([]byte(nil), io.EOF).Once()
-	rawConnMock.On("Shutdown").Return(nil).Once()
 
 	serializerMock := &serializerMocks.SerializerMock{}
 	serializerMock.On("Parse", []byte("registrationMessage"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
@@ -257,7 +246,6 @@ func TestSplits(t *testing.T) {
 	cm := NewClientManager(rawConnMock, logger, sdkMock, serializerMock)
 	err := cm.handleClientInteractions()
 	assert.Nil(t, err)
-	rawConnMock.AssertNumberOfCalls(t, "Shutdown", 1)
 }
 
 func TestSplit(t *testing.T) {
@@ -267,7 +255,6 @@ func TestSplit(t *testing.T) {
 	rawConnMock.On("ReceiveMessage").Return([]byte("split"), nil).Once()
 	rawConnMock.On("SendMessage", []byte("successPayload")).Return(nil).Once()
 	rawConnMock.On("ReceiveMessage").Return([]byte(nil), io.EOF).Once()
-	rawConnMock.On("Shutdown").Return(nil).Once()
 
 	serializerMock := &serializerMocks.SerializerMock{}
 	serializerMock.On("Parse", []byte("registrationMessage"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
@@ -304,13 +291,11 @@ func TestSplit(t *testing.T) {
 	cm := NewClientManager(rawConnMock, logger, sdkMock, serializerMock)
 	err := cm.handleClientInteractions()
 	assert.Nil(t, err)
-	rawConnMock.AssertNumberOfCalls(t, "Shutdown", 1)
 }
 
 func TestTreatmentWithoutRegister(t *testing.T) {
 	rawConnMock := &transferMocks.RawConnMock{}
 	rawConnMock.On("ReceiveMessage").Return([]byte("treatmentMessage"), nil).Once()
-	rawConnMock.On("Shutdown").Return(nil).Once()
 
 	serializerMock := &serializerMocks.SerializerMock{}
 	serializerMock.On("Parse", []byte("treatmentMessage"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
@@ -326,13 +311,11 @@ func TestTreatmentWithoutRegister(t *testing.T) {
 	cm := NewClientManager(rawConnMock, logger, sdkMock, serializerMock)
 	err := cm.handleClientInteractions()
 	assert.Contains(t, err.Error(), "first call must be 'register'")
-	rawConnMock.AssertNumberOfCalls(t, "Shutdown", 1)
 }
 
 func TestConnectionFailureWhenReading(t *testing.T) {
 	rawConnMock := &transferMocks.RawConnMock{}
 	rawConnMock.On("ReceiveMessage").Return([]byte(nil), errors.New("something")).Once()
-	rawConnMock.On("Shutdown").Return(nil).Once()
 
 	serializerMock := &serializerMocks.SerializerMock{}
 	sdkMock := &sdkMocks.SDKMock{}
@@ -340,13 +323,11 @@ func TestConnectionFailureWhenReading(t *testing.T) {
 	cm := NewClientManager(rawConnMock, logger, sdkMock, serializerMock)
 	err := cm.handleClientInteractions()
 	assert.Contains(t, err.Error(), "error reading from conn")
-	rawConnMock.AssertNumberOfCalls(t, "Shutdown", 1)
 }
 
 func TestManagePanicRecovers(t *testing.T) {
 	rawConnMock := &transferMocks.RawConnMock{}
 	rawConnMock.On("ReceiveMessage").Panic("some panic")
-	rawConnMock.On("Shutdown", mock.Anything).Return(nil)
 
 	logger := &loggerMock{}
 	logger.On("Error", "CRITICAL - connection handler is panicking: ", "some panic").Once()
@@ -357,7 +338,6 @@ func TestManagePanicRecovers(t *testing.T) {
 
 	cm := NewClientManager(rawConnMock, logger, sdkMock, serializerMock)
 	cm.Manage()
-	rawConnMock.AssertNumberOfCalls(t, "Shutdown", 1)
 
 	logger.AssertExpectations(t)
 }
@@ -367,7 +347,6 @@ func TestFetchRPC(t *testing.T) {
 	someErr := errors.New("someConnErr")
 	rawConnMock := &transferMocks.RawConnMock{}
 	rawConnMock.On("ReceiveMessage").Return([]byte(nil), someErr)
-	rawConnMock.On("Shutdown", mock.Anything).Return(nil)
 	serializerMock := &serializerMocks.SerializerMock{}
 	logger := logging.NewLogger(nil)
 	cm := NewClientManager(rawConnMock, logger, nil, serializerMock)
@@ -379,7 +358,6 @@ func TestFetchRPC(t *testing.T) {
 	someErr = errors.New("someSerializationErr")
 	rawConnMock = &transferMocks.RawConnMock{}
 	rawConnMock.On("ReceiveMessage").Return([]byte{}, nil)
-	rawConnMock.On("Shutdown", mock.Anything).Return(nil)
 	serializerMock = &serializerMocks.SerializerMock{}
 	serializerMock.On("Parse", mock.Anything, mock.Anything).Return(someErr)
 	cm = NewClientManager(rawConnMock, logger, nil, serializerMock)
@@ -392,7 +370,6 @@ func TestSendResponse(t *testing.T) {
 	// error parsing message
 	someErr := errors.New("someSerializationErr")
 	rawConnMock := &transferMocks.RawConnMock{}
-	rawConnMock.On("Shutdown", mock.Anything).Return(nil)
 	serializerMock := &serializerMocks.SerializerMock{}
 	serializerMock.On("Serialize", mock.Anything).Return([]byte(nil), someErr)
 	logger := logging.NewLogger(nil)
@@ -404,7 +381,6 @@ func TestSendResponse(t *testing.T) {
 	someErr = errors.New("someConnErr")
 	rawConnMock = &transferMocks.RawConnMock{}
 	rawConnMock.On("SendMessage", mock.Anything).Return(someErr)
-	rawConnMock.On("Shutdown", mock.Anything).Return(nil)
 	serializerMock = &serializerMocks.SerializerMock{}
 	serializerMock.On("Serialize", mock.Anything).Return([]byte{}, nil)
 	cm = NewClientManager(rawConnMock, logger, nil, serializerMock)
