@@ -130,11 +130,11 @@ func (c *Impl) Track(key string, trafficType string, eventType string, value *fl
 
 	resp, err := doRPC[protov1.ResponseWrapper[protov1.TrackPayload]](c, &rpc)
 	if err != nil {
-		return fmt.Errorf("error executing treatment rpc: %w", err)
+		return fmt.Errorf("error executing track rpc: %w", err)
 	}
 
 	if resp.Status != protov1.ResultOk {
-		return fmt.Errorf("server responded treatment rpc with error %d", resp.Status)
+		return fmt.Errorf("server responded track rpc with error %d", resp.Status)
 	}
 
 	return nil
@@ -144,7 +144,7 @@ func (c *Impl) SplitNames() ([]string, error) {
 	rpc := protov1.RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: protov1.OCSplitNames}
 	resp, err := doRPC[protov1.ResponseWrapper[protov1.SplitNamesPayload]](c, &rpc)
 	if err != nil {
-		return nil, fmt.Errorf("error executing treatment rpc: %w", err)
+		return nil, fmt.Errorf("error executing split-names rpc: %w", err)
 	}
 
 	if resp.Status != protov1.ResultOk {
@@ -163,11 +163,11 @@ func (c *Impl) Split(name string) (*sdk.SplitView, error) { // TODO(mredolatti):
 
 	resp, err := doRPC[protov1.ResponseWrapper[protov1.SplitPayload]](c, &rpc)
 	if err != nil {
-		return nil, fmt.Errorf("error executing treatment rpc: %w", err)
+		return nil, fmt.Errorf("error executing split rpc: %w", err)
 	}
 
 	if resp.Status != protov1.ResultOk {
-		return nil, fmt.Errorf("server responded split-names rpc with error %d", resp.Status)
+		return nil, fmt.Errorf("server responded split rpc with error %d", resp.Status)
 	}
 
 	p := sdk.SplitView(resp.Payload)
@@ -178,11 +178,11 @@ func (c *Impl) Splits() ([]sdk.SplitView, error) {
 	rpc := protov1.RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: protov1.OCSplits}
 	resp, err := doRPC[protov1.ResponseWrapper[protov1.SplitsPayload]](c, &rpc)
 	if err != nil {
-		return nil, fmt.Errorf("error executing treatment rpc: %w", err)
+		return nil, fmt.Errorf("error executing splits rpc: %w", err)
 	}
 
 	if resp.Status != protov1.ResultOk {
-		return nil, fmt.Errorf("server responded split-names rpc with error %d", resp.Status)
+		return nil, fmt.Errorf("server responded splits rpc with error %d", resp.Status)
 	}
 
 	views := make([]sdk.SplitView, 0, len(resp.Payload.Splits))
