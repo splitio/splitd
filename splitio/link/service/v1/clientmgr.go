@@ -265,7 +265,7 @@ func (m *ClientManager) handleSplit(args *protov1.SplitArgs) (interface{}, error
 
 	response := &protov1.ResponseWrapper[protov1.SplitPayload]{
 		Status:  protov1.ResultOk,
-		Payload: viewToPayload(view),
+		Payload: protov1.SplitPayload(*view),
 	}
 
 	return response, nil
@@ -280,7 +280,7 @@ func (m *ClientManager) handleSplits(args *protov1.SplitsArgs) (interface{}, err
 	var p protov1.SplitsPayload
 	p.Splits = make([]protov1.SplitPayload, 0, len(views))
 	for _, view := range views {
-		p.Splits = append(p.Splits, viewToPayload(&view))
+		p.Splits = append(p.Splits, protov1.SplitPayload(view))
 	}
 
 	response := &protov1.ResponseWrapper[protov1.SplitsPayload]{
@@ -289,15 +289,4 @@ func (m *ClientManager) handleSplits(args *protov1.SplitsArgs) (interface{}, err
 	}
 
 	return response, nil
-}
-
-func viewToPayload(view *sdk.SplitView) protov1.SplitPayload {
-	return protov1.SplitPayload{
-		Name:         view.Name,
-		TrafficType:  view.TrafficType,
-		Killed:       view.Killed,
-		Treatments:   view.Treatments,
-		ChangeNumber: view.ChangeNumber,
-		Configs:      view.Configs,
-	}
 }
