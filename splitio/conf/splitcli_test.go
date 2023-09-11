@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/splitio/splitd/splitio/common/lang"
 	"github.com/splitio/splitd/splitio/link"
 	"github.com/stretchr/testify/assert"
 )
@@ -39,7 +40,7 @@ func TestCliConfig(t *testing.T) {
 	assert.Equal(t, []string{"someFeature1", "someFeature2"}, parsed.Features)
 	assert.Equal(t, "someTrafficType", parsed.TrafficType)
 	assert.Equal(t, "someEventType", parsed.EventType)
-	assert.Equal(t, ref(float64(0.123)), parsed.EventVal)
+	assert.Equal(t, lang.Ref(float64(0.123)), parsed.EventVal)
 	assert.Equal(t, map[string]interface{}{"some": "attribute"}, parsed.Attributes)
 
 	// test bad buffer size

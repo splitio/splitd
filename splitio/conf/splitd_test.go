@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/splitio/splitd/splitio/common/lang"
 	"github.com/splitio/splitd/splitio/link"
 	"github.com/splitio/splitd/splitio/link/protocol"
 	"github.com/splitio/splitd/splitio/link/serializer"
@@ -44,15 +45,15 @@ func TestConfig(t *testing.T) {
 func TestLink(t *testing.T) {
 
 	linkCFG := &Link{
-		Type:                 ref("unix-stream"),
-		Address:              ref("some/file"),
-		MaxSimultaneousConns: ref(1),
-		ReadTimeoutMS:        ref(2),
-		WriteTimeoutMS:       ref(3),
-		AcceptTimeoutMS:      ref(4),
-		Serialization:        ref("msgpack"),
-		BufferSize:           ref(5),
-		Protocol:             ref("v1"),
+		Type:                 lang.Ref("unix-stream"),
+		Address:              lang.Ref("some/file"),
+		MaxSimultaneousConns: lang.Ref(1),
+		ReadTimeoutMS:        lang.Ref(2),
+		WriteTimeoutMS:       lang.Ref(3),
+		AcceptTimeoutMS:      lang.Ref(4),
+		Serialization:        lang.Ref("msgpack"),
+		BufferSize:           lang.Ref(5),
+		Protocol:             lang.Ref("v1"),
 	}
 
 	expected := link.DefaultListenerOptions()
@@ -70,21 +71,21 @@ func TestLink(t *testing.T) {
 	assert.Equal(t, &expected, lopts)
 
 	// invalid protocol
-	linkCFG.Protocol = ref("sarasa")
+	linkCFG.Protocol = lang.Ref("sarasa")
 	lopts, err = linkCFG.ToListenerOpts()
 	assert.NotNil(t, err)
 	assert.Nil(t, lopts)
 
 	// invalid serialization
-	linkCFG.Protocol = ref("v1") // restore valid protocol
-	linkCFG.Serialization = ref("sarasa")
+	linkCFG.Protocol = lang.Ref("v1") // restore valid protocol
+	linkCFG.Serialization = lang.Ref("sarasa")
 	lopts, err = linkCFG.ToListenerOpts()
 	assert.NotNil(t, err)
 	assert.Nil(t, lopts)
 
 	// invalid conn type
-	linkCFG.Serialization = ref("msgpack") // restore valid serialization mechanism
-	linkCFG.Type = ref("sarasa")
+	linkCFG.Serialization = lang.Ref("msgpack") // restore valid serialization mechanism
+	linkCFG.Type = lang.Ref("sarasa")
 	lopts, err = linkCFG.ToListenerOpts()
 	assert.NotNil(t, err)
 	assert.Nil(t, lopts)
@@ -94,30 +95,30 @@ func TestSDK(t *testing.T) {
 
 	sdkCFG := &SDK{
 		Apikey:           "some",
-		LabelsEnabled:    ref(false),
-		StreamingEnabled: ref(false),
+		LabelsEnabled:    lang.Ref(false),
+		StreamingEnabled: lang.Ref(false),
 		URLs: URLs{
-			Auth:      ref("authURL"),
-			SDK:       ref("sdkURL"),
-			Events:    ref("eventsURL"),
-			Streaming: ref("streamingURL"),
-			Telemetry: ref("telemetryURL"),
+			Auth:      lang.Ref("authURL"),
+			SDK:       lang.Ref("sdkURL"),
+			Events:    lang.Ref("eventsURL"),
+			Streaming: lang.Ref("streamingURL"),
+			Telemetry: lang.Ref("telemetryURL"),
 		},
 		FeatureFlags: FeatureFlags{
-			SplitNotificationQueueSize:   ref(1),
-			SplitRefreshRateSeconds:      ref(2),
-			SegmentNotificationQueueSize: ref(3),
-			SegmentRefreshRateSeconds:    ref(4),
-			SegmentWorkerCount:           ref(5),
-			SegmentWorkerBufferSize:      ref(6),
+			SplitNotificationQueueSize:   lang.Ref(1),
+			SplitRefreshRateSeconds:      lang.Ref(2),
+			SegmentNotificationQueueSize: lang.Ref(3),
+			SegmentRefreshRateSeconds:    lang.Ref(4),
+			SegmentWorkerCount:           lang.Ref(5),
+			SegmentWorkerBufferSize:      lang.Ref(6),
 		},
 		Impressions: Impressions{
-			Mode:                    ref("optimized"),
-			RefreshRateSeconds:      ref(1),
-			CountRefreshRateSeconds: ref(2),
-			QueueSize:               ref(3),
-			ObserverSize:            ref(4),
-			Watermark:               ref(5),
+			Mode:                    lang.Ref("optimized"),
+			RefreshRateSeconds:      lang.Ref(1),
+			CountRefreshRateSeconds: lang.Ref(2),
+			QueueSize:               lang.Ref(3),
+			ObserverSize:            lang.Ref(4),
+			Watermark:               lang.Ref(5),
 		},
 	}
 

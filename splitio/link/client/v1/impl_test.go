@@ -5,10 +5,12 @@ import (
 
 	"github.com/splitio/go-split-commons/v4/dtos"
 	"github.com/splitio/go-toolkit/v5/logging"
+	"github.com/splitio/splitd/splitio/common/lang"
 	v1 "github.com/splitio/splitd/splitio/link/protocol/v1"
 	proto1Mocks "github.com/splitio/splitd/splitio/link/protocol/v1/mocks"
 	serializerMocks "github.com/splitio/splitd/splitio/link/serializer/mocks"
 	transferMocks "github.com/splitio/splitd/splitio/link/transfer/mocks"
+	"github.com/splitio/splitd/splitio/sdk"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -63,7 +65,7 @@ func TestTrack(t *testing.T) {
 		*args.Get(1).(*v1.ResponseWrapper[v1.RegisterPayload]) = v1.ResponseWrapper[v1.RegisterPayload]{Status: v1.ResultOk}
 	}).Once()
 
-	serializerMock.On("Serialize", proto1Mocks.NewTrackRPC("key1", "user", "checkin", ref(2.74), map[string]interface{}{"p1": 123})).
+	serializerMock.On("Serialize", proto1Mocks.NewTrackRPC("key1", "user", "checkin", lang.Ref(2.74), map[string]interface{}{"p1": 123})).
 		Return([]byte("trackMessage"), nil).Once()
 	serializerMock.On("Parse", []byte("trackResult"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args.Get(1).(*v1.ResponseWrapper[v1.TrackPayload]) = *proto1Mocks.NewTrackResp(true)
@@ -72,7 +74,7 @@ func TestTrack(t *testing.T) {
 	assert.NotNil(t, client)
 	assert.Nil(t, err)
 
-	err = client.Track("key1", "user", "checkin", ref(2.74), map[string]interface{}{"p1": 123})
+	err = client.Track("key1", "user", "checkin", lang.Ref(2.74), map[string]interface{}{"p1": 123})
 	assert.Nil(t, err)
 }
 
@@ -227,8 +229,123 @@ func TestClientGetTreatmentsWithImpression(t *testing.T) {
 
 }
 
-func ref[T any](t T) *T {
-	return &t
+func TestClientSplitNames(t *testing.T) {
+
+	logger := logging.NewLogger(nil)
+
+	rawConnMock := &transferMocks.RawConnMock{}
+	rawConnMock.On("SendMessage", []byte("registrationMessage")).Return(nil).Once()
+	rawConnMock.On("ReceiveMessage").Return([]byte("registrationSuccess"), nil).Once()
+	rawConnMock.On("SendMessage", []byte("splitNamesMessage")).Return(nil).Once()
+	rawConnMock.On("ReceiveMessage").Return([]byte("splitNamesResult"), nil).Once()
+
+	serializerMock := &serializerMocks.SerializerMock{}
+	serializerMock.On("Serialize", proto1Mocks.NewRegisterRPC("some", false)).Return([]byte("registrationMessage"), nil).Once()
+	serializerMock.On("Parse", []byte("registrationSuccess"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(1).(*v1.ResponseWrapper[v1.RegisterPayload]) = v1.ResponseWrapper[v1.RegisterPayload]{Status: v1.ResultOk}
+	}).Once()
+
+	serializerMock.On("Serialize", proto1Mocks.NewSplitNamesRPC()).
+		Return([]byte("splitNamesMessage"), nil).Once()
+	serializerMock.On("Parse", []byte("splitNamesResult"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(1).(*v1.ResponseWrapper[v1.SplitNamesPayload]) = v1.ResponseWrapper[v1.SplitNamesPayload]{
+			Status:  v1.ResultOk,
+			Payload: v1.SplitNamesPayload{Names: []string{"s1", "s2"}},
+		}
+	}).Once()
+	client, err := New("some", logger, rawConnMock, serializerMock, false)
+	assert.NotNil(t, client)
+	assert.Nil(t, err)
+
+	res, err := client.SplitNames()
+	assert.Nil(t, err)
+	assert.Equal(t, []string{"s1", "s2"}, res)
+}
+
+func TestClientSplits(t *testing.T) {
+
+	logger := logging.NewLogger(nil)
+
+	rawConnMock := &transferMocks.RawConnMock{}
+	rawConnMock.On("SendMessage", []byte("registrationMessage")).Return(nil).Once()
+	rawConnMock.On("ReceiveMessage").Return([]byte("registrationSuccess"), nil).Once()
+	rawConnMock.On("SendMessage", []byte("splitsMessage")).Return(nil).Once()
+	rawConnMock.On("ReceiveMessage").Return([]byte("splitsResult"), nil).Once()
+
+	serializerMock := &serializerMocks.SerializerMock{}
+	serializerMock.On("Serialize", proto1Mocks.NewRegisterRPC("some", false)).Return([]byte("registrationMessage"), nil).Once()
+	serializerMock.On("Parse", []byte("registrationSuccess"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(1).(*v1.ResponseWrapper[v1.RegisterPayload]) = v1.ResponseWrapper[v1.RegisterPayload]{Status: v1.ResultOk}
+	}).Once()
+
+	serializerMock.On("Serialize", proto1Mocks.NewSplitsRPC()).
+		Return([]byte("splitsMessage"), nil).Once()
+	serializerMock.On("Parse", []byte("splitsResult"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(1).(*v1.ResponseWrapper[v1.SplitsPayload]) = v1.ResponseWrapper[v1.SplitsPayload]{
+			Status: v1.ResultOk,
+			Payload: v1.SplitsPayload{Splits: []v1.SplitPayload{
+				{Name: "s1", TrafficType: "tt1", Killed: true, Treatments: []string{"on", "off"}, ChangeNumber: 1, Configs: map[string]string{"on": "a"}},
+				{Name: "s2", TrafficType: "tt1", Killed: true, Treatments: []string{"on", "off"}, ChangeNumber: 2, Configs: map[string]string{"on": "a"}},
+			}},
+		}
+	}).Once()
+
+	client, err := New("some", logger, rawConnMock, serializerMock, false)
+	assert.NotNil(t, client)
+	assert.Nil(t, err)
+
+	res, err := client.Splits()
+	assert.Nil(t, err)
+	assert.Equal(t, []sdk.SplitView{
+		{Name: "s1", TrafficType: "tt1", Killed: true, Treatments: []string{"on", "off"}, ChangeNumber: 1, Configs: map[string]string{"on": "a"}},
+		{Name: "s2", TrafficType: "tt1", Killed: true, Treatments: []string{"on", "off"}, ChangeNumber: 2, Configs: map[string]string{"on": "a"}},
+	}, res)
+}
+
+func TestClientSplit(t *testing.T) {
+
+	logger := logging.NewLogger(nil)
+
+	rawConnMock := &transferMocks.RawConnMock{}
+	rawConnMock.On("SendMessage", []byte("registrationMessage")).Return(nil).Once()
+	rawConnMock.On("ReceiveMessage").Return([]byte("registrationSuccess"), nil).Once()
+	rawConnMock.On("SendMessage", []byte("splitMessage")).Return(nil).Once()
+	rawConnMock.On("ReceiveMessage").Return([]byte("splitResult"), nil).Once()
+
+	serializerMock := &serializerMocks.SerializerMock{}
+	serializerMock.On("Serialize", proto1Mocks.NewRegisterRPC("some", false)).Return([]byte("registrationMessage"), nil).Once()
+	serializerMock.On("Parse", []byte("registrationSuccess"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(1).(*v1.ResponseWrapper[v1.RegisterPayload]) = v1.ResponseWrapper[v1.RegisterPayload]{Status: v1.ResultOk}
+	}).Once()
+
+	serializerMock.On("Serialize", proto1Mocks.NewSplitRPC("s1")).
+		Return([]byte("splitMessage"), nil).Once()
+	serializerMock.On("Parse", []byte("splitResult"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(1).(*v1.ResponseWrapper[v1.SplitPayload]) = v1.ResponseWrapper[v1.SplitPayload]{
+			Status: v1.ResultOk, Payload: v1.SplitPayload{
+				Name:         "s1",
+				TrafficType:  "tt1",
+				Killed:       true,
+				Treatments:   []string{"on", "off"},
+				ChangeNumber: 1,
+				Configs:      map[string]string{"on": "a"},
+			}}
+	}).Once()
+
+	client, err := New("some", logger, rawConnMock, serializerMock, false)
+	assert.NotNil(t, client)
+	assert.Nil(t, err)
+
+	res, err := client.Split("s1")
+	assert.Nil(t, err)
+	assert.Equal(t, &sdk.SplitView{
+		Name:         "s1",
+		TrafficType:  "tt1",
+		Killed:       true,
+		Treatments:   []string{"on", "off"},
+		ChangeNumber: 1,
+		Configs:      map[string]string{"on": "a"},
+	}, res)
 }
 
 func validateImpression(t *testing.T, expected *dtos.Impression, actual *dtos.Impression) {

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/splitio/splitd/splitio/common/lang"
 	"github.com/splitio/splitd/splitio/link"
-	cc "github.com/splitio/splitd/splitio/util/conf"
 )
 
 type CliArgs struct {
@@ -39,31 +39,30 @@ type CliArgs struct {
 func (a *CliArgs) LinkOpts() (*link.ConsumerOptions, error) {
 
 	opts := link.DefaultConsumerOptions()
-	cc.SetIfNotEmpty(&opts.Consumer.ID, &a.ID)
-
+	lang.SetIfNotEmpty(&opts.Consumer.ID, &a.ID)
 
 	var err error
 	if a.Protocol != "" {
-		if opts.Consumer.Protocol, err = cc.ParseProtocolVersion(a.Protocol); err != nil {
+		if opts.Consumer.Protocol, err = parseProtocolVersion(a.Protocol); err != nil {
 			return nil, fmt.Errorf("invalid protocol version %s", a.Protocol)
 		}
 	}
 	if a.ConnType != "" {
-		if opts.Transfer.ConnType, err = cc.ParseConnType(a.ConnType); err != nil {
+		if opts.Transfer.ConnType, err = parseConnType(a.ConnType); err != nil {
 			return nil, fmt.Errorf("invalid connection type %s", a.ConnType)
 		}
 	}
 	if a.Serialization != "" {
-		if opts.Serialization, err = cc.ParseSerializer(a.Serialization); err != nil {
+		if opts.Serialization, err = parseSerializer(a.Serialization); err != nil {
 			return nil, fmt.Errorf("invalid serialization %s", a.Serialization)
 		}
 	}
 
 	durationFromMS := func(i int) time.Duration { return time.Duration(i) * time.Millisecond }
-	cc.SetIfNotEmpty(&opts.Transfer.Address, &a.ConnAddr)
-	cc.SetIfNotEmpty(&opts.Transfer.BufferSize, &a.BufSize)
-	cc.MapIfNotEmpty(&opts.Transfer.ReadTimeout, &a.ReadTimeoutMS, durationFromMS)
-	cc.MapIfNotEmpty(&opts.Transfer.WriteTimeout, &a.WriteTimeoutMS, durationFromMS)
+	lang.SetIfNotEmpty(&opts.Transfer.Address, &a.ConnAddr)
+	lang.SetIfNotEmpty(&opts.Transfer.BufferSize, &a.BufSize)
+	lang.MapIfNotEmpty(&opts.Transfer.ReadTimeout, &a.ReadTimeoutMS, durationFromMS)
+	lang.MapIfNotEmpty(&opts.Transfer.WriteTimeout, &a.WriteTimeoutMS, durationFromMS)
 	return &opts, nil
 }
 

@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/splitio/splitd/splitio/common/lang"
 	"github.com/splitio/splitd/splitio/link/protocol"
 	"github.com/stretchr/testify/assert"
 )
@@ -72,7 +73,7 @@ func TestTreatmentRPCParsing(t *testing.T) {
 		Args:    []interface{}{"key", "bk", "feat1", map[string]interface{}{"a": 1}}})
 	assert.Nil(t, err)
 	assert.Equal(t, "key", r.Key)
-	assert.Equal(t, ref("bk"), r.BucketingKey)
+	assert.Equal(t, lang.Ref("bk"), r.BucketingKey)
 	assert.Equal(t, "feat1", r.Feature)
 	assert.Equal(t, map[string]interface{}{"a": int64(1)}, r.Attributes)
 
@@ -95,7 +96,7 @@ func TestTreatmentRPCParsing(t *testing.T) {
 		Args:    []interface{}{"key", "bk", "feat1", nil}})
 	assert.Nil(t, err)
 	assert.Equal(t, "key", r.Key)
-	assert.Equal(t, ref("bk"), r.BucketingKey)
+	assert.Equal(t, lang.Ref("bk"), r.BucketingKey)
 	assert.Equal(t, "feat1", r.Feature)
 	assert.Nil(t, r.Attributes)
 }
@@ -136,7 +137,7 @@ func TestTreatmentsRPCParsing(t *testing.T) {
 		Args:    []interface{}{"key", "bk", []interface{}{"feat1", "feat2"}, map[string]interface{}{"a": 1}}})
 	assert.Nil(t, err)
 	assert.Equal(t, "key", r.Key)
-	assert.Equal(t, ref("bk"), r.BucketingKey)
+	assert.Equal(t, lang.Ref("bk"), r.BucketingKey)
 	assert.Equal(t, []string{"feat1", "feat2"}, r.Features)
 	assert.Equal(t, map[string]interface{}{"a": int64(1)}, r.Attributes)
 
@@ -157,7 +158,7 @@ func TestTreatmentsRPCParsing(t *testing.T) {
 		Args:    []interface{}{"key", "bk", []interface{}{"feat1", "feat2"}, nil}})
 	assert.Nil(t, err)
 	assert.Equal(t, "key", r.Key)
-	assert.Equal(t, ref("bk"), r.BucketingKey)
+	assert.Equal(t, lang.Ref("bk"), r.BucketingKey)
 	assert.Equal(t, []string{"feat1", "feat2"}, r.Features)
 	assert.Nil(t, r.Attributes)
 }
@@ -201,7 +202,7 @@ func TestTrackRPCParsing(t *testing.T) {
 	assert.Equal(t, "key", r.Key)
 	assert.Equal(t, "tt", r.TrafficType)
 	assert.Equal(t, "et", r.EventType)
-	assert.Equal(t, ref(float64(2.8)), r.Value)
+	assert.Equal(t, lang.Ref(float64(2.8)), r.Value)
 	assert.Equal(t, map[string]interface{}{"a": int64(1)}, r.Properties)
 
 	// nil properties
@@ -214,7 +215,7 @@ func TestTrackRPCParsing(t *testing.T) {
 	assert.Equal(t, "key", r.Key)
 	assert.Equal(t, "tt", r.TrafficType)
 	assert.Equal(t, "et", r.EventType)
-	assert.Equal(t, ref(float64(2.8)), r.Value)
+	assert.Equal(t, lang.Ref(float64(2.8)), r.Value)
 	assert.Nil(t, r.Properties)
 
 	// nil value
@@ -316,7 +317,7 @@ func TestRPCEncoding(t *testing.T) {
 
 	ta := TreatmentArgs{
 		Key:          "someKey",
-		BucketingKey: ref("someBucketing"),
+		BucketingKey: lang.Ref("someBucketing"),
 		Feature:      "someFeature",
 		Attributes:   map[string]interface{}{"some": "attribute"},
 	}
@@ -328,7 +329,7 @@ func TestRPCEncoding(t *testing.T) {
 
 	tsa := TreatmentsArgs{
 		Key:          "someKey",
-		BucketingKey: ref("someBucketing"),
+		BucketingKey: lang.Ref("someBucketing"),
 		Features:     []string{"someFeature", "someFeature2"},
 		Attributes:   map[string]interface{}{"some": "attribute"},
 	}
@@ -342,7 +343,7 @@ func TestRPCEncoding(t *testing.T) {
 		Key:         "someKey",
 		TrafficType: "someTrafficType",
 		EventType:   "someEventType",
-		Value:       ref(123.),
+		Value:       lang.Ref(123.),
 		Properties:  map[string]interface{}{"a": 1},
 	}
 	encodedTrA := tra.Encode()
@@ -351,8 +352,4 @@ func TestRPCEncoding(t *testing.T) {
 	assert.Equal(t, tra.EventType, encodedTrA[TrackArgEventTypeIdx].(string))
 	assert.Equal(t, *tra.Value, encodedTrA[TrackArgValueIdx].(float64))
 	assert.Equal(t, tra.Properties, encodedTrA[TrackArgPropertiesIdx].(map[string]interface{}))
-}
-
-func ref[T any](t T) *T {
-	return &t
 }
