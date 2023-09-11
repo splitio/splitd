@@ -392,12 +392,12 @@ func TestSendResponse(t *testing.T) {
 func TestHandleRPCErrors(t *testing.T) {
 	logger := logging.NewLogger(nil)
 	cm := NewClientManager(nil, logger, nil, nil)
-	res, err := cm.handleRPC(&v1.RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: v1.OCTreatment})
+	res, err := cm.dispatchRPC(&v1.RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: v1.OCTreatment})
 	assert.Nil(t, res)
 	assert.ErrorContains(t, err, "first call must be 'register'")
 
 	// register wrong args
-	res, err = cm.handleRPC(&v1.RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: v1.OCRegister, Args: []interface{}{1, "hola"}})
+	res, err = cm.dispatchRPC(&v1.RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: v1.OCRegister, Args: []interface{}{1, "hola"}})
 	assert.Nil(t, res)
 	assert.ErrorContains(t, err, "error parsing register arguments")
 
@@ -405,12 +405,12 @@ func TestHandleRPCErrors(t *testing.T) {
 	cm.clientConfig = &types.ClientConfig{ReturnImpressionData: true}
 
 	// treatment wrong args
-	res, err = cm.handleRPC(&v1.RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: v1.OCTreatment, Args: []interface{}{1, "hola"}})
+	res, err = cm.dispatchRPC(&v1.RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: v1.OCTreatment, Args: []interface{}{1, "hola"}})
 	assert.Nil(t, res)
 	assert.ErrorContains(t, err, "error parsing treatment arguments")
 
 	// register wrong args
-	res, err = cm.handleRPC(&v1.RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: v1.OCTreatments, Args: []interface{}{1, "hola"}})
+	res, err = cm.dispatchRPC(&v1.RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: v1.OCTreatments, Args: []interface{}{1, "hola"}})
 	assert.Nil(t, res)
 	assert.ErrorContains(t, err, "error parsing treatments arguments")
 }
