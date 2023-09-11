@@ -22,6 +22,8 @@ func TestConfHelpers(t *testing.T) {
 	assert.Equal(t, 0, x)
 	MapIfNotNil(&x, nil, func(z int) int { return z + 1 })
 	assert.Equal(t, 0, x)
+	MapIfNotNil(&x, Ref(10), func(z int) int { return z + 1 })
+	assert.Equal(t, 11, x)
 
 	MapIfNotEmpty(&x, Ref(1), func(z int) int { return z + 1 })
 	assert.Equal(t, 2, x)

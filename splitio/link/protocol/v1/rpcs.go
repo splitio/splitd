@@ -36,9 +36,9 @@ func (o OpCode) String() string {
 	case OCTreatments:
 		return "treatments"
 	case OCTreatmentWithConfig:
-		return "treatmentWithConfig"
+		return "treatment-with-config"
 	case OCTreatmentsWithConfig:
-		return "treatmentsWithConfig"
+		return "treatments-with-config"
 	case OCTrack:
 		return "track"
 	case OCSplitNames:
@@ -101,7 +101,7 @@ func (r *RegisterArgs) PopulateFromRPC(rpc *RPC) error {
 	if r.SDKVersion, ok = rpc.Args[RegisterArgSDKVersionIdx].(string); !ok {
 		return RPCParseError{Code: PECInvalidArgType, Data: int64(RegisterArgSDKVersionIdx)}
 	}
-	if asUInt, ok := tryInt2[uint64](rpc.Args[RegisterArgFlagsIdx]); ok {
+	if asUInt, ok := tryInt[uint64](rpc.Args[RegisterArgFlagsIdx]); ok {
 		r.Flags = RegisterFlags(asUInt)
 	} else {
 		return RPCParseError{Code: PECInvalidArgType, Data: int64(RegisterArgFlagsIdx)}
@@ -394,7 +394,7 @@ func getOptional[T any /*TODO(mredolatti): restrict!*/](i interface{}) (T, error
 func sanitizeAttributes(attrs map[string]interface{}) map[string]interface{} {
 	for k, v := range attrs {
 
-		if asInt, ok := tryInt2[int64](v); ok {
+		if asInt, ok := tryInt[int64](v); ok {
 			attrs[k] = asInt
 		}
 
@@ -428,7 +428,7 @@ func sanitizeFeatureList(raw []interface{}) ([]string, bool) {
 	return features, true
 }
 
-func tryInt2[T int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64](x interface{}) (T, bool) {
+func tryInt[T int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64](x interface{}) (T, bool) {
 	switch parsed := x.(type) {
 	case uint8:
 		return T(parsed), true
@@ -455,7 +455,7 @@ func tryInt2[T int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64](
 }
 
 func tryNumberAsFloat(x interface{}) (float64, bool) {
-	if asInt, ok := tryInt2[int64](x); ok {
+	if asInt, ok := tryInt[int64](x); ok {
 		return float64(asInt), true
 	}
 

@@ -9,6 +9,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestOpStringify(t *testing.T) {
+
+	assert.Equal(t, "register", OCRegister.String())
+	assert.Equal(t, "treatment", OCTreatment.String())
+	assert.Equal(t, "treatment-with-config", OCTreatmentWithConfig.String())
+	assert.Equal(t, "treatments", OCTreatments.String())
+	assert.Equal(t, "treatments-with-config", OCTreatmentsWithConfig.String())
+	assert.Equal(t, "track", OCTrack.String())
+	assert.Equal(t, "split-names", OCSplitNames.String())
+	assert.Equal(t, "split", OCSplit.String())
+	assert.Equal(t, "splits", OCSplits.String())
+	assert.Equal(t, "unknown", OpCode(255).String())
+}
+
 func TestRegisterRPCParsing(t *testing.T) {
 	var r RegisterArgs
 	assert.Equal(t,
@@ -268,6 +282,22 @@ func TestSplitsRPCProcessing(t *testing.T) {
 
 	err = r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCSplits, Args: nil})
 	assert.Nil(t, err)
+}
+
+func TestSplitRPCProcessing(t *testing.T) {
+	var r SplitArgs
+	assert.Equal(t,
+		RPCParseError{Code: PECOpCodeMismatch},
+		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCRegister, Args: []interface{}{"s1"}}),
+	)
+	assert.Equal(t,
+		RPCParseError{Code: PECWrongArgCount},
+		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCSplit, Args: []interface{}{"s1", "s2"}}),
+	)
+
+	err := r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCSplit, Args: []interface{}{"s1"}})
+	assert.Nil(t, err)
+	assert.Equal(t, "s1", r.Name)
 }
 
 func TestSanitizeAttributes(t *testing.T) {
