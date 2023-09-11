@@ -12,6 +12,7 @@ import (
 	"github.com/splitio/go-split-commons/v4/synchronizer"
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/external/commons/mocks"
+	"github.com/splitio/splitd/splitio/common/lang"
 	"github.com/splitio/splitd/splitio/sdk/conf"
 	"github.com/splitio/splitd/splitio/sdk/storage"
 	"github.com/splitio/splitd/splitio/sdk/types"
@@ -296,7 +297,7 @@ func TestTrack(t *testing.T) {
 
 	md := types.ClientConfig{Metadata: types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}}
 
-	err := client.Track(&md, "key1", "user", "checkin", ref(123.4), map[string]interface{}{"a": 123})
+	err := client.Track(&md, "key1", "user", "checkin", lang.Ref(123.4), map[string]interface{}{"a": 123})
 	assert.Nil(t, err)
 
 	err = es.RangeAndClear(func(md types.ClientMetadata, st *storage.LockingQueue[dtos.EventDTO]) {
@@ -312,7 +313,7 @@ func TestTrack(t *testing.T) {
 			Key:             "key1",
 			TrafficTypeName: "user",
 			EventTypeID:     "checkin",
-			Value:           ref(123.4),
+			Value:           lang.Ref(123.4),
 			Properties:      map[string]interface{}{"a": 123},
 		}, &evs[0])
 		n, err = st.Pop(1, &evs)
@@ -321,10 +322,10 @@ func TestTrack(t *testing.T) {
 	})
 	assert.Nil(t, err)
 
-	err = client.Track(&md, "key1", "", "checkin", ref(123.4), map[string]interface{}{"a": 123})
+	err = client.Track(&md, "key1", "", "checkin", lang.Ref(123.4), map[string]interface{}{"a": 123})
 	assert.ErrorIs(t, err, ErrEmtpyTrafficType)
 
-	err = client.Track(&md, "key1", "user", "checkin", ref(123.4), map[string]interface{}{"a": strings.Repeat("qwertyui", 100000)})
+	err = client.Track(&md, "key1", "user", "checkin", lang.Ref(123.4), map[string]interface{}{"a": strings.Repeat("qwertyui", 100000)})
 	assert.ErrorIs(t, err, ErrEventTooBig)
 
 }
@@ -347,13 +348,13 @@ func TestTrackEventsFlush(t *testing.T) {
 
 	md := types.ClientConfig{Metadata: types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}}
 
-	err := client.Track(&md, "key1", "user", "checkin", ref(123.4), map[string]interface{}{"a": 123})
+	err := client.Track(&md, "key1", "user", "checkin", lang.Ref(123.4), map[string]interface{}{"a": 123})
 	assert.Nil(t, err)
-	err = client.Track(&md, "key2", "user", "checkin", ref(123.4), map[string]interface{}{"a": 123})
+	err = client.Track(&md, "key2", "user", "checkin", lang.Ref(123.4), map[string]interface{}{"a": 123})
 	assert.Nil(t, err)
-	err = client.Track(&md, "key3", "user", "checkin", ref(123.4), map[string]interface{}{"a": 123})
+	err = client.Track(&md, "key3", "user", "checkin", lang.Ref(123.4), map[string]interface{}{"a": 123})
 	assert.Nil(t, err)
-	err = client.Track(&md, "key4", "user", "checkin", ref(123.4), map[string]interface{}{"a": 123})
+	err = client.Track(&md, "key4", "user", "checkin", lang.Ref(123.4), map[string]interface{}{"a": 123})
 	assert.ErrorIs(t, err, ErrEventsQueueFull)
 
 	assert.Equal(t, "EVENTS_FULL", <-client.queueFullChan)
@@ -372,7 +373,7 @@ func TestTrackEventsFlush(t *testing.T) {
 			Key:             "key1",
 			TrafficTypeName: "user",
 			EventTypeID:     "checkin",
-			Value:           ref(123.4),
+			Value:           lang.Ref(123.4),
 			Properties:      map[string]interface{}{"a": 123},
 		}
 
@@ -388,10 +389,10 @@ func TestTrackEventsFlush(t *testing.T) {
 	})
 	assert.Nil(t, err)
 
-	err = client.Track(&md, "key1", "", "checkin", ref(123.4), map[string]interface{}{"a": 123})
+	err = client.Track(&md, "key1", "", "checkin", lang.Ref(123.4), map[string]interface{}{"a": 123})
 	assert.ErrorIs(t, err, ErrEmtpyTrafficType)
 
-	err = client.Track(&md, "key1", "user", "checkin", ref(123.4), map[string]interface{}{"a": strings.Repeat("qwertyui", 100000)})
+	err = client.Track(&md, "key1", "user", "checkin", lang.Ref(123.4), map[string]interface{}{"a": strings.Repeat("qwertyui", 100000)})
 	assert.ErrorIs(t, err, ErrEventTooBig)
 
 }

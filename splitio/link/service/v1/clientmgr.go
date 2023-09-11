@@ -142,21 +142,21 @@ func (m *ClientManager) handleRPC(rpc *protov1.RPC) (interface{}, error) {
 	case protov1.OCSplitNames:
 		var args protov1.SplitNamesArgs
 		if err := args.PopulateFromRPC(rpc); err != nil {
-			return nil, fmt.Errorf("error parsing track arguments: %w", err)
+			return nil, fmt.Errorf("error parsing split-names arguments: %w", err)
 		}
 		return m.handleSplitNames(&args)
 
 	case protov1.OCSplit:
 		var args protov1.SplitArgs
 		if err := args.PopulateFromRPC(rpc); err != nil {
-			return nil, fmt.Errorf("error parsing track arguments: %w", err)
+			return nil, fmt.Errorf("error parsing split arguments: %w", err)
 		}
 		return m.handleSplit(&args)
 
 	case protov1.OCSplits:
 		var args protov1.SplitsArgs
 		if err := args.PopulateFromRPC(rpc); err != nil {
-			return nil, fmt.Errorf("error parsing track arguments: %w", err)
+			return nil, fmt.Errorf("error parsing splits arguments: %w", err)
 		}
 		return m.handleSplits(&args)
 

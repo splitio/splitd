@@ -7,6 +7,7 @@ import (
 
 	"github.com/splitio/go-split-commons/v4/dtos"
 	"github.com/splitio/go-toolkit/v5/logging"
+	"github.com/splitio/splitd/splitio/common/lang"
 	"github.com/splitio/splitd/splitio/link/protocol"
 	v1 "github.com/splitio/splitd/splitio/link/protocol/v1"
 	proto1Mocks "github.com/splitio/splitd/splitio/link/protocol/v1/mocks"
@@ -163,7 +164,7 @@ func TestTrack(t *testing.T) {
 	}).Once()
 	serializerMock.On("Serialize", proto1Mocks.NewRegisterResp(true)).Return([]byte("successRegistration"), nil).Once()
 	serializerMock.On("Parse", []byte("trackMessage"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		*args.Get(1).(*v1.RPC) = *proto1Mocks.NewTrackRPC("key1", "user", "checkin", ref(2.75), map[string]interface{}{"a": 1})
+		*args.Get(1).(*v1.RPC) = *proto1Mocks.NewTrackRPC("key1", "user", "checkin", lang.Ref(2.75), map[string]interface{}{"a": 1})
 	}).Once()
 	serializerMock.On("Serialize", proto1Mocks.NewTrackResp(true)).Return([]byte("successPayload"), nil).Once()
 
@@ -171,7 +172,7 @@ func TestTrack(t *testing.T) {
 	sdkMock.
 		On("Track",
 			&types.ClientConfig{Metadata: types.ClientMetadata{ID: "someID", SdkVersion: "some_sdk-1.2.3"}},
-			"key1", "user", "checkin", ref(float64(2.75)), map[string]interface{}{"a": 1}).
+			"key1", "user", "checkin", lang.Ref(float64(2.75)), map[string]interface{}{"a": 1}).
 		Return((error)(nil)).Once()
 
 	logger := logging.NewLogger(nil)
