@@ -120,6 +120,10 @@ func (m *ClientManager) dispatchRPC(rpc *protov1.RPC) (interface{}, error) {
 		return m.handleGetTreatment(rpc)
 	case protov1.OCTreatments:
 		return m.handleGetTreatments(rpc)
+	case protov1.OCTreatmentWithConfig:
+		return m.handleGetTreatmentWithConfig(rpc)
+	case protov1.OCTreatmentsWithConfig:
+		return m.handleGetTreatmentsWithConfig(rpc)
 	case protov1.OCTrack:
 		return m.handleTrack(rpc)
 	case protov1.OCSplitNames:
@@ -178,6 +182,38 @@ func (m *ClientManager) handleGetTreatment(rpc *protov1.RPC) (interface{}, error
 	return response, nil
 }
 
+func (m *ClientManager) handleGetTreatmentWithConfig(rpc *protov1.RPC) (interface{}, error) {
+
+	var args protov1.TreatmentArgs
+	if err := args.PopulateFromRPC(rpc); err != nil {
+		return nil, fmt.Errorf("error parsing treatment arguments: %w", err)
+	}
+
+	res, err := m.splitSDK.Treatment(m.clientConfig, args.Key, args.BucketingKey, args.Feature, args.Attributes)
+	if err != nil {
+		return &protov1.ResponseWrapper[protov1.TreatmentWithConfigPayload]{Status: protov1.ResultInternalError}, err
+	}
+
+	response := &protov1.ResponseWrapper[protov1.TreatmentWithConfigPayload]{
+		Status:  protov1.ResultOk,
+		Payload: protov1.TreatmentWithConfigPayload{Treatment: res.Treatment},
+	}
+
+	if res.Config != nil {
+		response.Payload.Config = *res.Config
+	}
+
+	if m.clientConfig.ReturnImpressionData && res.Impression != nil {
+		response.Payload.ListenerData = &protov1.ListenerExtraData{
+			Label:        res.Impression.Label,
+			Timestamp:    res.Impression.Time,
+			ChangeNumber: res.Impression.ChangeNumber,
+		}
+	}
+
+	return response, nil
+}
+
 func (m *ClientManager) handleGetTreatments(rpc *protov1.RPC) (interface{}, error) {
 
 	var args protov1.TreatmentsArgs
@@ -199,7 +235,7 @@ func (m *ClientManager) handleGetTreatments(rpc *protov1.RPC) (interface{}, erro
 		}
 
 		results[idx].Treatment = ff.Treatment
-		if ff.Impression != nil {
+		if m.clientConfig.ReturnImpressionData && ff.Impression != nil {
 			results[idx].ListenerData = &protov1.ListenerExtraData{
 				Label:        ff.Impression.Label,
 				Timestamp:    ff.Impression.Time,
@@ -211,6 +247,49 @@ func (m *ClientManager) handleGetTreatments(rpc *protov1.RPC) (interface{}, erro
 	response := &protov1.ResponseWrapper[protov1.TreatmentsPayload]{
 		Status:  protov1.ResultOk,
 		Payload: protov1.TreatmentsPayload{Results: results},
+	}
+
+	return response, nil
+}
+
+func (m *ClientManager) handleGetTreatmentsWithConfig(rpc *protov1.RPC) (interface{}, error) {
+
+	var args protov1.TreatmentsArgs
+	if err := args.PopulateFromRPC(rpc); err != nil {
+		return nil, fmt.Errorf("error parsing treatments arguments: %w", err)
+	}
+
+	res, err := m.splitSDK.Treatments(m.clientConfig, args.Key, args.BucketingKey, args.Features, args.Attributes)
+	if err != nil {
+		return &protov1.ResponseWrapper[protov1.TreatmentsWithConfigPayload]{Status: protov1.ResultInternalError}, err
+	}
+
+	results := make([]protov1.TreatmentWithConfigPayload, len(args.Features))
+	for idx, feature := range args.Features {
+		ff, ok := res[feature]
+		if !ok {
+			results[idx].Treatment = "control"
+			continue
+		}
+
+		results[idx].Treatment = ff.Treatment
+
+		if ff.Config != nil {
+			results[idx].Config = *ff.Config
+		}
+
+		if m.clientConfig.ReturnImpressionData && ff.Impression != nil {
+			results[idx].ListenerData = &protov1.ListenerExtraData{
+				Label:        ff.Impression.Label,
+				Timestamp:    ff.Impression.Time,
+				ChangeNumber: ff.Impression.ChangeNumber,
+			}
+		}
+	}
+
+	response := &protov1.ResponseWrapper[protov1.TreatmentsWithConfigPayload]{
+		Status:  protov1.ResultOk,
+		Payload: protov1.TreatmentsWithConfigPayload{Results: results},
 	}
 
 	return response, nil
