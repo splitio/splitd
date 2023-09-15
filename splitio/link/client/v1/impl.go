@@ -43,166 +43,22 @@ func New(id string, logger logging.LoggerInterface, conn transfer.RawConn, seria
 
 // Treatment implements Interface
 func (c *Impl) Treatment(key string, bucketingKey string, feature string, attrs map[string]interface{}) (*types.Result, error) {
-	var bkp *string
-	if bucketingKey != "" {
-		bkp = &bucketingKey
-	}
-	rpc := protov1.RPC{
-		RPCBase: protocol.RPCBase{Version: protocol.V1},
-		OpCode:  protov1.OCTreatment,
-		Args:    protov1.TreatmentArgs{Key: key, BucketingKey: bkp, Feature: feature, Attributes: attrs}.Encode(),
-	}
-
-	resp, err := doRPC[protov1.ResponseWrapper[protov1.TreatmentPayload]](c, &rpc)
-	if err != nil {
-		return &types.Result{Treatment: Control}, fmt.Errorf("error executing treatment rpc: %w", err)
-	}
-
-	if resp.Status != protov1.ResultOk {
-		return &types.Result{Treatment: Control}, fmt.Errorf("server responded treatment rpc with error %d", resp.Status)
-	}
-
-	var imp *dtos.Impression
-	if c.listenerFeedback && resp.Payload.ListenerData != nil {
-		imp = &dtos.Impression{
-			KeyName:      key,
-			FeatureName:  feature,
-			Treatment:    resp.Payload.Treatment,
-			Time:         resp.Payload.ListenerData.Timestamp,
-			ChangeNumber: resp.Payload.ListenerData.ChangeNumber,
-			Label:        resp.Payload.ListenerData.Label,
-			BucketingKey: bucketingKey,
-		}
-	}
-
-	return &types.Result{Treatment: resp.Payload.Treatment, Impression: imp}, nil
-}
-
-// Treatment implements Interface
-func (c *Impl) Treatments(key string, bucketingKey string, features []string, attrs map[string]interface{}) (types.Results, error) {
-	var bkp *string
-	if bucketingKey != "" {
-		bkp = &bucketingKey
-	}
-	rpc := protov1.RPC{
-		RPCBase: protocol.RPCBase{Version: protocol.V1},
-		OpCode:  protov1.OCTreatments,
-		Args:    protov1.TreatmentsArgs{Key: key, BucketingKey: bkp, Features: features, Attributes: attrs}.Encode(),
-	}
-
-	resp, err := doRPC[protov1.ResponseWrapper[protov1.TreatmentsPayload]](c, &rpc)
-	if err != nil {
-		return nil, fmt.Errorf("error executing treatments rpc: %w", err)
-	}
-
-	if resp.Status != protov1.ResultOk {
-		return nil, fmt.Errorf("server responded treatments rpc with error %d", resp.Status)
-	}
-
-	results := make(types.Results)
-	for idx := range features {
-		var imp *dtos.Impression
-		if c.listenerFeedback && resp.Payload.Results[idx].ListenerData != nil {
-			imp = &dtos.Impression{
-				KeyName:      key,
-				FeatureName:  features[idx],
-				Treatment:    resp.Payload.Results[idx].Treatment,
-				Time:         resp.Payload.Results[idx].ListenerData.Timestamp,
-				ChangeNumber: resp.Payload.Results[idx].ListenerData.ChangeNumber,
-				Label:        resp.Payload.Results[idx].ListenerData.Label,
-				BucketingKey: bucketingKey,
-			}
-		}
-		results[features[idx]] = types.Result{Treatment: resp.Payload.Results[idx].Treatment, Impression: imp}
-	}
-
-	return results, nil
+	return c.treatment(key, bucketingKey, feature, attrs, false)
 }
 
 // TreatmentWithConfig implements types.ClientInterface
 func (c *Impl) TreatmentWithConfig(key string, bucketingKey string, feature string, attrs map[string]interface{}) (*types.Result, error) {
-	var bkp *string
-	if bucketingKey != "" {
-		bkp = &bucketingKey
-	}
-	rpc := protov1.RPC{
-		RPCBase: protocol.RPCBase{Version: protocol.V1},
-		OpCode:  protov1.OCTreatmentWithConfig,
-		Args:    protov1.TreatmentArgs{Key: key, BucketingKey: bkp, Feature: feature, Attributes: attrs}.Encode(),
-	}
+	return c.treatment(key, bucketingKey, feature, attrs, true)
+}
 
-	resp, err := doRPC[protov1.ResponseWrapper[protov1.TreatmentPayload]](c, &rpc)
-	if err != nil {
-		return &types.Result{Treatment: Control}, fmt.Errorf("error executing treatment rpc: %w", err)
-	}
-
-	if resp.Status != protov1.ResultOk {
-		return &types.Result{Treatment: Control}, fmt.Errorf("server responded treatment rpc with error %d", resp.Status)
-	}
-
-	var imp *dtos.Impression
-	if c.listenerFeedback && resp.Payload.ListenerData != nil {
-		imp = &dtos.Impression{
-			KeyName:      key,
-			FeatureName:  feature,
-			Treatment:    resp.Payload.Treatment,
-			Time:         resp.Payload.ListenerData.Timestamp,
-			ChangeNumber: resp.Payload.ListenerData.ChangeNumber,
-			Label:        resp.Payload.ListenerData.Label,
-			BucketingKey: bucketingKey,
-		}
-	}
-
-	return &types.Result{
-		Treatment:  resp.Payload.Treatment,
-		Impression: imp,
-		Config:     resp.Payload.Config,
-	}, nil
+// Treatment implements Interface
+func (c *Impl) Treatments(key string, bucketingKey string, features []string, attrs map[string]interface{}) (types.Results, error) {
+	return c.treatments(key, bucketingKey, features, attrs, false)
 }
 
 // TreatmentsWithConfig implements types.ClientInterface
 func (c *Impl) TreatmentsWithConfig(key string, bucketingKey string, features []string, attrs map[string]interface{}) (types.Results, error) {
-	var bkp *string
-	if bucketingKey != "" {
-		bkp = &bucketingKey
-	}
-	rpc := protov1.RPC{
-		RPCBase: protocol.RPCBase{Version: protocol.V1},
-		OpCode:  protov1.OCTreatmentsWithConfig,
-		Args:    protov1.TreatmentsArgs{Key: key, BucketingKey: bkp, Features: features, Attributes: attrs}.Encode(),
-	}
-
-	resp, err := doRPC[protov1.ResponseWrapper[protov1.TreatmentsPayload]](c, &rpc)
-	if err != nil {
-		return nil, fmt.Errorf("error executing treatments rpc: %w", err)
-	}
-
-	if resp.Status != protov1.ResultOk {
-		return nil, fmt.Errorf("server responded treatments rpc with error %d", resp.Status)
-	}
-
-	results := make(types.Results)
-	for idx := range features {
-		var imp *dtos.Impression
-		if c.listenerFeedback && resp.Payload.Results[idx].ListenerData != nil {
-			imp = &dtos.Impression{
-				KeyName:      key,
-				FeatureName:  features[idx],
-				Treatment:    resp.Payload.Results[idx].Treatment,
-				Time:         resp.Payload.Results[idx].ListenerData.Timestamp,
-				ChangeNumber: resp.Payload.Results[idx].ListenerData.ChangeNumber,
-				Label:        resp.Payload.Results[idx].ListenerData.Label,
-				BucketingKey: bucketingKey,
-			}
-		}
-		results[features[idx]] = types.Result{
-			Treatment:  resp.Payload.Results[idx].Treatment,
-			Config:     resp.Payload.Results[idx].Config,
-			Impression: imp,
-		}
-	}
-
-	return results, nil
+	return c.treatments(key, bucketingKey, features, attrs, true)
 }
 
 // Track implements types.ClientInterface
@@ -277,6 +133,96 @@ func (c *Impl) Splits() ([]sdk.SplitView, error) {
 	}
 
 	return views, nil
+}
+
+func (c *Impl) treatment(key string, bucketingKey string, feature string, attrs map[string]interface{}, withConfig bool) (*types.Result, error) {
+	var bkp *string
+	if bucketingKey != "" {
+		bkp = &bucketingKey
+	}
+
+	rpc := protov1.RPC{
+		RPCBase: protocol.RPCBase{Version: protocol.V1},
+		OpCode:  protov1.OCTreatment,
+		Args:    protov1.TreatmentArgs{Key: key, BucketingKey: bkp, Feature: feature, Attributes: attrs}.Encode(),
+	}
+
+	if withConfig {
+		rpc.OpCode = protov1.OCTreatmentWithConfig
+	}
+
+	resp, err := doRPC[protov1.ResponseWrapper[protov1.TreatmentPayload]](c, &rpc)
+	if err != nil {
+		return &types.Result{Treatment: Control}, fmt.Errorf("error executing treatment rpc: %w", err)
+	}
+
+	if resp.Status != protov1.ResultOk {
+		return &types.Result{Treatment: Control}, fmt.Errorf("server responded treatment rpc with error %d", resp.Status)
+	}
+
+	var imp *dtos.Impression
+	if c.listenerFeedback && resp.Payload.ListenerData != nil {
+		imp = &dtos.Impression{
+			KeyName:      key,
+			FeatureName:  feature,
+			Treatment:    resp.Payload.Treatment,
+			Time:         resp.Payload.ListenerData.Timestamp,
+			ChangeNumber: resp.Payload.ListenerData.ChangeNumber,
+			Label:        resp.Payload.ListenerData.Label,
+			BucketingKey: bucketingKey,
+		}
+	}
+
+	toRet := &types.Result{Treatment: resp.Payload.Treatment, Impression: imp}
+	if withConfig {
+		toRet.Config = resp.Payload.Config
+	}
+
+	return toRet, nil
+}
+
+func (c *Impl) treatments(key string, bucketingKey string, features []string, attrs map[string]interface{}, withConfig bool) (types.Results, error) {
+	var bkp *string
+	if bucketingKey != "" {
+		bkp = &bucketingKey
+	}
+	rpc := protov1.RPC{
+		RPCBase: protocol.RPCBase{Version: protocol.V1},
+		OpCode:  protov1.OCTreatments,
+		Args:    protov1.TreatmentsArgs{Key: key, BucketingKey: bkp, Features: features, Attributes: attrs}.Encode(),
+	}
+
+	if withConfig {
+		rpc.OpCode = protov1.OCTreatmentsWithConfig
+	}
+
+	resp, err := doRPC[protov1.ResponseWrapper[protov1.TreatmentsPayload]](c, &rpc)
+	if err != nil {
+		return nil, fmt.Errorf("error executing treatments rpc: %w", err)
+	}
+
+	if resp.Status != protov1.ResultOk {
+		return nil, fmt.Errorf("server responded treatments rpc with error %d", resp.Status)
+	}
+
+	results := make(types.Results)
+	for idx := range features {
+		var imp *dtos.Impression
+		if c.listenerFeedback && resp.Payload.Results[idx].ListenerData != nil {
+			imp = &dtos.Impression{
+				KeyName:      key,
+				FeatureName:  features[idx],
+				Treatment:    resp.Payload.Results[idx].Treatment,
+				Time:         resp.Payload.Results[idx].ListenerData.Timestamp,
+				ChangeNumber: resp.Payload.Results[idx].ListenerData.ChangeNumber,
+				Label:        resp.Payload.Results[idx].ListenerData.Label,
+				BucketingKey: bucketingKey,
+			}
+		}
+		results[features[idx]] = types.Result{Treatment: resp.Payload.Results[idx].Treatment, Impression: imp}
+	}
+
+	return results, nil
 }
 
 func (c *Impl) register(id string, impressionsFeedback bool) error {
