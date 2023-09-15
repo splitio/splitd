@@ -200,7 +200,7 @@ func (m *ClientManager) handleGetTreatmentWithConfig(rpc *protov1.RPC) (interfac
 	}
 
 	if res.Config != nil {
-		response.Payload.Config = *res.Config
+		response.Payload.Config = res.Config
 	}
 
 	if m.clientConfig.ReturnImpressionData && res.Impression != nil {
@@ -275,7 +275,7 @@ func (m *ClientManager) handleGetTreatmentsWithConfig(rpc *protov1.RPC) (interfa
 		results[idx].Treatment = ff.Treatment
 
 		if ff.Config != nil {
-			results[idx].Config = *ff.Config
+			results[idx].Config = ff.Config
 		}
 
 		if m.clientConfig.ReturnImpressionData && ff.Impression != nil {

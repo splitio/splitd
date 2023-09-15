@@ -25,7 +25,7 @@ type Result struct {
 type ResultWithConfig struct {
 	Treatment  string
 	Impression *dtos.Impression
-	Config     string
+	Config     *string
 }
 
 type Results = map[string]Result

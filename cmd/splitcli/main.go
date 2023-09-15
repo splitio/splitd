@@ -120,6 +120,10 @@ func executeCall(c types.ClientInterface, a *conf.CliArgs) (string, error) {
 	}
 }
 
-func formatWithConfig(treatment string, config string) string {
-	return fmt.Sprintf("[%s -- %s]", treatment, config)
+func formatWithConfig(treatment string, config *string) string {
+	var emtpyCfg string = ""
+	if config == nil {
+		config = &emtpyCfg
+	}
+	return fmt.Sprintf("[%s -- %s]", treatment, *config)
 }
