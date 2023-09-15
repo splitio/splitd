@@ -25,7 +25,7 @@ type TreatmentsPayload struct {
 
 type TreatmentWithConfigPayload struct {
 	Treatment    string             `msgpack:"t"`
-	Config       string             `msgpack:"c"`
+	Config       *string            `msgpack:"c"`
 	ListenerData *ListenerExtraData `msgpack:"l,omitempty"`
 }
 

@@ -1,3 +1,3 @@
 package splitio
 
-const CommitSHA = "dea9968"
+const CommitSHA = "e3832cd"
