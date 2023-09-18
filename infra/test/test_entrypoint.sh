@@ -35,6 +35,7 @@ function testAllVars {
     export SPLITD_LINK_READ_TIMEOUT_MS=2
     export SPLITD_LINK_WRITE_TIMEOUT_MS=3
     export SPLITD_LINK_ACCEPT_TIMEOUT_MS=4
+    export SPLITD_LINK_BUFFER_SIZE=5
     export SPLITD_LOG_LEVEL="WARNING"
     export SPLITD_LOG_OUTPUT="/dev/stderr"
 
@@ -92,6 +93,7 @@ function testAllVars {
     assert_eq "2" $(echo "$conf_json" | jq '.Link.ReadTimeoutMS') "incorrect read timeout"
     assert_eq "3" $(echo "$conf_json" | jq '.Link.WriteTimeoutMS') "incorrect write timeout"
     assert_eq "4" $(echo "$conf_json" | jq '.Link.AcceptTimeoutMS') "incorrect accept timeout"
+    assert_eq "5" $(echo "$conf_json" | jq '.Link.BufferSize') "incorrect buffer size"
 
     # ---
 
