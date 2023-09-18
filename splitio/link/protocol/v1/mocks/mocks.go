@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/splitio/splitd/splitio"
+	"github.com/splitio/splitd/splitio/common/lang"
 	"github.com/splitio/splitd/splitio/link/protocol"
 	v1 "github.com/splitio/splitd/splitio/link/protocol/v1"
 	"github.com/splitio/splitd/splitio/sdk"
@@ -86,6 +87,21 @@ func NewTreatmentResp(ok bool, treatment string, ilData *v1.ListenerExtraData) *
 	}
 }
 
+func NewTreatmentWithConfigResp(ok bool, treatment string, ilData *v1.ListenerExtraData, cfg string) *v1.ResponseWrapper[v1.TreatmentPayload] {
+	res := v1.ResultOk
+	if !ok {
+		res = v1.ResultInternalError
+	}
+	return &v1.ResponseWrapper[v1.TreatmentPayload]{
+		Status: res,
+		Payload: v1.TreatmentPayload{
+			Treatment:    treatment,
+			ListenerData: ilData,
+			Config:       lang.Ref(cfg),
+		},
+	}
+}
+
 func NewTreatmentsResp(ok bool, data []sdk.EvaluationResult) *v1.ResponseWrapper[v1.TreatmentsPayload] {
 	res := v1.ResultOk
 	if !ok {
@@ -94,7 +110,10 @@ func NewTreatmentsResp(ok bool, data []sdk.EvaluationResult) *v1.ResponseWrapper
 
 	payload := make([]v1.TreatmentPayload, 0, len(data))
 	for _, r := range data {
-		p := v1.TreatmentPayload{Treatment: r.Treatment}
+		p := v1.TreatmentPayload{
+			Treatment: r.Treatment,
+			Config:    r.Config,
+		}
 		if r.Impression != nil {
 			p.ListenerData = &v1.ListenerExtraData{
 				Label:        r.Impression.Label,

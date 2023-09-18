@@ -106,6 +106,96 @@ func TestRegisterAndTreatmentsHappyPath(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestRegisterAndTreatmentWithConfigHappyPath(t *testing.T) {
+	rawConnMock := &transferMocks.RawConnMock{}
+	rawConnMock.On("ReceiveMessage").Return([]byte("registrationMessage"), nil).Once()
+	rawConnMock.On("SendMessage", []byte("successRegistration")).Return(nil).Once()
+	rawConnMock.On("ReceiveMessage").Return([]byte("treatmentWithConfigMessage"), nil).Once()
+	rawConnMock.On("SendMessage", []byte("successPayload")).Return(nil).Once()
+	rawConnMock.On("ReceiveMessage").Return([]byte(nil), io.EOF).Once()
+
+	serializerMock := &serializerMocks.SerializerMock{}
+	serializerMock.On("Parse", []byte("registrationMessage"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(1).(*v1.RPC) = v1.RPC{
+			RPCBase: protocol.RPCBase{Version: protocol.V1},
+			OpCode:  v1.OCRegister,
+			Args:    []interface{}{"someID", "some_sdk-1.2.3", uint64(0)},
+		}
+	}).Once()
+	serializerMock.On("Serialize", proto1Mocks.NewRegisterResp(true)).Return([]byte("successRegistration"), nil).Once()
+	serializerMock.On("Parse", []byte("treatmentWithConfigMessage"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(1).(*v1.RPC) = v1.RPC{
+			RPCBase: protocol.RPCBase{Version: protocol.V1},
+			OpCode:  v1.OCTreatmentWithConfig,
+			Args:    []interface{}{"key", nil, "someFeature", map[string]interface{}(nil)},
+		}
+	}).Once()
+	serializerMock.On("Serialize", proto1Mocks.NewTreatmentWithConfigResp(true, "on", nil, `{"a": "some"}`)).Return([]byte("successPayload"), nil).Once()
+
+	sdkMock := &sdkMocks.SDKMock{}
+	sdkMock.
+		On("Treatment",
+			&types.ClientConfig{Metadata: types.ClientMetadata{ID: "someID", SdkVersion: "some_sdk-1.2.3"}},
+			"key", (*string)(nil), "someFeature", map[string]interface{}(nil)).
+		Return(&sdk.EvaluationResult{Treatment: "on", Config: lang.Ref(`{"a": "some"}`)}, nil).Once()
+
+	logger := logging.NewLogger(nil)
+	cm := NewClientManager(rawConnMock, logger, sdkMock, serializerMock)
+	err := cm.handleClientInteractions()
+	assert.Nil(t, err)
+}
+
+func TestRegisterAndTreatmentsWithConfigHappyPath(t *testing.T) {
+	rawConnMock := &transferMocks.RawConnMock{}
+	rawConnMock.On("ReceiveMessage").Return([]byte("registrationMessage"), nil).Once()
+	rawConnMock.On("SendMessage", []byte("successRegistration")).Return(nil).Once()
+	rawConnMock.On("ReceiveMessage").Return([]byte("treatmentsWithConfigMessage"), nil).Once()
+	rawConnMock.On("SendMessage", []byte("successPayload")).Return(nil).Once()
+	rawConnMock.On("ReceiveMessage").Return([]byte(nil), io.EOF).Once()
+
+	var strCfg = "what"
+
+	serializerMock := &serializerMocks.SerializerMock{}
+	serializerMock.On("Parse", []byte("registrationMessage"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(1).(*v1.RPC) = v1.RPC{
+			RPCBase: protocol.RPCBase{Version: protocol.V1},
+			OpCode:  v1.OCRegister,
+			Args:    []interface{}{"someID", "some_sdk-1.2.3", uint64(0)},
+		}
+	}).Once()
+	serializerMock.On("Serialize", proto1Mocks.NewRegisterResp(true)).Return([]byte("successRegistration"), nil).Once()
+	serializerMock.On("Parse", []byte("treatmentsWithConfigMessage"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(1).(*v1.RPC) = v1.RPC{
+			RPCBase: protocol.RPCBase{Version: protocol.V1},
+			OpCode:  v1.OCTreatmentsWithConfig,
+			Args:    []interface{}{"key", nil, []interface{}{"feat1", "feat2", "feat3"}, map[string]interface{}(nil)},
+		}
+	}).Once()
+	serializerMock.On("Serialize", proto1Mocks.NewTreatmentsResp(true, []sdk.EvaluationResult{
+		{Treatment: "on"}, {Treatment: "off"}, {Treatment: "control", Config: &strCfg},
+	})).Return([]byte("successPayload"), nil).Once()
+
+	sdkMock := &sdkMocks.SDKMock{}
+	sdkMock.
+		On(
+			"Treatments",
+			&types.ClientConfig{Metadata: types.ClientMetadata{ID: "someID", SdkVersion: "some_sdk-1.2.3"}},
+			"key",
+			(*string)(nil),
+			[]string{"feat1", "feat2", "feat3"},
+			map[string]interface{}(nil),
+		).Return(map[string]sdk.EvaluationResult{
+		"feat1": {Treatment: "on"},
+		"feat2": {Treatment: "off"},
+		"feat3": {Treatment: "control", Config: &strCfg},
+	}, nil).Once()
+
+	logger := logging.NewLogger(nil)
+	cm := NewClientManager(rawConnMock, logger, sdkMock, serializerMock)
+	err := cm.handleClientInteractions()
+	assert.Nil(t, err)
+}
+
 func TestRegisterWithImpsAndTreatmentHappyPath(t *testing.T) {
 	rawConnMock := &transferMocks.RawConnMock{}
 	rawConnMock.On("ReceiveMessage").Return([]byte("registrationMessage"), nil).Once()
