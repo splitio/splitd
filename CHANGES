@@ -1,3 +1,8 @@
+1.1.0 (Sep 19, 2023):
+- Add support for Client/GetTreatment(s)WithConfig operations.
+- Add support for Manager operations.
+- Use bump default buffer sizes to 200k (linux default)
+
 1.0.1 (Sep 5, 2023):
 - Add support for .track
 - Fixed issue where impressions could take too long to evict even with the queue full
