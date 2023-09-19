@@ -219,7 +219,12 @@ func (c *Impl) treatments(key string, bucketingKey string, features []string, at
 				BucketingKey: bucketingKey,
 			}
 		}
-		results[features[idx]] = types.Result{Treatment: resp.Payload.Results[idx].Treatment, Impression: imp}
+
+		res := types.Result{Treatment: resp.Payload.Results[idx].Treatment, Impression: imp}
+		if withConfig {
+			res.Config = resp.Payload.Results[idx].Config
+		}
+		results[features[idx]] = res
 	}
 
 	return results, nil

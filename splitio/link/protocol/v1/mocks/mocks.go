@@ -22,20 +22,29 @@ func NewRegisterRPC(id string, listener bool) *v1.RPC {
 	}
 }
 
-func NewTreatmentRPC(key string, bucketing string, feature string, attrs map[string]interface{}) *v1.RPC {
-	return &v1.RPC{
+func NewTreatmentRPC(key string, bucketing string, feature string, attrs map[string]interface{}, withConfig bool) *v1.RPC {
+	rpc := &v1.RPC{
 		RPCBase: protocol.RPCBase{Version: protocol.V1},
 		OpCode:  v1.OCTreatment,
 		Args:    []interface{}{key, bucketing, feature, attrs},
 	}
+	if withConfig {
+		rpc.OpCode = v1.OCTreatmentWithConfig
+	}
+	return rpc
 }
 
-func NewTreatmentsRPC(key string, bucketing string, features []string, attrs map[string]interface{}) *v1.RPC {
-	return &v1.RPC{
+func NewTreatmentsRPC(key string, bucketing string, features []string, attrs map[string]interface{}, withConfig bool) *v1.RPC {
+	rpc := &v1.RPC{
 		RPCBase: protocol.RPCBase{Version: protocol.V1},
 		OpCode:  v1.OCTreatments,
 		Args:    []interface{}{key, bucketing, features, attrs},
 	}
+
+	if withConfig {
+		rpc.OpCode = v1.OCTreatmentsWithConfig
+	}
+	return rpc
 }
 
 func NewTrackRPC(key string, trafficType string, eventType string, eventVal *float64, props map[string]interface{}) *v1.RPC {
