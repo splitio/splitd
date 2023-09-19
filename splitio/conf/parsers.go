@@ -8,7 +8,7 @@ import (
 	"github.com/splitio/splitd/splitio/link/transfer"
 )
 
-func ParseProtocolVersion(p string) (protocol.Version, error) {
+func parseProtocolVersion(p string) (protocol.Version, error) {
 	switch p {
 	case "v1":
 		return protocol.V1, nil
@@ -16,7 +16,7 @@ func ParseProtocolVersion(p string) (protocol.Version, error) {
 	return 0, fmt.Errorf("unkown protocol version '%s'", p)
 }
 
-func ParseConnType(t string) (transfer.ConnType, error) {
+func parseConnType(t string) (transfer.ConnType, error) {
 	switch t {
 	case "unix-seqpacket":
 		return transfer.ConnTypeUnixSeqPacket, nil
@@ -26,7 +26,7 @@ func ParseConnType(t string) (transfer.ConnType, error) {
 	return 0, fmt.Errorf("unknown listener type '%s'", t)
 }
 
-func ParseSerializer(s string) (serializer.Mechanism, error) {
+func parseSerializer(s string) (serializer.Mechanism, error) {
 	switch s {
 	case "msgpack":
 		return serializer.MsgPack, nil

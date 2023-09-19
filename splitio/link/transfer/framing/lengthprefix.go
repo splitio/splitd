@@ -10,18 +10,26 @@ import (
 var (
 	ErrInsufficientHeaderData = errors.New("not enough bytes received when decoding packet size")
 	ErrSizeDecode             = errors.New("error decoding size prefix from message")
-	ErrReceivedSizeMismatch   = errors.New("recevied data size mismatch")
-	ErrSenSentSizeMismatch    = errors.New("recevied data size mismatch")
 )
 
 type Interface interface {
-	WriteFrame(writer io.Writer, raw []byte) (int, error)
-	ReadFrame(reader io.Reader, readBuf []byte) (int, error)
+	WriteFrame(raw []byte) (int, error)
+	ReadFrame(readBuf []byte) (int, error)
 }
 
-type LengthPrefixImpl struct{}
+type LengthPrefixImpl struct {
+	lr io.LimitedReader
+	w  io.Writer
+}
 
-func (l *LengthPrefixImpl) WriteFrame(writer io.Writer, raw []byte) (int, error) {
+func NewLengthPrefix(rw io.ReadWriter) *LengthPrefixImpl {
+	return &LengthPrefixImpl{
+		lr: io.LimitedReader{R: rw, N: 4},
+		w:  rw,
+	}
+}
+
+func (l *LengthPrefixImpl) WriteFrame(raw []byte) (int, error) {
 	size := len(raw)
 	framedSize := size + 4
 	framed := make([]byte, 0, framedSize)
@@ -30,25 +38,21 @@ func (l *LengthPrefixImpl) WriteFrame(writer io.Writer, raw []byte) (int, error)
 
 	sent := 0
 	for sent < framedSize {
-        n, err := writer.Write(framed[sent:])
-		if err != nil {
-            return n, fmt.Errorf("error writing message: %w", err)
-		}
+		n, err := l.w.Write(framed[sent:])
 		sent += n
-	}
-
-	if framedSize < 0 {
-		return sent, ErrSenSentSizeMismatch
+		if err != nil {
+			return sent, err
+		}
 	}
 
 	return sent - 4, nil
 
 }
 
-func (l *LengthPrefixImpl) ReadFrame(reader io.Reader, readBuf []byte) (int, error) {
-	lr := io.LimitedReader{R: reader, N: 4}
+func (l *LengthPrefixImpl) ReadFrame(readBuf []byte) (int, error) {
 	var sizeb [4]byte
-	n, err := lr.Read(sizeb[:])
+	l.lr.N = 4
+	n, err := l.lr.Read(sizeb[:])
 	if err != nil {
 		return 0, fmt.Errorf("error reading size: %w", err)
 	}
@@ -57,19 +61,20 @@ func (l *LengthPrefixImpl) ReadFrame(reader io.Reader, readBuf []byte) (int, err
 		return 0, ErrInsufficientHeaderData
 	}
 
-    size := decodeSize(sizeb[:])
-	lr.N = int64(size)
-	read := 0
-	for read < int(size) {
-		n, err = lr.Read(readBuf[read:])
-		if err != nil {
-			return n, fmt.Errorf("error reading message: %w", err)
-		}
-        read += n
+	size := decodeSize(sizeb[:])
+	if bufSize := len(readBuf); int(size) > bufSize {
+		return 0, fmt.Errorf("read buffer is too small (%d bytes) to handle incoming message (%d bytes)", bufSize, size)
 	}
 
-	if read != int(size) {
-		return read, ErrReceivedSizeMismatch
+	l.lr.N = int64(size)
+
+	read := 0
+	for read < int(size) {
+		n, err = l.lr.Read(readBuf[read:])
+		read += n
+		if err != nil {
+			return read, err
+		}
 	}
 
 	return read, nil
@@ -77,8 +82,10 @@ func (l *LengthPrefixImpl) ReadFrame(reader io.Reader, readBuf []byte) (int, err
 
 func encodeSize(size int, target []byte) []byte {
 	target = binary.LittleEndian.AppendUint32(target, uint32(size))
-    return target
+	return target
 }
 func decodeSize(size []byte) uint32 {
 	return binary.LittleEndian.Uint32(size[:])
 }
+
+var _ Interface = (*LengthPrefixImpl)(nil)

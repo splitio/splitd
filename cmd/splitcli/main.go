@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -80,10 +81,49 @@ func executeCall(c types.ClientInterface, a *conf.CliArgs) (string, error) {
 		}
 		return sb.String(), err
 	case "track":
-        return "", c.Track(a.Key, a.TrafficType, a.EventType, a.EventVal, nil)
-	case "treatmentWithConfig", "treatmentsWithConfig":
-		return "", fmt.Errorf("method '%s' is not yet implemented", a.Method)
+		return "", c.Track(a.Key, a.TrafficType, a.EventType, a.EventVal, nil)
+	case "treatment-with-config":
+		res, err := c.TreatmentWithConfig(a.Key, a.BucketingKey, a.Feature, a.Attributes)
+		return formatWithConfig(res.Treatment, res.Config), err
+	case "treatments-with-config":
+		res, err := c.TreatmentsWithConfig(a.Key, a.BucketingKey, a.Features, a.Attributes)
+		var sb strings.Builder
+		for _, result := range res {
+			s := formatWithConfig(result.Treatment, result.Config)
+			if sb.Len() == 0 { // first item doesn't require a leading ','
+				sb.WriteString(s)
+			} else {
+				sb.WriteString("," + s)
+			}
+		}
+		return sb.String(), err
+	case "split-names":
+		names, err := c.SplitNames()
+		return strings.Join(names, ","), err
+	case "split":
+		split, err := c.Split(a.Feature)
+		if err != nil {
+			return "", err
+		}
+		asJson, err := json.Marshal(split)
+		return string(asJson), err
+	case "splits":
+		splits, err := c.Splits()
+		fmt.Println(splits)
+		if err != nil {
+			return "", err
+		}
+		asJson, err := json.Marshal(splits)
+		return string(asJson), err
 	default:
 		return "", fmt.Errorf("unknwon method '%s'", a.Method)
 	}
+}
+
+func formatWithConfig(treatment string, config *string) string {
+	var emtpyCfg string = ""
+	if config == nil {
+		config = &emtpyCfg
+	}
+	return fmt.Sprintf("[%s -- %s]", treatment, *config)
 }
