@@ -52,6 +52,7 @@ accum=$(yq '.sdk.apikey = env(SPLITD_APIKEY) | .link.address = env(SPLITD_LINK_A
 [ ! -z ${SPLITD_LINK_READ_TIMEOUT_MS+x} ]   && accum=$(echo "${accum}" | yq '.link.readTimeoutMS = env(SPLITD_LINK_READ_TIMEOUT_MS)')
 [ ! -z ${SPLITD_LINK_WRITE_TIMEOUT_MS+x} ]  && accum=$(echo "${accum}" | yq '.link.writeTimeoutMS = env(SPLITD_LINK_WRITE_TIMEOUT_MS)')
 [ ! -z ${SPLITD_LINK_ACCEPT_TIMEOUT_MS+x} ] && accum=$(echo "${accum}" | yq '.link.acceptTimeoutMS = env(SPLITD_LINK_ACCEPT_TIMEOUT_MS)')
+[ ! -z ${SPLITD_LINK_BUFFER_SIZE+x} ]       && accum=$(echo "${accum}" | yq '.link.bufferSize = env(SPLITD_LINK_BUFFER_SIZE)')
 
 # logger configs
 [ ! -z ${SPLITD_LOG_LEVEL+x} ]  && accum=$(echo "${accum}" | yq '.logging.level = env(SPLITD_LOG_LEVEL)')

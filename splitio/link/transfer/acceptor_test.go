@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/splitio/go-toolkit/v5/logging"
-	"github.com/splitio/splitd/splitio/link/transfer/framing"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -37,7 +36,7 @@ func TestAcceptor(t *testing.T) {
 	acceptorConfig.AcceptTimeout = 100 * time.Millisecond
 	acceptorConfig.MaxSimultaneousConnections = 1
 	acc := newAcceptor(&net.UnixAddr{Net: "unix", Name: serverSockFN}, func(c net.Conn) RawConn {
-		return newConnWrapper(c, &framing.LengthPrefixImpl{}, &connOpts)
+		return newConnWrapper(c, lpFramerFromConn, &connOpts)
 	}, logger, &acceptorConfig)
 
 	endc, err := acc.Start(func(c RawConn) {

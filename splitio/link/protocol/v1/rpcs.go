@@ -21,7 +21,36 @@ const (
 
 	// Track-related ops
 	OCTrack OpCode = 0x80
+
+	OCSplitNames OpCode = 0xA0
+	OCSplit      OpCode = 0xA1
+	OCSplits     OpCode = 0xA2
 )
+
+func (o OpCode) String() string {
+	switch o {
+	case OCRegister:
+		return "register"
+	case OCTreatment:
+		return "treatment"
+	case OCTreatments:
+		return "treatments"
+	case OCTreatmentWithConfig:
+		return "treatment-with-config"
+	case OCTreatmentsWithConfig:
+		return "treatments-with-config"
+	case OCTrack:
+		return "track"
+	case OCSplitNames:
+		return "split-names"
+	case OCSplit:
+		return "split"
+	case OCSplits:
+		return "splits"
+	default:
+		return "unknown"
+	}
+}
 
 type RPC struct {
 	protocol.RPCBase
@@ -72,7 +101,7 @@ func (r *RegisterArgs) PopulateFromRPC(rpc *RPC) error {
 	if r.SDKVersion, ok = rpc.Args[RegisterArgSDKVersionIdx].(string); !ok {
 		return RPCParseError{Code: PECInvalidArgType, Data: int64(RegisterArgSDKVersionIdx)}
 	}
-	if asUInt, ok := tryInt2[uint64](rpc.Args[RegisterArgFlagsIdx]); ok {
+	if asUInt, ok := tryInt[uint64](rpc.Args[RegisterArgFlagsIdx]); ok {
 		r.Flags = RegisterFlags(asUInt)
 	} else {
 		return RPCParseError{Code: PECInvalidArgType, Data: int64(RegisterArgFlagsIdx)}
@@ -265,6 +294,71 @@ func (t *TrackArgs) PopulateFromRPC(rpc *RPC) error {
 	return nil
 }
 
+type SplitNamesArgs struct{}
+
+func (s SplitNamesArgs) Encode() []interface{} {
+	return nil
+}
+
+func (t *SplitNamesArgs) PopulateFromRPC(rpc *RPC) error {
+	if rpc.OpCode != OCSplitNames {
+		return RPCParseError{Code: PECOpCodeMismatch}
+	}
+
+	if len(rpc.Args) != 0 {
+		return RPCParseError{Code: PECWrongArgCount}
+	}
+
+	return nil
+}
+
+type SplitsArgs struct{}
+
+func (s SplitsArgs) Encode() []interface{} {
+	return nil
+}
+
+func (t *SplitsArgs) PopulateFromRPC(rpc *RPC) error {
+	if rpc.OpCode != OCSplits {
+		return RPCParseError{Code: PECOpCodeMismatch}
+	}
+
+	if len(rpc.Args) != 0 {
+		return RPCParseError{Code: PECWrongArgCount}
+	}
+
+	return nil
+}
+
+const (
+	SplitArgNameIdx int = 0
+)
+
+type SplitArgs struct {
+	Name string
+}
+
+func (s SplitArgs) Encode() []interface{} {
+	return []interface{}{s.Name}
+}
+
+func (t *SplitArgs) PopulateFromRPC(rpc *RPC) error {
+	if rpc.OpCode != OCSplit {
+		return RPCParseError{Code: PECOpCodeMismatch}
+	}
+
+	if len(rpc.Args) != 1 {
+		return RPCParseError{Code: PECWrongArgCount}
+	}
+
+	var ok bool
+	if t.Name, ok = rpc.Args[SplitArgNameIdx].(string); !ok {
+		return RPCParseError{Code: PECInvalidArgType, Data: int64(TrackArgKeyIdx)}
+	}
+
+	return nil
+}
+
 // -- helpers
 var ErrWrongType = errors.New("wrong type")
 
@@ -300,7 +394,7 @@ func getOptional[T any /*TODO(mredolatti): restrict!*/](i interface{}) (T, error
 func sanitizeAttributes(attrs map[string]interface{}) map[string]interface{} {
 	for k, v := range attrs {
 
-		if asInt, ok := tryInt2[int64](v); ok {
+		if asInt, ok := tryInt[int64](v); ok {
 			attrs[k] = asInt
 		}
 
@@ -334,7 +428,7 @@ func sanitizeFeatureList(raw []interface{}) ([]string, bool) {
 	return features, true
 }
 
-func tryInt2[T int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64](x interface{}) (T, bool) {
+func tryInt[T int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64](x interface{}) (T, bool) {
 	switch parsed := x.(type) {
 	case uint8:
 		return T(parsed), true
@@ -361,7 +455,7 @@ func tryInt2[T int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64](
 }
 
 func tryNumberAsFloat(x interface{}) (float64, bool) {
-	if asInt, ok := tryInt2[int64](x); ok {
+	if asInt, ok := tryInt[int64](x); ok {
 		return float64(asInt), true
 	}
 

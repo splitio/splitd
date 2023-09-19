@@ -40,12 +40,11 @@ type AcceptorConfig struct {
 }
 
 func DefaultAcceptorConfig() AcceptorConfig {
-    return AcceptorConfig{
+	return AcceptorConfig{
 		MaxSimultaneousConnections: 32,
 		AcceptTimeout:              1 * time.Second,
-    }
+	}
 }
-
 
 func newAcceptor(address net.Addr, rawConnFactory RawConnFactory, logger logging.LoggerInterface, cfg *AcceptorConfig) *Acceptor {
 	return &Acceptor{
@@ -94,6 +93,7 @@ func (a *Acceptor) Start(onClientAttachedCallback OnClientAttachedCallback) (<-c
 			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), a.maxWait)
+			defer cancel()
 			err = a.sem.Acquire(ctx, 1)
 			if err != nil {
 				a.logger.Error(fmt.Sprintf("Incoming connection request timed out. If the current parallelism is expected, "+
@@ -101,7 +101,6 @@ func (a *Acceptor) Start(onClientAttachedCallback OnClientAttachedCallback) (<-c
 				conn.Close()
 				continue
 			}
-			cancel() // connection allowed. abort timeout timer
 
 			go func(rc RawConn) {
 				onClientAttachedCallback(rc)

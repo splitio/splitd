@@ -11,6 +11,7 @@ import (
 	protov1 "github.com/splitio/splitd/splitio/link/protocol/v1"
 	"github.com/splitio/splitd/splitio/link/serializer"
 	"github.com/splitio/splitd/splitio/link/transfer"
+	"github.com/splitio/splitd/splitio/sdk"
 )
 
 const (
@@ -42,14 +43,112 @@ func New(id string, logger logging.LoggerInterface, conn transfer.RawConn, seria
 
 // Treatment implements Interface
 func (c *Impl) Treatment(key string, bucketingKey string, feature string, attrs map[string]interface{}) (*types.Result, error) {
+	return c.treatment(key, bucketingKey, feature, attrs, false)
+}
+
+// TreatmentWithConfig implements types.ClientInterface
+func (c *Impl) TreatmentWithConfig(key string, bucketingKey string, feature string, attrs map[string]interface{}) (*types.Result, error) {
+	return c.treatment(key, bucketingKey, feature, attrs, true)
+}
+
+// Treatment implements Interface
+func (c *Impl) Treatments(key string, bucketingKey string, features []string, attrs map[string]interface{}) (types.Results, error) {
+	return c.treatments(key, bucketingKey, features, attrs, false)
+}
+
+// TreatmentsWithConfig implements types.ClientInterface
+func (c *Impl) TreatmentsWithConfig(key string, bucketingKey string, features []string, attrs map[string]interface{}) (types.Results, error) {
+	return c.treatments(key, bucketingKey, features, attrs, true)
+}
+
+// Track implements types.ClientInterface
+func (c *Impl) Track(key string, trafficType string, eventType string, value *float64, properties map[string]interface{}) error {
+
+	rpc := protov1.RPC{
+		RPCBase: protocol.RPCBase{Version: protocol.V1},
+		OpCode:  protov1.OCTrack,
+		Args:    protov1.TrackArgs{Key: key, TrafficType: trafficType, EventType: eventType, Value: value, Properties: properties}.Encode(),
+	}
+
+	resp, err := doRPC[protov1.ResponseWrapper[protov1.TrackPayload]](c, &rpc)
+	if err != nil {
+		return fmt.Errorf("error executing track rpc: %w", err)
+	}
+
+	if resp.Status != protov1.ResultOk {
+		return fmt.Errorf("server responded track rpc with error %d", resp.Status)
+	}
+
+	return nil
+}
+
+func (c *Impl) SplitNames() ([]string, error) {
+	rpc := protov1.RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: protov1.OCSplitNames}
+	resp, err := doRPC[protov1.ResponseWrapper[protov1.SplitNamesPayload]](c, &rpc)
+	if err != nil {
+		return nil, fmt.Errorf("error executing split-names rpc: %w", err)
+	}
+
+	if resp.Status != protov1.ResultOk {
+		return nil, fmt.Errorf("server responded split-names rpc with error %d", resp.Status)
+	}
+
+	return resp.Payload.Names, nil
+}
+
+func (c *Impl) Split(name string) (*sdk.SplitView, error) { // TODO(mredolatti): use a local dto instead of package sdk's
+	rpc := protov1.RPC{
+		RPCBase: protocol.RPCBase{Version: protocol.V1},
+		OpCode:  protov1.OCSplit,
+		Args:    protov1.SplitArgs{Name: name}.Encode(),
+	}
+
+	resp, err := doRPC[protov1.ResponseWrapper[protov1.SplitPayload]](c, &rpc)
+	if err != nil {
+		return nil, fmt.Errorf("error executing split rpc: %w", err)
+	}
+
+	if resp.Status != protov1.ResultOk {
+		return nil, fmt.Errorf("server responded split rpc with error %d", resp.Status)
+	}
+
+	p := sdk.SplitView(resp.Payload)
+	return &p, nil
+}
+
+func (c *Impl) Splits() ([]sdk.SplitView, error) {
+	rpc := protov1.RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: protov1.OCSplits}
+	resp, err := doRPC[protov1.ResponseWrapper[protov1.SplitsPayload]](c, &rpc)
+	if err != nil {
+		return nil, fmt.Errorf("error executing splits rpc: %w", err)
+	}
+
+	if resp.Status != protov1.ResultOk {
+		return nil, fmt.Errorf("server responded splits rpc with error %d", resp.Status)
+	}
+
+	views := make([]sdk.SplitView, 0, len(resp.Payload.Splits))
+	for _, v := range resp.Payload.Splits {
+		views = append(views, sdk.SplitView(v))
+	}
+
+	return views, nil
+}
+
+func (c *Impl) treatment(key string, bucketingKey string, feature string, attrs map[string]interface{}, withConfig bool) (*types.Result, error) {
 	var bkp *string
 	if bucketingKey != "" {
 		bkp = &bucketingKey
 	}
+
 	rpc := protov1.RPC{
 		RPCBase: protocol.RPCBase{Version: protocol.V1},
 		OpCode:  protov1.OCTreatment,
 		Args:    protov1.TreatmentArgs{Key: key, BucketingKey: bkp, Feature: feature, Attributes: attrs}.Encode(),
+	}
+
+	if withConfig {
+		rpc.OpCode = protov1.OCTreatmentWithConfig
 	}
 
 	resp, err := doRPC[protov1.ResponseWrapper[protov1.TreatmentPayload]](c, &rpc)
@@ -74,11 +173,15 @@ func (c *Impl) Treatment(key string, bucketingKey string, feature string, attrs 
 		}
 	}
 
-	return &types.Result{Treatment: resp.Payload.Treatment, Impression: imp}, nil
+	toRet := &types.Result{Treatment: resp.Payload.Treatment, Impression: imp}
+	if withConfig {
+		toRet.Config = resp.Payload.Config
+	}
+
+	return toRet, nil
 }
 
-// Treatment implements Interface
-func (c *Impl) Treatments(key string, bucketingKey string, features []string, attrs map[string]interface{}) (types.Results, error) {
+func (c *Impl) treatments(key string, bucketingKey string, features []string, attrs map[string]interface{}, withConfig bool) (types.Results, error) {
 	var bkp *string
 	if bucketingKey != "" {
 		bkp = &bucketingKey
@@ -87,6 +190,10 @@ func (c *Impl) Treatments(key string, bucketingKey string, features []string, at
 		RPCBase: protocol.RPCBase{Version: protocol.V1},
 		OpCode:  protov1.OCTreatments,
 		Args:    protov1.TreatmentsArgs{Key: key, BucketingKey: bkp, Features: features, Attributes: attrs}.Encode(),
+	}
+
+	if withConfig {
+		rpc.OpCode = protov1.OCTreatmentsWithConfig
 	}
 
 	resp, err := doRPC[protov1.ResponseWrapper[protov1.TreatmentsPayload]](c, &rpc)
@@ -112,31 +219,15 @@ func (c *Impl) Treatments(key string, bucketingKey string, features []string, at
 				BucketingKey: bucketingKey,
 			}
 		}
-		results[features[idx]] = types.Result{Treatment: resp.Payload.Results[idx].Treatment, Impression: imp}
+
+		res := types.Result{Treatment: resp.Payload.Results[idx].Treatment, Impression: imp}
+		if withConfig {
+			res.Config = resp.Payload.Results[idx].Config
+		}
+		results[features[idx]] = res
 	}
 
 	return results, nil
-}
-
-// Track implements types.ClientInterface
-func (c *Impl) Track(key string, trafficType string, eventType string, value *float64, properties map[string]interface{}) error {
-
-	rpc := protov1.RPC{
-		RPCBase: protocol.RPCBase{Version: protocol.V1},
-		OpCode:  protov1.OCTrack,
-		Args:    protov1.TrackArgs{Key: key, TrafficType: trafficType, EventType: eventType, Value: value, Properties: properties}.Encode(),
-	}
-
-	resp, err := doRPC[protov1.ResponseWrapper[protov1.TrackPayload]](c, &rpc)
-	if err != nil {
-		return fmt.Errorf("error executing treatment rpc: %w", err)
-	}
-
-	if resp.Status != protov1.ResultOk {
-		return fmt.Errorf("server responded treatment rpc with error %d", resp.Status)
-	}
-
-	return nil
 }
 
 func (c *Impl) register(id string, impressionsFeedback bool) error {
@@ -175,7 +266,7 @@ func doRPC[T any](c *Impl, rpc *protov1.RPC) (*T, error) {
 
 	resp, err := c.conn.ReceiveMessage()
 	if err != nil {
-		return nil, fmt.Errorf("error reading response from daeom: %w", err)
+		return nil, fmt.Errorf("error reading response from daemon: %w", err)
 	}
 
 	var response T

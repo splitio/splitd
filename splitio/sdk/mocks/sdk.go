@@ -45,4 +45,22 @@ func (m *SDKMock) Shutdown() error {
 	return args.Error(0)
 }
 
+// Split implements sdk.Interface
+func (m *SDKMock) Split(name string) (*sdk.SplitView, error) {
+	args := m.Called(name)
+	return args.Get(0).(*sdk.SplitView), args.Error(1)
+}
+
+// SplitNames implements sdk.Interface
+func (m *SDKMock) SplitNames() ([]string, error) {
+	args := m.Called()
+	return args.Get(0).([]string), args.Error(1)
+}
+
+// Splits implements sdk.Interface
+func (m *SDKMock) Splits() ([]sdk.SplitView, error) {
+	args := m.Called()
+	return args.Get(0).([]sdk.SplitView), args.Error(1)
+}
+
 var _ sdk.Interface = (*SDKMock)(nil)

@@ -8,21 +8,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/splitio/splitd/splitio/common/lang"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGetWriterStd(t *testing.T) {
 	// stdout/stderr
-	writer, err := GetWriter(ref("stdout"), nil, nil)
+	writer, err := GetWriter(lang.Ref("stdout"), nil, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, os.Stdout, writer)
-	writer, err = GetWriter(ref("/dev/stdout"), nil, nil)
+	writer, err = GetWriter(lang.Ref("/dev/stdout"), nil, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, os.Stdout, writer)
-	writer, err = GetWriter(ref("stderr"), nil, nil)
+	writer, err = GetWriter(lang.Ref("stderr"), nil, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, os.Stderr, writer)
-	writer, err = GetWriter(ref("/dev/stderr"), nil, nil)
+	writer, err = GetWriter(lang.Ref("/dev/stderr"), nil, nil)
 	assert.Nil(t, err)
 	assert.Equal(t, os.Stderr, writer)
 }
@@ -46,18 +47,17 @@ func TestGetWriterFileNoRotation(t *testing.T) {
 
 func TestGetWriterFileRotation(t *testing.T) {
 
-    // remove any old file
-    fl, err := os.ReadDir(os.TempDir())
-    assert.Nil(t, err)
-    for _, fe := range fl {
-        if strings.HasPrefix(fe.Name(), "someLogFile") {
-            os.Remove(fe.Name())
-        }
-    }
-
+	// remove any old file
+	fl, err := os.ReadDir(os.TempDir())
+	assert.Nil(t, err)
+	for _, fe := range fl {
+		if strings.HasPrefix(fe.Name(), "someLogFile") {
+			os.Remove(fe.Name())
+		}
+	}
 
 	fn := strings.Join([]string{os.TempDir(), "someLogFile"}, string(os.PathSeparator))
-	writer, err := GetWriter(&fn, ref(2), ref(5))
+	writer, err := GetWriter(&fn, lang.Ref(2), lang.Ref(5))
 	assert.Nil(t, err)
 
 	writer.Write([]byte("12345"))
@@ -67,21 +67,20 @@ func TestGetWriterFileRotation(t *testing.T) {
 	writer.Write([]byte("zxcvb"))
 	writer.Write([]byte("hjaiu"))
 
+	time.Sleep(1 * time.Second) // file rotate writer is async.. give it a second before looking at the fs
+	fl, err = os.ReadDir(os.TempDir())
+	assert.Nil(t, err)
+	names := make([]string, 0, 3)
+	for _, fe := range fl {
+		if strings.HasPrefix(fe.Name(), "someLogFile") {
+			names = append(names, fe.Name())
+		}
+	}
 
-    time.Sleep(1*time.Second) // file rotate writer is async.. give it a second before looking at the fs
-    fl, err = os.ReadDir(os.TempDir())
-    assert.Nil(t, err)
-    names := make([]string, 0, 3)
-    for _, fe := range fl {
-        if strings.HasPrefix(fe.Name(), "someLogFile") {
-            names = append(names, fe.Name())
-        }
-    }
-
-    assert.Contains(t, names, "someLogFile")
-    assert.Contains(t, names, "someLogFile.1")
-    assert.Contains(t, names, "someLogFile.2")
-    assert.NotContains(t, names, "someLogFile.3")
+	assert.Contains(t, names, "someLogFile")
+	assert.Contains(t, names, "someLogFile.1")
+	assert.Contains(t, names, "someLogFile.2")
+	assert.NotContains(t, names, "someLogFile.3")
 }
 
 func assertFileContents(t *testing.T, expected string, fn string) {
@@ -89,7 +88,4 @@ func assertFileContents(t *testing.T, expected string, fn string) {
 	contents, err := ioutil.ReadFile(fn)
 	assert.Nil(t, err)
 	assert.Equal(t, expected, string(contents))
-}
-func ref[T any](t T) *T {
-	return &t
 }
