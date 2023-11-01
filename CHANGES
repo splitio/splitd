@@ -1,3 +1,6 @@
+1.1.1 (TBD):
+- Try to remove dead sockets on startup instead of failing immediately if the socket file exists
+
 1.1.0 (Sep 19, 2023):
 - Add support for Client/GetTreatment(s)WithConfig operations.
 - Add support for Manager operations.

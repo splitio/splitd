@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
+	"syscall"
 	"time"
 
 	"github.com/splitio/go-toolkit/v5/logging"
@@ -29,7 +31,8 @@ const (
 )
 
 var (
-	ErrInvalidConnType = errors.New("invalid conn type")
+	ErrInvalidConnType     = errors.New("invalid conn type")
+	ErrServiceAddressInUse = errors.New("provided socket file / address is already in use")
 )
 
 func NewAcceptor(logger logging.LoggerInterface, o *Options, listenerConfig *AcceptorConfig) (*Acceptor, error) {
@@ -44,6 +47,10 @@ func NewAcceptor(logger logging.LoggerInterface, o *Options, listenerConfig *Acc
 		ff = lpFramerFromConn
 	default:
 		return nil, ErrInvalidConnType
+	}
+
+	if err := ensureAddressUsable(logger, address); err != nil {
+		return nil, err
 	}
 
 	cf := func(c net.Conn) RawConn { return newConnWrapper(c, ff, o) }
@@ -93,3 +100,35 @@ func DefaultOpts() Options {
 // helpers
 
 func lpFramerFromConn(c net.Conn) framing.Interface { return framing.NewLengthPrefix(c) }
+
+func ensureAddressUsable(logger logging.LoggerInterface, address net.Addr) error {
+	switch address.Network() {
+	case "unix", "unixpacket":
+		if _, err := os.Stat(address.String()); errors.Is(err, os.ErrNotExist) {
+			return nil // file doesn't exist, we're ok
+		}
+
+		logger.Warning("The socket file exists. Testing if it's currently accepting connections")
+		c, err := net.Dial(address.Network(), address.String())
+		if err == nil {
+			c.Close()
+			return ErrServiceAddressInUse
+		}
+
+		logger.Warning("The socket appears to be from a previous (dead) execution. Will try to remove it")
+
+		if !errors.Is(err, syscall.ECONNREFUSED) {
+			return fmt.Errorf("unknown error when testing for a dead socket: %w", err)
+		}
+
+		// the socket seems to be bound to a dead process, will try removing it
+		// so that a listener can be created
+		if err := os.Remove(address.String()); err != nil {
+			return fmt.Errorf("error removing dead-socket file from a previous execution: %w", err)
+		}
+
+		logger.Warning("Dead socket file removed successfuly")
+
+	}
+	return nil
+}
