@@ -28,6 +28,7 @@ type Config struct {
 	Logger Logger `yaml:"logging"`
 	SDK    SDK    `yaml:"sdk"`
 	Link   Link   `yaml:"link"`
+	Debug  Debug  `yaml:"debug"`
 }
 
 func (c Config) String() string {
@@ -58,6 +59,7 @@ func (c *Config) PopulateWithDefaults() {
 	c.SDK.PopulateWithDefaults()
 	c.Link.PopulateWithDefaults()
 	c.Logger.PopulateWithDefaults()
+	c.Debug.PopulateWithDefaults()
 }
 
 type Link struct {
@@ -269,6 +271,26 @@ func (l *Logger) ToLoggerOptions() (*logging.LoggerOptions, error) {
 	}
 
 	return opts, nil
+}
+
+type Debug struct {
+	Profiling Profiling `yaml:"profiling"`
+}
+
+func (d *Debug) PopulateWithDefaults() {
+	d.Profiling.PopulateWithDefaults()
+}
+
+type Profiling struct {
+	Enable bool   `yaml:"enable"`
+	Host   string `yaml:"host"`
+	Port   int    `yaml:"port"`
+}
+
+func (p *Profiling) PopulateWithDefaults() {
+	p.Enable = false
+	p.Host = "localhost"
+	p.Port = 8888
 }
 
 func ReadConfig() (*Config, error) {

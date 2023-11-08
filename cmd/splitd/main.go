@@ -4,8 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strconv"
-	"strings"
 
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio"
@@ -51,8 +49,9 @@ func main() {
 	})
 	defer shutdown.Wait()
 
-	if p := setupProfiler(); p != nil {
+	if pc := cfg.Debug.Profiling; pc.Enable {
 		go func() {
+			p := profiler.New(pc.Host, pc.Port)
 			if err := p.ListenAndServe(); err != nil {
 				panic(err.Error())
 			}
@@ -76,23 +75,6 @@ func handleFlags(cfg *conf.Config) {
 		fmt.Printf("\nConfig: %s\n", cfg)
 		os.Exit(0)
 	}
-}
-
-func setupProfiler() *profiler.HTTPProfileInterface {
-	switch strings.ToLower(os.Getenv("SPLITD_PROFILING")) {
-	case "on", "true", "enabled", "1":
-		host := "localhost"
-		if h := os.Getenv("SPLITD_PROFILING_HOSTNAME"); h != "" {
-			host = h
-		}
-		port := 8888
-		if p, err := strconv.Atoi(os.Getenv("SPLITD_PROFILING_PORT")); err != nil {
-			port = p
-		}
-		return profiler.New(host, port)
-	}
-
-	return nil
 }
 
 func exitOnErr(ctxStr string, err error) {
