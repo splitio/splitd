@@ -96,5 +96,4 @@ func TestNewAcceptorInstantiation(t *testing.T) {
 	assert.Equal(t, opts.Address, acc.address.(*net.UnixAddr).Name)
 	assert.Equal(t, "unix", acc.address.(*net.UnixAddr).Network())
 	assert.Nil(t, acc.Shutdown())
-
 }
