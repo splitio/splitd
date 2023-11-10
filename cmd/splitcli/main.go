@@ -11,6 +11,7 @@ import (
 	"github.com/splitio/splitd/splitio/conf"
 	"github.com/splitio/splitd/splitio/link"
 	"github.com/splitio/splitd/splitio/link/client/types"
+	"github.com/splitio/splitd/splitio/link/transfer"
 	"github.com/splitio/splitd/splitio/util"
 )
 
@@ -37,6 +38,21 @@ func main() {
 		DebugWriter:   os.Stderr,
 		VerboseWriter: os.Stderr,
 	})
+
+	if args.Method == "ping" {
+		// no consumer is created (to avoid registering)
+		c, err := transfer.NewClientConn(logger, &linkOpts.Transfer)
+		if err != nil {
+			logger.Error("error connecting to socket: ", err.Error())
+			os.Exit(2)
+		}
+		if err = c.Shutdown(); err != nil {
+			logger.Error("error closing connection: ", err.Error())
+			os.Exit(2)
+		}
+		logger.Info("socket is accepting connections properly")
+		os.Exit(0)
+	}
 
 	c, err := link.Consumer(logger, linkOpts)
 	if err != nil {

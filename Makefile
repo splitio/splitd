@@ -10,7 +10,7 @@ PLATFORM ?=
 PLATFORM_STR := $(if $(PLATFORM),--platform=$(PLATFORM),)
 
 VERSION	:= $(shell cat splitio/version.go | grep 'const Version' | sed 's/const Version = //' | tr -d '"')
-COMMIT_SHA := $(shell git rev-parse --short HEAD)
+COMMIT_SHA := $(shell bash -c '[ ! -z $${GITHUB_SHA} ] && echo $${GITHUB_SHA:0:7} || git rev-parse --short=7 HEAD')
 COMMIT_SHA_FILE := splitio/commitsha.go
 
 GO_FILES := $(shell find . -name "*.go" -not -name "$(COMMIT_SHA_FILE)") go.sum
@@ -37,6 +37,9 @@ clean:
 ## build binaries for this platform
 build: splitd splitcli sdhelper
 
+## print current commit SHA (from repo metadata if local, from env-var if GHA)
+printsha:
+	@echo $(COMMIT_SHA)
 
 
 ## run all tests

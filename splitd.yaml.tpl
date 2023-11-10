@@ -40,4 +40,9 @@ link:
     serialization: msgpack
     bufferSize: 1024
     protocol: v1
+debug:
+    profiling:
+        enable: false
+        host: localhost
+        port: 8888
 
