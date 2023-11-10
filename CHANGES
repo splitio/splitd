@@ -1,5 +1,6 @@
-1.1.1 (TBD):
-- Try to remove dead sockets on startup instead of failing immediately if the socket file exists
+1.1.1 (Nov 10, 2023):
+- Updated startup logic to remove dead sockets instead of failing immediately if the socket file exists
+- Fix memory leak when accepting an incoming connection.
 
 1.1.0 (Sep 19, 2023):
 - Add support for Client/GetTreatment(s)WithConfig operations.
