@@ -53,6 +53,10 @@ function testAllVars {
     export SPLITD_EVENTS_REFRESH_SECS="11"
     export SPLITD_EVENTS_QUEUE_SIZE="12"
 
+    export SPLITD_PROFILING_ENABLE="true"
+    export SPLITD_PROFILING_HOST="somehost"
+    export SPLITD_PROFILING_PORT="1234"
+
 
     # Exec entrypoint
     [ -f "./testcfg" ] && rm ./testcfg
@@ -94,6 +98,12 @@ function testAllVars {
     assert_eq "3" $(echo "$conf_json" | jq '.Link.WriteTimeoutMS') "incorrect write timeout"
     assert_eq "4" $(echo "$conf_json" | jq '.Link.AcceptTimeoutMS') "incorrect accept timeout"
     assert_eq "5" $(echo "$conf_json" | jq '.Link.BufferSize') "incorrect buffer size"
+
+    # ---
+
+    assert_eq "true" $(echo "$conf_json" | jq '.Debug.Profiling.Enable') "incorrect profiling status"
+    assert_eq '"somehost"' $(echo "$conf_json" | jq '.Debug.Profiling.Host') "incorrect profiling host"
+    assert_eq "1234" $(echo "$conf_json" | jq '.Debug.Profiling.Port') "incorrect profiling port"
 
     # ---
 

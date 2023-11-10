@@ -92,9 +92,13 @@ func (a *Acceptor) Start(onClientAttachedCallback OnClientAttachedCallback) (<-c
 				return
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), a.maxWait)
-			defer cancel()
-			err = a.sem.Acquire(ctx, 1)
+			// try to acquire a semaphore slot (throughput limiting):
+			// to avoid leaks, the lifetime of the context/deadline is scoped to a func containing a defer statement
+			err = func() error {
+				ctx, cancel := context.WithTimeout(context.Background(), a.maxWait)
+				defer cancel()
+				return a.sem.Acquire(ctx, 1)
+			}()
 			if err != nil {
 				a.logger.Error(fmt.Sprintf("Incoming connection request timed out. If the current parallelism is expected, "+
 					"consider increasing `maxConcurrentConnections` (current=%d)", a.maxConns))

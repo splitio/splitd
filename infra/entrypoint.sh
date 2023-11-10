@@ -57,6 +57,11 @@ accum=$(yq '.sdk.apikey = env(SPLITD_APIKEY) | .link.address = env(SPLITD_LINK_A
 # logger configs
 [ ! -z ${SPLITD_LOG_LEVEL+x} ]  && accum=$(echo "${accum}" | yq '.logging.level = env(SPLITD_LOG_LEVEL)')
 [ ! -z ${SPLITD_LOG_OUTPUT+x} ] && accum=$(echo "${accum}" | yq '.logging.output = env(SPLITD_LOG_OUTPUT)')
+
+# profiling configs
+[ ! -z ${SPLITD_PROFILING_ENABLE+x} ]  && accum=$(echo "${accum}" | yq '.debug.profiling.enable = env(SPLITD_PROFILING_ENABLE)')
+[ ! -z ${SPLITD_PROFILING_HOST+x} ]  && accum=$(echo "${accum}" | yq '.debug.profiling.host = env(SPLITD_PROFILING_HOST)')
+[ ! -z ${SPLITD_PROFILING_PORT+x} ]  && accum=$(echo "${accum}" | yq '.debug.profiling.port = env(SPLITD_PROFILING_PORT)')
 # @}
 
 # Ensure that the socket-file is read-writable by anyone

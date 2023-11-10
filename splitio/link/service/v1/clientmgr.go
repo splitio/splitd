@@ -56,13 +56,13 @@ func (m *ClientManager) handleClientInteractions() error {
 		rpc, err := m.fetchRPC()
 		if err != nil {
 			if errors.Is(err, io.EOF) { // connection ended, no error
-				m.logger.Debug(fmt.Sprintf("connection remotely closed for metadata=%+v", m.clientConfig.Metadata))
+				m.logger.Debug(fmt.Sprintf("connection remotely closed for metadata=%s", formatClientConfig(m.clientConfig)))
 				return nil
 			} else if errors.Is(err, os.ErrDeadlineExceeded) { // we waited for an RPC, got none, try again.
-				m.logger.Debug(fmt.Sprintf("read timeout/no RPC fetched. restarting loop for metadata=%+v", m.clientConfig))
+				m.logger.Debug(fmt.Sprintf("read timeout/no RPC fetched. restarting loop for metadata=%s", formatClientConfig(m.clientConfig)))
 				continue
 			} else {
-				m.logger.Error(fmt.Sprintf("unexpected error reading RPC: %s. Closing conn for metadata=%+v", err, m.clientConfig))
+				m.logger.Error(fmt.Sprintf("unexpected error reading RPC: %s. Closing conn for metadata=%s", err, formatClientConfig(m.clientConfig)))
 				return err
 			}
 		}
@@ -312,4 +312,12 @@ func (m *ClientManager) handleSplits(rpc *protov1.RPC) (interface{}, error) {
 	}
 
 	return response, nil
+}
+
+func formatClientConfig(c *types.ClientConfig) string {
+	if c == nil {
+		return "<nil>"
+	}
+
+	return fmt.Sprintf("%+v", c)
 }

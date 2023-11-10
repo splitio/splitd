@@ -11,6 +11,8 @@ import (
 	"github.com/splitio/splitd/splitio/link"
 	"github.com/splitio/splitd/splitio/sdk"
 	"github.com/splitio/splitd/splitio/util"
+
+	"github.com/splitio/splitd/splitio/provisional/profiler"
 )
 
 func main() {
@@ -46,6 +48,15 @@ func main() {
 		splitSDK.Shutdown() // evict pending impressions & events
 	})
 	defer shutdown.Wait()
+
+	if pc := cfg.Debug.Profiling; pc.Enable {
+		go func() {
+			p := profiler.New(pc.Host, pc.Port)
+			if err := p.ListenAndServe(); err != nil {
+				panic(err.Error())
+			}
+		}()
+	}
 
 	// Wait for connection to end (either gracefully of because of an error)
 	err = <-errc

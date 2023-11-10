@@ -1,3 +1,7 @@
+1.1.1 (Nov 10, 2023):
+- Updated startup logic to remove dead sockets instead of failing immediately if the socket file exists
+- Fix memory leak when accepting an incoming connection.
+
 1.1.0 (Sep 19, 2023):
 - Add support for Client/GetTreatment(s)WithConfig operations.
 - Add support for Manager operations.
