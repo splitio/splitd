@@ -300,5 +300,6 @@ func ReadConfig() (*Config, error) {
 	}
 
 	var c Config
+	c.PopulateWithDefaults()
 	return &c, c.parse(cfgFN)
 }
