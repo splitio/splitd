@@ -61,5 +61,3 @@ func (s *ShutdownHandler) TriggerAndWait() {
 	defer s.Wait()
 	s.incoming <- syscall.SIGTERM
 }
-
-

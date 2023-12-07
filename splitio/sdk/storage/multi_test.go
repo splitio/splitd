@@ -25,7 +25,7 @@ func TestMultiStorageBasic(t *testing.T) {
 	assert.Equal(t, 3, n)
 	assert.Nil(t, err)
 
-	mq.RangeAndClear(func(cm types.ClientMetadata, q *LockingQueue[dtos.EventDTO]) {
+	mq.Range(func(cm types.ClientMetadata, q *LockingQueue[dtos.EventDTO]) {
 		switch cm.SdkVersion {
 		case "go-1.2.3":
 			assert.Equal(t, 4, q.Len())
@@ -33,6 +33,17 @@ func TestMultiStorageBasic(t *testing.T) {
 			n, err := q.Pop(5, &buf)
 			assert.Equal(t, ErrQueueEmpty, err)
 			assert.Equal(t, 4, n)
+		case "php-1.2.3":
+            // do nothing, to be used in the next assertions
+		default:
+			assert.Fail(t, "unexpected metadata: "+cm.SdkVersion)
+		}
+	})
+
+	mq.RangeAndClear(func(cm types.ClientMetadata, q *LockingQueue[dtos.EventDTO]) {
+		switch cm.SdkVersion {
+		case "go-1.2.3":
+            // used previously
 		case "php-1.2.3":
 			assert.Equal(t, 3, q.Len())
 			var buf []dtos.EventDTO
@@ -44,7 +55,6 @@ func TestMultiStorageBasic(t *testing.T) {
 		}
 	})
 
-	mq.RangeAndClear(func(cm types.ClientMetadata, q *LockingQueue[dtos.EventDTO]) {
-		assert.Fail(t, "should not execute")
-	})
+	mq.Range(func(cm types.ClientMetadata, q *LockingQueue[dtos.EventDTO]) { assert.Fail(t, "should not execute") })
+	mq.RangeAndClear(func(cm types.ClientMetadata, q *LockingQueue[dtos.EventDTO]) { assert.Fail(t, "should not execute") })
 }

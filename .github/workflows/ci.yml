@@ -1,11 +1,12 @@
 name: ci
+
 on:
   pull_request:
     branches:
-      - dev
+      - main
   push:
     branches:
-      - dev
+      - main
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'push' && github.run_number || github.event.pull_request.number }}
@@ -16,16 +17,20 @@ jobs:
     name: Run unit tests
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set VERSION env
-        run: echo "VERSION=$(cat splitio/version.go | grep 'Version =' | awk '{print $3}' | tr -d '"')" >> $GITHUB_ENV
+        run: echo "VERSION=$(cat splitio/version.go | grep 'Version =' | awk '{print $4}' | tr -d '"')" >> $GITHUB_ENV
 
       - name: Version validation
         if: ${{ github.event_name == 'pull_request' }}
         uses: mukunku/tag-exists-action@v1.2.0
         id: checkTag
         with:
-          tag: ${{ env.VERSION }}
+          tag: v${{ env.VERSION }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -35,56 +40,47 @@ jobs:
         with:
           script: core.setFailed('[ERROR] Tag already exists.')
 
+      - name: Setup Go version
+        uses: actions/setup-go@v4
+        with:
+          go-version: '^1.20.7'
+
+      - name: Build binaries for host machine
+        run: make splitd splitcli
+
+      - name: Run tests
+        run: make test
+
+      - name: Cross build for GNU Linux & Darwin x amd64 & arm64
+        run: make binaries_release
+
+      - name: SonarQube Scan
+        uses: SonarSource/sonarcloud-github-action@v2.0.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectBaseDir: .
+          args: >
+            -Dsonar.host.url=${{ secrets.SONARQUBE_HOST }}
+            -Dsonar.projectVersion=${{ env.VERSION }}
+
       - name: Git tag
         if: ${{ github.event_name == 'push' }}
         uses: mathieudutour/github-tag-action@v6.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           custom_tag: ${{ env.VERSION }}
-          tag_prefix: ''
+          tag_prefix: 'v'
 
-      - name: Setup Go version
-        uses: actions/setup-go@v4
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: ${{ github.event_name == 'push' }}
         with:
-          go-version: '^1.19.1'
-
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Build binaries for host machine
-        run: make splitd splitcli
-
-      - name: Cross build for GNU Linux & Darwin x amd64 & arm64
-        run: make binaries_release
-
-      - name: Run tests
-        run: make test
-
-          #      - name: SonarQube Scan (Push)
-          #        if: matrix.version == '8.2' && github.event_name == 'push'
-          #        uses: SonarSource/sonarcloud-github-action@v1.9
-          #        env:
-          #          SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
-          #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          #        with:
-          #          projectBaseDir: .
-          #          args: >
-          #            -Dsonar.host.url=${{ secrets.SONARQUBE_HOST }}
-          #            -Dsonar.projectVersion=${{ env.VERSION }}
-          #
-          #      - name: SonarQube Scan (Pull Request)
-          #        if: matrix.version == '8.2' && github.event_name == 'pull_request'
-          #        uses: SonarSource/sonarcloud-github-action@v1.9
-          #        env:
-          #          SONAR_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
-          #          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          #        with:
-          #          projectBaseDir: .
-          #          args: >
-          #            -Dsonar.host.url=${{ secrets.SONARQUBE_HOST }}
-          #            -Dsonar.projectVersion=${{ env.VERSION }}
-          #            -Dsonar.pullrequest.key=${{ github.event.pull_request.number }}
-          #            -Dsonar.pullrequest.branch=${{ github.event.pull_request.head.ref }}
-          #            -Dsonar.pullrequest.base=${{ github.event.pull_request.base.ref }}
+          name: splitd-${{ env.VERSION }}
+          tag_name: v${{ env.VERSION }}
+          files: |
+            splitd-darwin-amd64-${{ env.VERSION }}.bin
+            splitd-darwin-arm-${{ env.VERSION }}.bin
+            splitd-linux-amd64-${{ env.VERSION }}.bin
+            splitd-linux-arm-${{ env.VERSION }}.bin

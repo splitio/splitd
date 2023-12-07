@@ -34,14 +34,26 @@ type Acceptor struct {
 
 var errNoSetDeadline = errors.New("listener doesn't support setting a deadline")
 
-func newAcceptor(address net.Addr, rawConnFactory RawConnFactory, o *Options) *Acceptor {
+type AcceptorConfig struct {
+	AcceptTimeout              time.Duration
+	MaxSimultaneousConnections int
+}
+
+func DefaultAcceptorConfig() AcceptorConfig {
+	return AcceptorConfig{
+		MaxSimultaneousConnections: 32,
+		AcceptTimeout:              1 * time.Second,
+	}
+}
+
+func newAcceptor(address net.Addr, rawConnFactory RawConnFactory, logger logging.LoggerInterface, cfg *AcceptorConfig) *Acceptor {
 	return &Acceptor{
 		rawConnFactory: rawConnFactory,
-		logger:         o.Logger,
+		logger:         logger,
 		address:        address,
-		maxConns:       o.MaxSimultaneousConnections,
-		sem:            semaphore.NewWeighted(int64(o.MaxSimultaneousConnections)),
-		maxWait:        o.AcceptTimeout,
+		maxConns:       cfg.MaxSimultaneousConnections,
+		sem:            semaphore.NewWeighted(int64(cfg.MaxSimultaneousConnections)),
+		maxWait:        cfg.AcceptTimeout,
 	}
 }
 
@@ -80,15 +92,19 @@ func (a *Acceptor) Start(onClientAttachedCallback OnClientAttachedCallback) (<-c
 				return
 			}
 
-			ctx, cancel := context.WithTimeout(context.Background(), a.maxWait)
-			err = a.sem.Acquire(ctx, 1)
+			// try to acquire a semaphore slot (throughput limiting):
+			// to avoid leaks, the lifetime of the context/deadline is scoped to a func containing a defer statement
+			err = func() error {
+				ctx, cancel := context.WithTimeout(context.Background(), a.maxWait)
+				defer cancel()
+				return a.sem.Acquire(ctx, 1)
+			}()
 			if err != nil {
 				a.logger.Error(fmt.Sprintf("Incoming connection request timed out. If the current parallelism is expected, "+
 					"consider increasing `maxConcurrentConnections` (current=%d)", a.maxConns))
 				conn.Close()
 				continue
 			}
-			cancel() // connection allowed. abort timeout timer
 
 			go func(rc RawConn) {
 				onClientAttachedCallback(rc)

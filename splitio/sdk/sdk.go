@@ -1,6 +1,7 @@
 package sdk
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -16,37 +17,59 @@ import (
 	"github.com/splitio/go-split-commons/v4/healthcheck/application"
 	"github.com/splitio/go-split-commons/v4/provisional"
 	"github.com/splitio/go-split-commons/v4/service/api"
+	commonStorage "github.com/splitio/go-split-commons/v4/storage"
 	"github.com/splitio/go-split-commons/v4/synchronizer"
 	"github.com/splitio/go-toolkit/v5/common"
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio"
 )
 
+const (
+	impressionsFullNotif = "IMPRESSIONS_FULL"
+	eventsFullNotif      = "EVENTS_FULL"
+)
+
+var (
+	ErrEventsQueueFull = errors.New("events queue full")
+	ErrSplitNotFound   = errors.New("split not found")
+)
+
 type Attributes = map[string]interface{}
 
 type Interface interface {
-	Treatment(cfg *types.ClientConfig, Key string, BucketingKey *string, Feature string, attributes map[string]interface{}) (*Result, error)
-	Treatments(cfg *types.ClientConfig, Key string, BucketingKey *string, Features []string, attributes map[string]interface{}) (map[string]Result, error)
+	Treatment(cfg *types.ClientConfig, key string, bucketingKey *string, feature string, attributes map[string]interface{}) (*EvaluationResult, error)
+	Treatments(cfg *types.ClientConfig, key string, bucketingKey *string, features []string, attributes map[string]interface{}) (map[string]EvaluationResult, error)
+	Track(cfg *types.ClientConfig, key string, trafficType string, eventType string, value *float64, properties map[string]interface{}) error
+	SplitNames() ([]string, error)
+	Splits() ([]SplitView, error)
+	Split(name string) (*SplitView, error)
+	Shutdown() error
 }
 
 type Impl struct {
-	logger logging.LoggerInterface
-	ev     evaluator.Interface
-	sm     synchronizer.Manager
-	ss     synchronizer.Synchronizer
-	is     *storage.ImpressionsStorage
-	iq     provisional.ImpressionManager
-	cfg    sdkConf.Config
-	status chan int
+	logger        logging.LoggerInterface
+	ev            evaluator.Interface
+	sm            synchronizer.Manager
+	ss            synchronizer.Synchronizer
+	is            *storage.ImpressionsStorage
+	es            *storage.EventsStorage
+	iq            provisional.ImpressionManager
+	splitStorage  commonStorage.SplitStorage
+	cfg           sdkConf.Config
+	status        chan int
+	queueFullChan chan string
+	validator     Validator
 }
 
-func New(logger logging.LoggerInterface, apikey string, opts ...conf.Option) (*Impl, error) {
+func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, error) {
+
+	if warnings := c.Normalize(); len(warnings) > 0 {
+		for _, w := range warnings {
+			logger.Warning(w)
+		}
+	}
 
 	md := dtos.Metadata{SDKVersion: fmt.Sprintf("splitd-%s", splitio.Version)}
-	c := sdkConf.DefaultConfig()
-	if err := c.ParseOptions(opts); err != nil {
-		return nil, fmt.Errorf("error parsing SDK config: %w", err)
-	}
 	advCfg := c.ToAdvancedConfig()
 
 	stores := setupStorages(c)
@@ -56,10 +79,12 @@ func New(logger logging.LoggerInterface, apikey string, opts ...conf.Option) (*I
 	}
 
 	hc := &application.Dummy{}
+
+	queueFullChan := make(chan string, 2)
 	splitApi := api.NewSplitAPI(apikey, *advCfg, logger, md)
-	workers := setupWorkers(logger, splitApi, stores, hc)
+	workers := setupWorkers(logger, splitApi, stores, hc, c)
 	tasks := setupTasks(c, stores, logger, workers, impc, md, splitApi)
-	sync := synchronizer.NewSynchronizer(*advCfg, *tasks, *workers, logger, nil, nil)
+	sync := synchronizer.NewSynchronizer(*advCfg, *tasks, *workers, logger, queueFullChan, nil)
 
 	status := make(chan int, 10)
 	manager, err := synchronizer.NewSynchronizerManager(sync, logger, *advCfg, splitApi.AuthClient, stores.splits, status, stores.telemetry, md, nil, hc)
@@ -75,29 +100,29 @@ func New(logger logging.LoggerInterface, apikey string, opts ...conf.Option) (*I
 	}
 
 	return &Impl{
-		logger: logger,
-		sm:     manager,
-		ss:     sync,
-		ev:     evaluator.NewEvaluator(stores.splits, stores.segments, engine.NewEngine(logger), logger),
-		is:     stores.impressions,
-		iq:     impc.manager,
-		cfg:    *c,
+		logger:        logger,
+		sm:            manager,
+		ss:            sync,
+		ev:            evaluator.NewEvaluator(stores.splits, stores.segments, engine.NewEngine(logger), logger),
+		is:            stores.impressions,
+		es:            stores.events,
+		iq:            impc.manager,
+		splitStorage:  stores.splits,
+		cfg:           *c,
+		queueFullChan: queueFullChan,
+		validator:     Validator{logger: logger, splits: stores.splits},
 	}, nil
 }
 
 // Treatment implements Interface
-func (i *Impl) Treatment(cfg *types.ClientConfig, key string, bk *string, feature string, attributes Attributes) (*Result, error) {
+func (i *Impl) Treatment(cfg *types.ClientConfig, key string, bk *string, feature string, attributes Attributes) (*EvaluationResult, error) {
 	res := i.ev.EvaluateFeature(key, bk, feature, attributes)
 	if res == nil {
 		return nil, fmt.Errorf("nil result")
 	}
 
-	imp, err := i.handleImpression(key, bk, feature, res, cfg.Metadata)
-	if err != nil {
-		i.logger.Error("error handling impression: ", err)
-	}
-
-	return &Result{
+	imp := i.handleImpression(key, bk, feature, res, cfg.Metadata)
+	return &EvaluationResult{
 		Treatment:  res.Treatment,
 		Impression: imp,
 		Config:     res.Config,
@@ -105,33 +130,94 @@ func (i *Impl) Treatment(cfg *types.ClientConfig, key string, bk *string, featur
 }
 
 // Treatment implements Interface
-func (i *Impl) Treatments(cfg *types.ClientConfig, key string, bk *string, features []string, attributes Attributes) (map[string]Result, error) {
+func (i *Impl) Treatments(cfg *types.ClientConfig, key string, bk *string, features []string, attributes Attributes) (map[string]EvaluationResult, error) {
 
 	res := i.ev.EvaluateFeatures(key, bk, features, attributes)
-	toRet := make(map[string]Result, len(res.Evaluations))
+	toRet := make(map[string]EvaluationResult, len(res.Evaluations))
 	for _, feature := range features {
-        
-        curr, ok := res.Evaluations[feature]
-        if !ok {
-            toRet[feature] = Result{Treatment: "control"}
-            continue
-        }
 
-		var err error
-		var eres Result
-		eres.Treatment = curr.Treatment
-		eres.Impression, err = i.handleImpression(key, bk, feature, &curr, cfg.Metadata)
-		eres.Config = curr.Config
-		if err != nil {
-			i.logger.Error("error handling impression: ", err)
+		curr, ok := res.Evaluations[feature]
+		if !ok {
+			toRet[feature] = EvaluationResult{Treatment: "control"}
+			continue
 		}
+
+		var eres EvaluationResult
+		eres.Treatment = curr.Treatment
+		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata)
+		eres.Config = curr.Config
 		toRet[feature] = eres
 	}
 
 	return toRet, nil
 }
 
-func (i *Impl) handleImpression(key string, bk *string, f string, r *evaluator.Result, cm types.ClientMetadata) (*dtos.Impression, error) {
+func (i *Impl) Track(cfg *types.ClientConfig, key string, trafficType string, eventType string, value *float64, properties map[string]interface{}) error {
+
+	// TODO(mredolatti): validate traffic type & truncate properties if needed
+	trafficType, err := i.validator.validateTrafficType(trafficType)
+	if err != nil {
+		return err
+	}
+
+	properties, _, err = i.validator.validateTrackProperties(properties)
+	if err != nil {
+		return err
+	}
+
+	event := &dtos.EventDTO{
+		Key:             key,
+		TrafficTypeName: trafficType,
+		EventTypeID:     eventType,
+		Value:           value,
+		Timestamp:       timeMillis(),
+		Properties:      properties,
+	}
+
+	_, err = i.es.Push(cfg.Metadata, *event)
+	if err != nil {
+		if err == storage.ErrQueueFull {
+			select {
+			case i.queueFullChan <- eventsFullNotif:
+			default:
+				i.logger.Warning("events queue has filled up and is currently performing a flush. Current event will be dropped")
+			}
+			return ErrEventsQueueFull
+		}
+		i.logger.Error("error handling event: ", err)
+		return err
+	}
+	return nil
+}
+
+func (i *Impl) Split(name string) (*SplitView, error) {
+	split := i.splitStorage.Split(name)
+	if split == nil {
+		return nil, ErrSplitNotFound
+	}
+
+	return splitToView(split), nil
+}
+
+func (i *Impl) SplitNames() ([]string, error) {
+	return i.splitStorage.SplitNames(), nil
+}
+
+func (i *Impl) Splits() ([]SplitView, error) {
+	splits := i.splitStorage.All()
+	asViews := make([]SplitView, 0, len(splits))
+	for idx := range splits {
+		asViews = append(asViews, *splitToView(&splits[idx]))
+	}
+	return asViews, nil
+}
+
+func (i *Impl) Shutdown() error {
+	i.sm.Stop()
+	return nil
+}
+
+func (i *Impl) handleImpression(key string, bk *string, f string, r *evaluator.Result, cm types.ClientMetadata) *dtos.Impression {
 	var label string
 	if i.cfg.LabelsEnabled {
 		label = r.Label
@@ -150,10 +236,39 @@ func (i *Impl) handleImpression(key string, bk *string, f string, r *evaluator.R
 	shouldStore := i.iq.ProcessSingle(imp)
 	if shouldStore {
 		_, err := i.is.Push(cm, *imp)
-		return imp, err
+		if err != nil {
+			if err == storage.ErrQueueFull {
+				select {
+				case i.queueFullChan <- impressionsFullNotif:
+				default:
+					i.logger.Warning("impressions queue has filled up and is currently performing a flush. Current impression will bedropped")
+				}
+			} else {
+				i.logger.Error("error handling impression: ", err)
+			}
+		}
 	}
 
-	return imp, nil
+	return imp
+}
+
+func splitToView(s *dtos.SplitDTO) *SplitView {
+
+	var treatments []string
+	for _, c := range s.Conditions {
+		for _, p := range c.Partitions {
+			treatments = append(treatments, p.Treatment)
+		}
+	}
+
+	return &SplitView{
+		Name:         s.Name,
+		TrafficType:  s.TrafficTypeName,
+		Killed:       s.Killed,
+		ChangeNumber: s.ChangeNumber,
+		Configs:      s.Configurations,
+		Treatments:   treatments,
+	}
 }
 
 func timeMillis() int64 {
