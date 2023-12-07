@@ -1,7 +1,7 @@
 package mocks
 
 import (
-	"github.com/splitio/go-client/v6/splitio/engine/evaluator"
+	"github.com/splitio/go-split-commons/v5/engine/evaluator"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -18,6 +18,11 @@ func (e *EvaluatorMock) EvaluateFeature(key string, bucketingKey *string, featur
 // EvaluateFeatures implements evaluator.Interface
 func (e *EvaluatorMock) EvaluateFeatures(key string, bucketingKey *string, features []string, attributes map[string]interface{}) evaluator.Results {
 	args := e.Called(key, bucketingKey, features, attributes)
+	return args.Get(0).(evaluator.Results)
+}
+
+func (e *EvaluatorMock) EvaluateFeatureByFlagSets(key string, bucketingKey *string, flagSets []string, attributes map[string]interface{}) evaluator.Results {
+	args := e.Called(key, bucketingKey, flagSets, attributes)
 	return args.Get(0).(evaluator.Results)
 }
 
