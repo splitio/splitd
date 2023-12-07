@@ -7,22 +7,21 @@ import (
 	sss "github.com/splitio/splitd/splitio/sdk/storage"
 	"github.com/splitio/splitd/splitio/sdk/workers"
 
-	"github.com/splitio/go-split-commons/v4/conf"
-	"github.com/splitio/go-split-commons/v4/dtos"
-	"github.com/splitio/go-split-commons/v4/healthcheck/application"
-	"github.com/splitio/go-split-commons/v4/provisional"
-	"github.com/splitio/go-split-commons/v4/provisional/strategy"
-	"github.com/splitio/go-split-commons/v4/service/api"
-	"github.com/splitio/go-split-commons/v4/storage"
-	"github.com/splitio/go-split-commons/v4/storage/inmemory"
-	"github.com/splitio/go-split-commons/v4/storage/inmemory/mutexmap"
-	"github.com/splitio/go-split-commons/v4/synchronizer"
-	"github.com/splitio/go-split-commons/v4/synchronizer/worker/impressionscount"
-	"github.com/splitio/go-split-commons/v4/synchronizer/worker/segment"
-	"github.com/splitio/go-split-commons/v4/synchronizer/worker/split"
-	"github.com/splitio/go-split-commons/v4/tasks"
-
-	storageCommon "github.com/splitio/go-split-commons/v4/storage"
+	"github.com/splitio/go-split-commons/v5/conf"
+	"github.com/splitio/go-split-commons/v5/dtos"
+	"github.com/splitio/go-split-commons/v5/flagsets"
+	"github.com/splitio/go-split-commons/v5/healthcheck/application"
+	"github.com/splitio/go-split-commons/v5/provisional"
+	"github.com/splitio/go-split-commons/v5/provisional/strategy"
+	"github.com/splitio/go-split-commons/v5/service/api"
+	"github.com/splitio/go-split-commons/v5/storage"
+	"github.com/splitio/go-split-commons/v5/storage/inmemory"
+	"github.com/splitio/go-split-commons/v5/storage/inmemory/mutexmap"
+	"github.com/splitio/go-split-commons/v5/synchronizer"
+	"github.com/splitio/go-split-commons/v5/synchronizer/worker/impressionscount"
+	"github.com/splitio/go-split-commons/v5/synchronizer/worker/segment"
+	"github.com/splitio/go-split-commons/v5/synchronizer/worker/split"
+	"github.com/splitio/go-split-commons/v5/tasks"
 	"github.com/splitio/go-toolkit/v5/logging"
 )
 
@@ -32,11 +31,11 @@ func setupWorkers(
 	str *storages,
 	hc application.MonitorProducerInterface,
 	cfg *sdkConf.Config,
-
+	flagSetsFilter flagsets.FlagSetFilter,
 ) *synchronizer.Workers {
 	return &synchronizer.Workers{
-		SplitFetcher:       split.NewSplitFetcher(str.splits, api.SplitFetcher, logger, str.telemetry, hc),
-		SegmentFetcher:     segment.NewSegmentFetcher(str.splits, str.segments, api.SegmentFetcher, logger, str.telemetry, hc),
+		SplitUpdater:       split.NewSplitUpdater(str.splits, api.SplitFetcher, logger, str.telemetry, hc, flagSetsFilter),
+		SegmentUpdater:     segment.NewSegmentUpdater(str.splits, str.segments, api.SegmentFetcher, logger, str.telemetry, hc),
 		ImpressionRecorder: workers.NewImpressionsWorker(logger, str.telemetry, api.ImpressionRecorder, str.impressions, &cfg.Impressions),
 		EventRecorder:      workers.NewEventsWorker(logger, str.telemetry, api.EventRecorder, str.events, &cfg.Events),
 	}
@@ -54,9 +53,9 @@ func setupTasks(
 	impCfg := cfg.Impressions
 	evCfg := cfg.Events
 	tg := &synchronizer.SplitTasks{
-		SplitSyncTask: tasks.NewFetchSplitsTask(workers.SplitFetcher, int(cfg.Splits.SyncPeriod.Seconds()), logger),
+		SplitSyncTask: tasks.NewFetchSplitsTask(workers.SplitUpdater, int(cfg.Splits.SyncPeriod.Seconds()), logger),
 		SegmentSyncTask: tasks.NewFetchSegmentsTask(
-			workers.SegmentFetcher,
+			workers.SegmentUpdater,
 			int(cfg.Segments.SyncPeriod.Seconds()),
 			cfg.Segments.WorkerCount,
 			cfg.Segments.QueueSize,
@@ -86,7 +85,7 @@ type impComponents struct {
 	counter *strategy.ImpressionsCounter
 }
 
-func setupImpressionsComponents(c *sdkConf.Impressions, telemetry storageCommon.TelemetryRuntimeProducer) (impComponents, error) {
+func setupImpressionsComponents(c *sdkConf.Impressions, telemetry storage.TelemetryRuntimeProducer) (impComponents, error) {
 
 	observer, err := strategy.NewImpressionObserver(c.ObserverSize)
 	if err != nil {
@@ -118,13 +117,13 @@ type storages struct {
 	events      *sss.EventsStorage
 }
 
-func setupStorages(cfg *sdkConf.Config) *storages {
+func setupStorages(cfg *sdkConf.Config, flagSetsFilter flagsets.FlagSetFilter) *storages {
 	ts, _ := inmemory.NewTelemetryStorage()
 	iq, _ := sss.NewImpressionsQueue(cfg.Impressions.QueueSize)
 	eq, _ := sss.NewEventsQueue(cfg.Events.QueueSize)
 
 	return &storages{
-		splits:      mutexmap.NewMMSplitStorage(),
+		splits:      mutexmap.NewMMSplitStorage(flagSetsFilter),
 		segments:    mutexmap.NewMMSegmentStorage(),
 		impressions: iq,
 		events:      eq,

@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/splitio/go-client/v6/splitio/engine/evaluator"
-	"github.com/splitio/go-split-commons/v4/dtos"
-	"github.com/splitio/go-split-commons/v4/storage/inmemory"
-	"github.com/splitio/go-split-commons/v4/synchronizer"
+	"github.com/splitio/go-split-commons/v5/dtos"
+	"github.com/splitio/go-split-commons/v5/engine/evaluator"
+	"github.com/splitio/go-split-commons/v5/storage/inmemory"
+	"github.com/splitio/go-split-commons/v5/synchronizer"
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/external/commons/mocks"
 	"github.com/splitio/splitd/splitio/common/lang"
@@ -221,7 +221,7 @@ func TestImpressionsQueueFull(t *testing.T) {
 	ts, _ := inmemory.NewTelemetryStorage()
 	iw := workers.NewImpressionsWorker(logger, ts, impRecorder, is, &conf.Impressions{Mode: "optimized", SyncPeriod: 100 * time.Second})
 	sworkers := synchronizer.Workers{ImpressionRecorder: iw}
-	sy := synchronizer.NewSynchronizer(*conf.DefaultConfig().ToAdvancedConfig(), synchronizer.SplitTasks{}, sworkers, logger, queueFullChan, nil)
+	sy := synchronizer.NewSynchronizer(*conf.DefaultConfig().ToAdvancedConfig(), synchronizer.SplitTasks{}, sworkers, logger, queueFullChan)
 	sy.StartPeriodicDataRecording()
 	// @}
 

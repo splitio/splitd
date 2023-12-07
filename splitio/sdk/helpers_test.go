@@ -3,6 +3,7 @@ package sdk
 import (
 	"testing"
 
+	"github.com/splitio/go-split-commons/v5/flagsets"
 	sdkConf "github.com/splitio/splitd/splitio/sdk/conf"
 	"github.com/stretchr/testify/assert"
 )
@@ -10,7 +11,7 @@ import (
 func TestSetupImpressionsComponents(t *testing.T) {
 
 	sdkCfg := sdkConf.DefaultConfig()
-	storages := setupStorages(sdkCfg)
+	storages := setupStorages(sdkCfg, flagsets.FlagSetFilter{})
 
 	ic, err := setupImpressionsComponents(&sdkCfg.Impressions, storages.telemetry)
 	assert.Nil(t, err)
