@@ -6,7 +6,6 @@ import (
 
 type MultiMetaQueues[T elemConstraint, U comparable, Q BackingQueue[T]] struct {
 	m        sync.Map
-	qpowSize int
 	cFactory func() Q
 }
 

@@ -14,7 +14,7 @@ import (
 
 func TestHappyPathNoFraming(t *testing.T) {
 	conn := &connMock{}
-    wrapped := newConnWrapper(conn, nil, &Options{BufferSize: 1024})
+	wrapped := newConnWrapper(conn, nil, &Options{BufferSize: 1024})
 
 	recent := func(t time.Time) bool { return time.Now().Sub(t) < time.Millisecond }
 
@@ -47,22 +47,9 @@ func TestWriteTimeout(t *testing.T) {
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
 }
 
-func TestWriteSizeMismatch(t *testing.T) {
-	conn := &connMock{}
-    wrapped := newConnWrapper(conn, nil, &Options{BufferSize: 1024})
-
-	recent := func(t time.Time) bool { return time.Now().Sub(t) < time.Millisecond }
-
-	conn.On("SetWriteDeadline", mock.MatchedBy(recent)).Return((error)(nil)).Once()
-	conn.On("Write", []byte("SOME MESSAGE")).Return(int(5), (error)(nil)).Once()
-
-	err := wrapped.SendMessage([]byte("SOME MESSAGE"))
-	assert.ErrorIs(t, err, ErrSentDataMismatch)
-}
-
 func TestReadEOF(t *testing.T) {
 	conn := &connMock{}
-    wrapped := newConnWrapper(conn, nil, &Options{BufferSize: 1024})
+	wrapped := newConnWrapper(conn, nil, &Options{BufferSize: 1024})
 
 	recent := func(t time.Time) bool { return time.Now().Sub(t) < time.Millisecond }
 
@@ -76,23 +63,23 @@ func TestReadEOF(t *testing.T) {
 
 func TestReadNonEOFError(t *testing.T) {
 	conn := &connMock{}
-    wrapped := newConnWrapper(conn, nil, &Options{BufferSize: 1024})
+	wrapped := newConnWrapper(conn, nil, &Options{BufferSize: 1024})
 
 	recent := func(t time.Time) bool { return time.Now().Sub(t) < time.Millisecond }
 
-    var someErr = errors.New("some")
+	var someErr = errors.New("some")
 	conn.On("SetReadDeadline", mock.MatchedBy(recent)).Return((error)(nil)).Once()
 	conn.On("Read", mock.Anything).Return(0, someErr).Once()
 
 	message, err := wrapped.ReceiveMessage()
 	assert.Nil(t, message)
 	assert.NotEqual(t, err, someErr)
-    assert.ErrorIs(t, err,  someErr)
+	assert.ErrorIs(t, err, someErr)
 }
 
 func TestReadInsufficientBufferSpace(t *testing.T) {
 	conn := &connMock{}
-    wrapped := newConnWrapper(conn, nil, &Options{BufferSize: 1024})
+	wrapped := newConnWrapper(conn, nil, &Options{BufferSize: 1024})
 
 	recent := func(t time.Time) bool { return time.Now().Sub(t) < time.Millisecond }
 
@@ -101,7 +88,7 @@ func TestReadInsufficientBufferSpace(t *testing.T) {
 
 	message, err := wrapped.ReceiveMessage()
 	assert.Nil(t, message)
-    assert.Equal(t, ErrBufferTooSmall, err)
+	assert.Equal(t, ErrBufferTooSmall, err)
 }
 
 type connMock struct {

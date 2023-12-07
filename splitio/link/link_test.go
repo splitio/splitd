@@ -2,41 +2,66 @@ package link
 
 import (
 	"testing"
-	"time"
 
-	"github.com/splitio/splitd/splitio/link/common"
+	"github.com/splitio/go-toolkit/v5/logging"
+	"github.com/splitio/splitd/splitio/link/client"
 	"github.com/splitio/splitd/splitio/link/protocol"
 	"github.com/splitio/splitd/splitio/link/serializer"
 	"github.com/splitio/splitd/splitio/link/transfer"
+	"github.com/splitio/splitd/splitio/sdk/mocks"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestOptions(t *testing.T) {
-	var linkOpts Options
-	err := linkOpts.populate([]Option{
-		WithAcceptTimeoutMs(5),
-		WithAddress("some_address"),
-		WithBufSize(123),
-		WithMaxSimultaneousConns(234),
-		WithProtocol("v1"),
-		WithReadTimeoutMs(6),
-		WithSerialization("msgpack"),
-		WithSockType("unix-stream"),
-		WithWriteTimeoutMs(7),
-	})
-	assert.Nil(t, err)
+	assert.Equal(t, ListenerOptions{
+		Transfer:      transfer.DefaultOpts(),
+		Acceptor:      transfer.DefaultAcceptorConfig(),
+		Serialization: serializer.MsgPack,
+		Protocol:      protocol.V1,
+	},
+		DefaultListenerOptions())
 
-	var transferOpts transfer.Options
-	transferOpts.Parse(linkOpts.forTransfer())
-	assert.Equal(t, 5*time.Millisecond, transferOpts.AcceptTimeout)
-	assert.Equal(t, 6*time.Millisecond, transferOpts.ReadTimeout)
-	assert.Equal(t, 7*time.Millisecond, transferOpts.WriteTimeout)
-	assert.Equal(t, 123, transferOpts.BufferSize)
-	assert.Equal(t, transfer.ConnTypeUnixStream, transferOpts.ConnType)
-	assert.Equal(t, 234, transferOpts.MaxSimultaneousConnections)
+	assert.Equal(t, ConsumerOptions{
+		Transfer:      transfer.DefaultOpts(),
+		Consumer:      client.DefaultOptions(),
+		Serialization: serializer.MsgPack,
+	}, DefaultConsumerOptions())
+}
 
-	var hlOpts common.Opts
-	hlOpts.Parse(linkOpts.forApp())
-	assert.Equal(t, protocol.V1, hlOpts.ProtoV)
-	assert.Equal(t, serializer.MsgPack, hlOpts.Serial)
+func TestListenErrors(t *testing.T) {
+	lo := DefaultListenerOptions()
+	lo.Transfer.ConnType = transfer.ConnType(222)
+	acc, shutdown, err := Listen(logging.NewLogger(nil), &mocks.SDKMock{}, &lo)
+	assert.Nil(t, acc)
+	assert.Nil(t, shutdown)
+	assert.ErrorContains(t, err, "invalid conn type")
+
+	lo = DefaultListenerOptions()
+	lo.Protocol = protocol.Version(123)
+	acc, shutdown, err = Listen(logging.NewLogger(nil), &mocks.SDKMock{}, &lo)
+	assert.Nil(t, acc)
+	assert.Nil(t, shutdown)
+	assert.ErrorContains(t, err, "protocol")
+
+	lo = DefaultListenerOptions()
+	lo.Serialization = serializer.Mechanism(123)
+	acc, shutdown, err = Listen(logging.NewLogger(nil), &mocks.SDKMock{}, &lo)
+	assert.Nil(t, acc)
+	assert.Nil(t, shutdown)
+	assert.ErrorContains(t, err, "serializer")
+}
+
+func TestConsumerErrors(t *testing.T) {
+	co := DefaultConsumerOptions()
+    co.Transfer.ConnType = transfer.ConnType(123)
+	client, err := Consumer(logging.NewLogger(nil), &co)
+	assert.Nil(t, client)
+	assert.ErrorContains(t, err, "invalid conn type")
+
+	co = DefaultConsumerOptions()
+	co.Serialization = serializer.Mechanism(123)
+	client, err = Consumer(logging.NewLogger(nil), &co)
+	assert.Nil(t, client)
+	assert.ErrorContains(t, err, "serializer")
+
 }

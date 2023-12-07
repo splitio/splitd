@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
+	"syscall"
 	"time"
 
 	"github.com/splitio/go-toolkit/v5/logging"
@@ -12,48 +14,59 @@ import (
 
 type ConnType int
 
+func (c ConnType) String() string {
+	switch c {
+	case ConnTypeUnixSeqPacket:
+		return "unix-seqpacket"
+	case ConnTypeUnixStream:
+		return "unix-stream"
+	default:
+		return "invalid-socket-type"
+	}
+}
+
 const (
 	ConnTypeUnixSeqPacket ConnType = 1
 	ConnTypeUnixStream    ConnType = 2
 )
 
 var (
-	ErrInvalidConnType = errors.New("invalid listener type")
+	ErrInvalidConnType     = errors.New("invalid conn type")
+	ErrServiceAddressInUse = errors.New("provided socket file / address is already in use")
 )
 
-func NewAcceptor(opts ...Option) (*Acceptor, error) {
-
-	o := defaultOpts()
-    o.Parse(opts)
+func NewAcceptor(logger logging.LoggerInterface, o *Options, listenerConfig *AcceptorConfig) (*Acceptor, error) {
 
 	var address net.Addr
-	var framer framing.Interface
+	var ff FramingWrapperFactory
 	switch o.ConnType {
 	case ConnTypeUnixSeqPacket:
 		address = &net.UnixAddr{Net: "unixpacket", Name: o.Address}
 	case ConnTypeUnixStream:
 		address = &net.UnixAddr{Net: "unix", Name: o.Address}
-		framer = &framing.LengthPrefixImpl{}
+		ff = lpFramerFromConn
 	default:
 		return nil, ErrInvalidConnType
 	}
 
-	connFactory := func(c net.Conn) RawConn { return newConnWrapper(c, framer, &o) }
-	return newAcceptor(address, connFactory, &o), nil
+	if err := ensureAddressUsable(logger, address); err != nil {
+		return nil, err
+	}
+
+	cf := func(c net.Conn) RawConn { return newConnWrapper(c, ff, o) }
+	return newAcceptor(address, cf, logger, listenerConfig), nil
 }
 
-func NewClientConn(opts ...Option) (RawConn, error) {
-	o := defaultOpts()
-    o.Parse(opts)
+func NewClientConn(logger logging.LoggerInterface, o *Options) (RawConn, error) {
 
 	var address net.Addr
-	var framer framing.Interface
+	var ff FramingWrapperFactory
 	switch o.ConnType {
 	case ConnTypeUnixSeqPacket:
 		address = &net.UnixAddr{Net: "unixpacket", Name: o.Address}
 	case ConnTypeUnixStream:
 		address = &net.UnixAddr{Net: "unix", Name: o.Address}
-		framer = &framing.LengthPrefixImpl{}
+		ff = lpFramerFromConn
 	default:
 		return nil, ErrInvalidConnType
 	}
@@ -63,46 +76,59 @@ func NewClientConn(opts ...Option) (RawConn, error) {
 		return nil, fmt.Errorf("error creating connection: %w", err)
 	}
 
-	return newConnWrapper(c, framer, &o), nil
+	return newConnWrapper(c, ff, o), nil
 }
-
-type Option func(*Options)
-
-func WithAddress(address string) Option                { return func(o *Options) { o.Address = address } }
-func WithType(t ConnType) Option                       { return func(o *Options) { o.ConnType = t } }
-func WithLogger(logger logging.LoggerInterface) Option { return func(o *Options) { o.Logger = logger } }
-func WithBufSize(s int) Option                         { return func(o *Options) { o.BufferSize = s } }
-func WithMaxConns(m int) Option                        { return func(o *Options) { o.MaxSimultaneousConnections = m } }
-func WithReadTimeout(d time.Duration) Option           { return func(o *Options) { o.ReadTimeout = d } }
-func WithWriteTimeout(d time.Duration) Option          { return func(o *Options) { o.WriteTimeout = d } }
-func WithAcceptTimeout(d time.Duration) Option         { return func(o *Options) { o.AcceptTimeout = d } }
 
 type Options struct {
-	ConnType                   ConnType
-	Address                    string
-	Logger                     logging.LoggerInterface
-	BufferSize                 int
-	MaxSimultaneousConnections int
-	ReadTimeout                time.Duration
-	WriteTimeout               time.Duration
-	AcceptTimeout              time.Duration
+	ConnType     ConnType
+	Address      string
+	BufferSize   int
+	ReadTimeout  time.Duration
+	WriteTimeout time.Duration
 }
 
-func (o *Options) Parse(opts []Option) {
-	for _, configure := range opts {
-		configure(o)
-	}
-}
-
-func defaultOpts() Options {
+func DefaultOpts() Options {
 	return Options{
-		ConnType:                   ConnTypeUnixSeqPacket,
-		Address:                    "/var/run/splitd.sock",
-		Logger:                     logging.NewLogger(nil),
-		BufferSize:                 1024,
-		MaxSimultaneousConnections: 32,
-		ReadTimeout:                1 * time.Second,
-		WriteTimeout:               1 * time.Second,
-		AcceptTimeout:              1 * time.Second,
+		ConnType:     ConnTypeUnixSeqPacket,
+		Address:      "/var/run/splitd.sock",
+		BufferSize:   1024,
+		ReadTimeout:  1 * time.Second,
+		WriteTimeout: 1 * time.Second,
 	}
+}
+
+// helpers
+
+func lpFramerFromConn(c net.Conn) framing.Interface { return framing.NewLengthPrefix(c) }
+
+func ensureAddressUsable(logger logging.LoggerInterface, address net.Addr) error {
+	switch address.Network() {
+	case "unix", "unixpacket":
+		if _, err := os.Stat(address.String()); errors.Is(err, os.ErrNotExist) {
+			return nil // file doesn't exist, we're ok
+		}
+
+		logger.Warning("The socket file exists. Testing if it's currently accepting connections")
+		c, err := net.Dial(address.Network(), address.String())
+		if err == nil {
+			c.Close()
+			return ErrServiceAddressInUse
+		}
+
+		logger.Warning("The socket appears to be from a previous (dead) execution. Will try to remove it")
+
+		if !errors.Is(err, syscall.ECONNREFUSED) {
+			return fmt.Errorf("unknown error when testing for a dead socket: %w", err)
+		}
+
+		// the socket seems to be bound to a dead process, will try removing it
+		// so that a listener can be created
+		if err := os.Remove(address.String()); err != nil {
+			return fmt.Errorf("error removing dead-socket file from a previous execution: %w", err)
+		}
+
+		logger.Warning("Dead socket file removed successfuly")
+
+	}
+	return nil
 }
