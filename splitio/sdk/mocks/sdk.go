@@ -34,6 +34,18 @@ func (m *SDKMock) Treatments(
 	return args.Get(0).(map[string]sdk.EvaluationResult), args.Error(1)
 }
 
+// TreatmentsByFlagSet implements sdk.Interface
+func (m *SDKMock) TreatmentsByFlagSet(
+	md *types.ClientConfig,
+	key string,
+	bucketingKey *string,
+	flagSet string,
+	attributes map[string]interface{},
+) (map[string]sdk.EvaluationResult, error) {
+	args := m.Called(md, key, bucketingKey, flagSet, attributes)
+	return args.Get(0).(map[string]sdk.EvaluationResult), args.Error(1)
+}
+
 // Track implements sdk.Interface
 func (m *SDKMock) Track(cfg *types.ClientConfig, key string, trafficType string, eventType string, value *float64, properties map[string]interface{}) error {
 	args := m.Called(cfg, key, trafficType, eventType, value, properties)
