@@ -14,10 +14,12 @@ const (
 	OCRegister OpCode = 0x00
 
 	// Treatment-related ops
-	OCTreatment            OpCode = 0x11
-	OCTreatments           OpCode = 0x12
-	OCTreatmentWithConfig  OpCode = 0x13
-	OCTreatmentsWithConfig OpCode = 0x14
+	OCTreatment                     OpCode = 0x11
+	OCTreatments                    OpCode = 0x12
+	OCTreatmentWithConfig           OpCode = 0x13
+	OCTreatmentsWithConfig          OpCode = 0x14
+	OCTreatmentsByFlagSet           OpCode = 0x15
+	OCTreatmentsWithConfigByFlagSet OpCode = 0x16
 
 	// Track-related ops
 	OCTrack OpCode = 0x80
@@ -39,6 +41,10 @@ func (o OpCode) String() string {
 		return "treatment-with-config"
 	case OCTreatmentsWithConfig:
 		return "treatments-with-config"
+	case OCTreatmentsByFlagSet:
+		return "treatments-by-flag=set"
+	case OCTreatmentsWithConfigByFlagSet:
+		return "treatments-with-config-by-flag=set"
 	case OCTrack:
 		return "track"
 	case OCSplitNames:
@@ -223,6 +229,60 @@ func (t *TreatmentsArgs) PopulateFromRPC(rpc *RPC) error {
 	rawAttrs, err := getOptional[map[string]interface{}](rpc.Args[TreatmentsArgAttributesIdx])
 	if err != nil {
 		return RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsArgAttributesIdx)}
+	}
+	t.Attributes = sanitizeAttributes(rawAttrs)
+
+	return nil
+}
+
+const (
+	TreatmentsByFlagSetArgKeyIdx          int = 0
+	TreatmentsByFlagSetArgBucketingKeyIdx int = 1
+	TreatmentsByFlagSetArgFlagSetIdx      int = 2
+	TreatmentsByFlagSetArgAttributesIdx   int = 3
+)
+
+type TreatmentsByFlagSetArgs struct {
+	Key          string                 `msgpack:"k"`
+	BucketingKey *string                `msgpack:"b"`
+	FlagSet      string                 `msgpack:"f"`
+	Attributes   map[string]interface{} `msgpack:"a"`
+}
+
+func (r TreatmentsByFlagSetArgs) Encode() []interface{} {
+	var bk string
+	if r.BucketingKey != nil {
+		bk = *r.BucketingKey
+	}
+	return []interface{}{r.Key, bk, r.FlagSet, r.Attributes}
+}
+
+func (t *TreatmentsByFlagSetArgs) PopulateFromRPC(rpc *RPC) error {
+	if rpc.OpCode != OCTreatmentsByFlagSet && rpc.OpCode != OCTreatmentsWithConfigByFlagSet {
+		return RPCParseError{Code: PECOpCodeMismatch}
+	}
+	if len(rpc.Args) != 4 {
+		return RPCParseError{Code: PECWrongArgCount}
+	}
+
+	var ok bool
+	var err error
+
+	if t.Key, ok = rpc.Args[TreatmentsByFlagSetArgKeyIdx].(string); !ok {
+		return RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsArgKeyIdx)}
+	}
+
+	if t.BucketingKey, err = getOptionalRef[string](rpc.Args[TreatmentsByFlagSetArgBucketingKeyIdx]); err != nil {
+		return RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsArgBucketingKeyIdx)}
+	}
+
+	if t.FlagSet, ok = rpc.Args[TreatmentsByFlagSetArgFlagSetIdx].(string); !ok {
+		return RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsByFlagSetArgFlagSetIdx)}
+	}
+
+	rawAttrs, err := getOptional[map[string]interface{}](rpc.Args[TreatmentsByFlagSetArgAttributesIdx])
+	if err != nil {
+		return RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsByFlagSetArgAttributesIdx)}
 	}
 	t.Attributes = sanitizeAttributes(rawAttrs)
 
