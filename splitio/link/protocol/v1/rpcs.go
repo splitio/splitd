@@ -42,9 +42,9 @@ func (o OpCode) String() string {
 	case OCTreatmentsWithConfig:
 		return "treatments-with-config"
 	case OCTreatmentsByFlagSet:
-		return "treatments-by-flag=set"
+		return "treatments-by-flag-set"
 	case OCTreatmentsWithConfigByFlagSet:
-		return "treatments-with-config-by-flag=set"
+		return "treatments-with-config-by-flag-set"
 	case OCTrack:
 		return "track"
 	case OCSplitNames:
@@ -269,11 +269,11 @@ func (t *TreatmentsByFlagSetArgs) PopulateFromRPC(rpc *RPC) error {
 	var err error
 
 	if t.Key, ok = rpc.Args[TreatmentsByFlagSetArgKeyIdx].(string); !ok {
-		return RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsArgKeyIdx)}
+		return RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsByFlagSetArgKeyIdx)}
 	}
 
 	if t.BucketingKey, err = getOptionalRef[string](rpc.Args[TreatmentsByFlagSetArgBucketingKeyIdx]); err != nil {
-		return RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsArgBucketingKeyIdx)}
+		return RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsByFlagSetArgBucketingKeyIdx)}
 	}
 
 	if t.FlagSet, ok = rpc.Args[TreatmentsByFlagSetArgFlagSetIdx].(string); !ok {
