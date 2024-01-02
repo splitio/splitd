@@ -33,12 +33,14 @@ type SplitNamesPayload struct {
 }
 
 type SplitPayload struct {
-	Name         string            `msgpack:"n"`
-	TrafficType  string            `msgpack:"t"`
-	Killed       bool              `msgpack:"k"`
-	Treatments   []string          `msgpack:"s"`
-	ChangeNumber int64             `msgpack:"c"`
-	Configs      map[string]string `msgpack:"f"`
+	Name             string            `msgpack:"n"`
+	TrafficType      string            `msgpack:"t"`
+	Killed           bool              `msgpack:"k"`
+	Treatments       []string          `msgpack:"s"`
+	ChangeNumber     int64             `msgpack:"c"`
+	Configs          map[string]string `msgpack:"f"`
+	DefaultTreatment string            `msgpack:"d"`
+	Sets             []string          `msgpack:"e"`
 }
 
 type SplitsPayload struct {

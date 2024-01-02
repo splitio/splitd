@@ -262,12 +262,14 @@ func splitToView(s *dtos.SplitDTO) *SplitView {
 	}
 
 	return &SplitView{
-		Name:         s.Name,
-		TrafficType:  s.TrafficTypeName,
-		Killed:       s.Killed,
-		ChangeNumber: s.ChangeNumber,
-		Configs:      s.Configurations,
-		Treatments:   treatments,
+		Name:             s.Name,
+		TrafficType:      s.TrafficTypeName,
+		Killed:           s.Killed,
+		ChangeNumber:     s.ChangeNumber,
+		Configs:          s.Configurations,
+		Treatments:       treatments,
+		DefaultTreatment: s.DefaultTreatment,
+		Sets:             s.Sets,
 	}
 }
 
