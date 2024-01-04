@@ -9,10 +9,10 @@ import (
 	"github.com/splitio/splitd/splitio/sdk/types"
 	serrors "github.com/splitio/splitd/splitio/util/errors"
 
-	"github.com/splitio/go-split-commons/v4/dtos"
-	"github.com/splitio/go-split-commons/v4/service"
-	"github.com/splitio/go-split-commons/v4/storage"
-	"github.com/splitio/go-split-commons/v4/synchronizer/worker/event"
+	"github.com/splitio/go-split-commons/v5/dtos"
+	"github.com/splitio/go-split-commons/v5/service"
+	"github.com/splitio/go-split-commons/v5/storage"
+	"github.com/splitio/go-split-commons/v5/synchronizer/worker/event"
 	"github.com/splitio/go-toolkit/v5/logging"
 	gtsync "github.com/splitio/go-toolkit/v5/sync"
 )
@@ -57,9 +57,9 @@ func (m *MultiMetaEventsWorker) FlushEvents(bulkSize int64) error {
 	var errs serrors.ConcurrentErrorCollector
 	var wg sync.WaitGroup
 
-    // same logic as impressions workers, without the need for formatting. check impressions.go for a better
-    // description of what's being done
-    if err := m.iq.RangeAndClear(func(md types.ClientMetadata, q *sss.LockingQueue[dtos.EventDTO]) {
+	// same logic as impressions workers, without the need for formatting. check impressions.go for a better
+	// description of what's being done
+	if err := m.iq.RangeAndClear(func(md types.ClientMetadata, q *sss.LockingQueue[dtos.EventDTO]) {
 		extracted := make([]dtos.EventDTO, 0, q.Len())
 		n, err := q.Pop(q.Len(), &extracted)
 		if err != nil && !errors.Is(err, sss.ErrQueueEmpty) {

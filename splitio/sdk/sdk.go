@@ -6,19 +6,18 @@ import (
 	"time"
 
 	"github.com/splitio/splitd/splitio/sdk/conf"
-	sdkConf "github.com/splitio/splitd/splitio/sdk/conf"
 	"github.com/splitio/splitd/splitio/sdk/storage"
 	"github.com/splitio/splitd/splitio/sdk/types"
 
-	"github.com/splitio/go-client/v6/splitio/engine"
-	"github.com/splitio/go-client/v6/splitio/engine/evaluator"
-
-	"github.com/splitio/go-split-commons/v4/dtos"
-	"github.com/splitio/go-split-commons/v4/healthcheck/application"
-	"github.com/splitio/go-split-commons/v4/provisional"
-	"github.com/splitio/go-split-commons/v4/service/api"
-	commonStorage "github.com/splitio/go-split-commons/v4/storage"
-	"github.com/splitio/go-split-commons/v4/synchronizer"
+	"github.com/splitio/go-split-commons/v5/dtos"
+	"github.com/splitio/go-split-commons/v5/engine"
+	"github.com/splitio/go-split-commons/v5/engine/evaluator"
+	"github.com/splitio/go-split-commons/v5/flagsets"
+	"github.com/splitio/go-split-commons/v5/healthcheck/application"
+	"github.com/splitio/go-split-commons/v5/provisional"
+	"github.com/splitio/go-split-commons/v5/service/api"
+	commonStorage "github.com/splitio/go-split-commons/v5/storage"
+	"github.com/splitio/go-split-commons/v5/synchronizer"
 	"github.com/splitio/go-toolkit/v5/common"
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio"
@@ -55,8 +54,7 @@ type Impl struct {
 	es            *storage.EventsStorage
 	iq            provisional.ImpressionManager
 	splitStorage  commonStorage.SplitStorage
-	cfg           sdkConf.Config
-	status        chan int
+	cfg           conf.Config
 	queueFullChan chan string
 	validator     Validator
 }
@@ -72,7 +70,9 @@ func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, 
 	md := dtos.Metadata{SDKVersion: fmt.Sprintf("splitd-%s", splitio.Version)}
 	advCfg := c.ToAdvancedConfig()
 
-	stores := setupStorages(c)
+	flagSetsFilter := flagsets.NewFlagSetFilter(advCfg.FlagSetsFilter)
+
+	stores := setupStorages(c, flagSetsFilter)
 	impc, err := setupImpressionsComponents(&c.Impressions, stores.telemetry)
 	if err != nil {
 		return nil, fmt.Errorf("error setting up impressions components")
@@ -82,9 +82,9 @@ func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, 
 
 	queueFullChan := make(chan string, 2)
 	splitApi := api.NewSplitAPI(apikey, *advCfg, logger, md)
-	workers := setupWorkers(logger, splitApi, stores, hc, c)
+	workers := setupWorkers(logger, splitApi, stores, hc, c, flagSetsFilter)
 	tasks := setupTasks(c, stores, logger, workers, impc, md, splitApi)
-	sync := synchronizer.NewSynchronizer(*advCfg, *tasks, *workers, logger, queueFullChan, nil)
+	sync := synchronizer.NewSynchronizer(*advCfg, *tasks, *workers, logger, queueFullChan)
 
 	status := make(chan int, 10)
 	manager, err := synchronizer.NewSynchronizerManager(sync, logger, *advCfg, splitApi.AuthClient, stores.splits, status, stores.telemetry, md, nil, hc)
