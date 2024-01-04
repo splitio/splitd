@@ -3,7 +3,7 @@ package storage
 import (
 	"testing"
 
-	"github.com/splitio/go-split-commons/v4/dtos"
+	"github.com/splitio/go-split-commons/v5/dtos"
 	"github.com/splitio/splitd/splitio/sdk/types"
 
 	"github.com/stretchr/testify/assert"
@@ -34,7 +34,7 @@ func TestMultiStorageBasic(t *testing.T) {
 			assert.Equal(t, ErrQueueEmpty, err)
 			assert.Equal(t, 4, n)
 		case "php-1.2.3":
-            // do nothing, to be used in the next assertions
+			// do nothing, to be used in the next assertions
 		default:
 			assert.Fail(t, "unexpected metadata: "+cm.SdkVersion)
 		}
@@ -43,7 +43,7 @@ func TestMultiStorageBasic(t *testing.T) {
 	mq.RangeAndClear(func(cm types.ClientMetadata, q *LockingQueue[dtos.EventDTO]) {
 		switch cm.SdkVersion {
 		case "go-1.2.3":
-            // used previously
+			// used previously
 		case "php-1.2.3":
 			assert.Equal(t, 3, q.Len())
 			var buf []dtos.EventDTO
