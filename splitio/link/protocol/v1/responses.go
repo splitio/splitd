@@ -14,6 +14,10 @@ type ResponseWrapper[T validPayloadsConstraint] struct {
 
 type RegisterPayload struct{}
 
+type TreatmentsWithFeaturePayload struct {
+	Results map[string]TreatmentPayload `msgpack:"r"`
+}
+
 type TreatmentPayload struct {
 	Treatment    string             `msgpack:"t"`
 	Config       *string            `msgpack:"c,omitempty"`
@@ -60,5 +64,6 @@ type validPayloadsConstraint interface {
 		SplitNamesPayload |
 		SplitPayload |
 		SplitsPayload |
-		RegisterPayload
+		RegisterPayload |
+		TreatmentsWithFeaturePayload
 }
