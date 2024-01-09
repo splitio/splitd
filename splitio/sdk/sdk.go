@@ -39,6 +39,7 @@ type Interface interface {
 	Treatment(cfg *types.ClientConfig, key string, bucketingKey *string, feature string, attributes map[string]interface{}) (*EvaluationResult, error)
 	Treatments(cfg *types.ClientConfig, key string, bucketingKey *string, features []string, attributes map[string]interface{}) (map[string]EvaluationResult, error)
 	TreatmentsByFlagSet(cfg *types.ClientConfig, key string, bucketingKey *string, flagSet string, attributes map[string]interface{}) (map[string]EvaluationResult, error)
+	TreatmentsByFlagSets(cfg *types.ClientConfig, key string, bucketingKey *string, flagSets []string, attributes map[string]interface{}) (map[string]EvaluationResult, error)
 	Track(cfg *types.ClientConfig, key string, trafficType string, eventType string, value *float64, properties map[string]interface{}) error
 	SplitNames() ([]string, error)
 	Splits() ([]SplitView, error)
@@ -157,6 +158,22 @@ func (i *Impl) Treatments(cfg *types.ClientConfig, key string, bk *string, featu
 func (i *Impl) TreatmentsByFlagSet(cfg *types.ClientConfig, key string, bk *string, flagSet string, attributes Attributes) (map[string]EvaluationResult, error) {
 
 	res := i.ev.EvaluateFeatureByFlagSets(key, bk, []string{flagSet}, attributes)
+	toRet := make(map[string]EvaluationResult, len(res.Evaluations))
+	for feature, curr := range res.Evaluations {
+		var eres EvaluationResult
+		eres.Treatment = curr.Treatment
+		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata)
+		eres.Config = curr.Config
+		toRet[feature] = eres
+	}
+
+	return toRet, nil
+}
+
+// TreatmentsByFlagSets implements Interface
+func (i *Impl) TreatmentsByFlagSets(cfg *types.ClientConfig, key string, bk *string, flagSets []string, attributes Attributes) (map[string]EvaluationResult, error) {
+
+	res := i.ev.EvaluateFeatureByFlagSets(key, bk, flagSets, attributes)
 	toRet := make(map[string]EvaluationResult, len(res.Evaluations))
 	for feature, curr := range res.Evaluations {
 		var eres EvaluationResult
