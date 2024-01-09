@@ -565,13 +565,21 @@ func TestSplitNames(t *testing.T) {
 func TestSplits(t *testing.T) {
 	var ss mocks.SplitStorageMock
 	ss.On("All").Return([]dtos.SplitDTO{
-		{Name: "s1", TrafficTypeName: "tt1", ChangeNumber: 1, Conditions: []dtos.ConditionDTO{{Partitions: []dtos.PartitionDTO{{Treatment: "a"}, {Treatment: "b"}}}}},
 		{
-			Name:            "s2",
-			TrafficTypeName: "tt1",
-			ChangeNumber:    1,
-			Conditions:      []dtos.ConditionDTO{{Partitions: []dtos.PartitionDTO{{Treatment: "a"}, {Treatment: "b"}}}},
-			Configurations:  map[string]string{"a": "conf1", "b": "conf2"},
+			Name:             "s1",
+			TrafficTypeName:  "tt1",
+			ChangeNumber:     1,
+			Conditions:       []dtos.ConditionDTO{{Partitions: []dtos.PartitionDTO{{Treatment: "a"}, {Treatment: "b"}}}},
+			DefaultTreatment: "a",
+			Sets:             []string{"s1", "s2"},
+		},
+		{
+			Name:             "s2",
+			TrafficTypeName:  "tt1",
+			ChangeNumber:     1,
+			Conditions:       []dtos.ConditionDTO{{Partitions: []dtos.PartitionDTO{{Treatment: "a"}, {Treatment: "b"}}}},
+			Configurations:   map[string]string{"a": "conf1", "b": "conf2"},
+			DefaultTreatment: "a",
 		},
 	}).Once()
 
@@ -580,8 +588,8 @@ func TestSplits(t *testing.T) {
 	splits, err := c.Splits()
 	assert.Nil(t, err)
 	assert.Equal(t, []SplitView{
-		{Name: "s1", TrafficType: "tt1", Killed: false, Treatments: []string{"a", "b"}, ChangeNumber: 1},
-		{Name: "s2", TrafficType: "tt1", Killed: false, Treatments: []string{"a", "b"}, ChangeNumber: 1, Configs: map[string]string{"a": "conf1", "b": "conf2"}},
+		{Name: "s1", TrafficType: "tt1", Killed: false, Treatments: []string{"a", "b"}, ChangeNumber: 1, DefaultTreatment: "a", Sets: []string{"s1", "s2"}},
+		{Name: "s2", TrafficType: "tt1", Killed: false, Treatments: []string{"a", "b"}, ChangeNumber: 1, Configs: map[string]string{"a": "conf1", "b": "conf2"}, DefaultTreatment: "a"},
 	}, splits)
 }
 
