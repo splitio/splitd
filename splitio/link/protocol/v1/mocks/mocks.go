@@ -139,6 +139,34 @@ func NewTreatmentsResp(ok bool, data []sdk.EvaluationResult) *v1.ResponseWrapper
 	}
 }
 
+func NewTreatmentsByFlagSetResp(ok bool, data map[string]sdk.EvaluationResult) *v1.ResponseWrapper[v1.TreatmentsWithFeaturePayload] {
+	res := v1.ResultOk
+	if !ok {
+		res = v1.ResultInternalError
+	}
+
+	payload := make(map[string]v1.TreatmentPayload, len(data))
+	for f, r := range data {
+		p := v1.TreatmentPayload{
+			Treatment: r.Treatment,
+			Config:    r.Config,
+		}
+		if r.Impression != nil {
+			p.ListenerData = &v1.ListenerExtraData{
+				Label:        r.Impression.Label,
+				Timestamp:    r.Impression.Time,
+				ChangeNumber: r.Impression.ChangeNumber,
+			}
+		}
+		payload[f] = p
+	}
+
+	return &v1.ResponseWrapper[v1.TreatmentsWithFeaturePayload]{
+		Status:  res,
+		Payload: v1.TreatmentsWithFeaturePayload{Results: payload},
+	}
+}
+
 func NewTrackResp(ok bool) *v1.ResponseWrapper[v1.TrackPayload] {
 	res := v1.ResultOk
 	if !ok {
