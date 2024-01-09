@@ -339,8 +339,8 @@ func (t *TreatmentsByFlagSetsArgs) PopulateFromRPC(rpc *RPC) error {
 	rawFlagSetsList, ok := rpc.Args[TreatmentsByFlagSetsArgFlagSetsIdx].([]interface{})
 	if !ok {
 		return RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsByFlagSetsArgFlagSetsIdx)}
-
 	}
+
 	t.FlagSets, ok = sanitizeToStringSlice(rawFlagSetsList)
 	if !ok {
 		return RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsByFlagSetsArgFlagSetsIdx)}
