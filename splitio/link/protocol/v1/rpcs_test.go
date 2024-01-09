@@ -499,6 +499,30 @@ func TestRPCEncoding(t *testing.T) {
 	assert.Equal(t, tsa.Features, encodedTsA[TreatmentsArgFeaturesIdx].([]string))
 	assert.Equal(t, tsa.Attributes, encodedTsA[TreatmentsArgAttributesIdx].(map[string]interface{}))
 
+	tsfa := TreatmentsByFlagSetArgs{
+		Key:          "someKey",
+		BucketingKey: lang.Ref("someBucketing"),
+		FlagSet:      "set",
+		Attributes:   map[string]interface{}{"some": "attribute"},
+	}
+	encodedTsfA := tsfa.Encode()
+	assert.Equal(t, tsfa.Key, encodedTsfA[TreatmentsByFlagSetArgKeyIdx].(string))
+	assert.Equal(t, *tsfa.BucketingKey, encodedTsfA[TreatmentsByFlagSetArgBucketingKeyIdx].(string))
+	assert.Equal(t, tsfa.FlagSet, encodedTsfA[TreatmentsByFlagSetArgFlagSetIdx].(string))
+	assert.Equal(t, tsfa.Attributes, encodedTsfA[TreatmentsByFlagSetArgAttributesIdx].(map[string]interface{}))
+
+	tsfsa := TreatmentsByFlagSetsArgs{
+		Key:          "someKey",
+		BucketingKey: lang.Ref("someBucketing"),
+		FlagSets:     []string{"set_1", "set_2"},
+		Attributes:   map[string]interface{}{"some": "attribute"},
+	}
+	encodedTsfsA := tsfsa.Encode()
+	assert.Equal(t, tsfsa.Key, encodedTsfsA[TreatmentsByFlagSetsArgKeyIdx].(string))
+	assert.Equal(t, *tsfsa.BucketingKey, encodedTsfsA[TreatmentsByFlagSetsArgBucketingKeyIdx].(string))
+	assert.Equal(t, tsfsa.FlagSets, encodedTsfsA[TreatmentsByFlagSetsArgFlagSetsIdx].([]string))
+	assert.Equal(t, tsfsa.Attributes, encodedTsfsA[TreatmentsByFlagSetsArgAttributesIdx].(map[string]interface{}))
+
 	tra := TrackArgs{
 		Key:         "someKey",
 		TrafficType: "someTrafficType",

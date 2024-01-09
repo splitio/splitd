@@ -240,7 +240,7 @@ func (m *ClientManager) handleGetTreatmentsByFlagSet(rpc *protov1.RPC, withConfi
 
 	var args protov1.TreatmentsByFlagSetArgs
 	if err := args.PopulateFromRPC(rpc); err != nil {
-		return nil, fmt.Errorf("error parsing treatments arguments: %w", err)
+		return nil, fmt.Errorf("error parsing treatmentsByFlagSet arguments: %w", err)
 	}
 
 	res, err := m.splitSDK.TreatmentsByFlagSet(m.clientConfig, args.Key, args.BucketingKey, args.FlagSet, args.Attributes)
@@ -281,7 +281,7 @@ func (m *ClientManager) handleGetTreatmentsByFlagSets(rpc *protov1.RPC, withConf
 
 	var args protov1.TreatmentsByFlagSetsArgs
 	if err := args.PopulateFromRPC(rpc); err != nil {
-		return nil, fmt.Errorf("error parsing treatments arguments: %w", err)
+		return nil, fmt.Errorf("error parsing treatmentsByFlagSets arguments: %w", err)
 	}
 
 	res, err := m.splitSDK.TreatmentsByFlagSets(m.clientConfig, args.Key, args.BucketingKey, args.FlagSets, args.Attributes)
