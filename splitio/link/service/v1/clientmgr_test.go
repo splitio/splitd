@@ -523,14 +523,14 @@ func TestSplits(t *testing.T) {
 		*args.Get(1).(*v1.RPC) = *proto1Mocks.NewSplitsRPC()
 	}).Once()
 	serializerMock.On("Serialize", proto1Mocks.NewSplitsResp(true, []v1.SplitPayload{
-		{Name: "s1", TrafficType: "tt1", Killed: true, Treatments: []string{"on", "off"}, ChangeNumber: 1, Configs: map[string]string{"a": "x"}},
-		{Name: "s2", TrafficType: "tt1", Killed: false, Treatments: []string{"on", "off"}, ChangeNumber: 1, Configs: map[string]string{"a": "y"}},
+		{Name: "s1", TrafficType: "tt1", Killed: true, Treatments: []string{"on", "off"}, ChangeNumber: 1, Configs: map[string]string{"a": "x"}, DefaultTreatment: "on"},
+		{Name: "s2", TrafficType: "tt1", Killed: false, Treatments: []string{"on", "off"}, ChangeNumber: 1, Configs: map[string]string{"a": "y"}, DefaultTreatment: "on", Sets: []string{"s1", "s2"}},
 	})).Return([]byte("successPayload"), nil).Once()
 
 	sdkMock := &sdkMocks.SDKMock{}
 	sdkMock.On("Splits").Return([]sdk.SplitView{
-		{Name: "s1", TrafficType: "tt1", Killed: true, Treatments: []string{"on", "off"}, ChangeNumber: 1, Configs: map[string]string{"a": "x"}},
-		{Name: "s2", TrafficType: "tt1", Killed: false, Treatments: []string{"on", "off"}, ChangeNumber: 1, Configs: map[string]string{"a": "y"}},
+		{Name: "s1", TrafficType: "tt1", Killed: true, Treatments: []string{"on", "off"}, ChangeNumber: 1, Configs: map[string]string{"a": "x"}, DefaultTreatment: "on"},
+		{Name: "s2", TrafficType: "tt1", Killed: false, Treatments: []string{"on", "off"}, ChangeNumber: 1, Configs: map[string]string{"a": "y"}, DefaultTreatment: "on", Sets: []string{"s1", "s2"}},
 	}, (error)(nil)).Once()
 
 	logger := logging.NewLogger(nil)
@@ -560,22 +560,26 @@ func TestSplit(t *testing.T) {
 		*args.Get(1).(*v1.RPC) = *proto1Mocks.NewSplitRPC("s1")
 	}).Once()
 	serializerMock.On("Serialize", proto1Mocks.NewSplitResp(true, v1.SplitPayload{
-		Name:         "s1",
-		TrafficType:  "tt1",
-		Killed:       true,
-		Treatments:   []string{"on", "off"},
-		ChangeNumber: 1,
-		Configs:      map[string]string{"a": "x"},
+		Name:             "s1",
+		TrafficType:      "tt1",
+		Killed:           true,
+		Treatments:       []string{"on", "off"},
+		ChangeNumber:     1,
+		Configs:          map[string]string{"a": "x"},
+		DefaultTreatment: "on",
+		Sets:             []string{"s1", "s2"},
 	})).Return([]byte("successPayload"), nil).Once()
 
 	sdkMock := &sdkMocks.SDKMock{}
 	sdkMock.On("Split", "s1").Return(&sdk.SplitView{
-		Name:         "s1",
-		TrafficType:  "tt1",
-		Killed:       true,
-		Treatments:   []string{"on", "off"},
-		ChangeNumber: 1,
-		Configs:      map[string]string{"a": "x"},
+		Name:             "s1",
+		TrafficType:      "tt1",
+		Killed:           true,
+		Treatments:       []string{"on", "off"},
+		ChangeNumber:     1,
+		Configs:          map[string]string{"a": "x"},
+		DefaultTreatment: "on",
+		Sets:             []string{"s1", "s2"},
 	}, (error)(nil)).Once()
 
 	logger := logging.NewLogger(nil)
