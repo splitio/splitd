@@ -248,7 +248,7 @@ func (m *ClientManager) handleGetTreatmentsByFlagSet(rpc *protov1.RPC, withConfi
 		return &protov1.ResponseWrapper[protov1.TreatmentsWithFeaturePayload]{Status: protov1.ResultInternalError}, err
 	}
 
-	results := make(map[string]protov1.TreatmentPayload, 0)
+	results := make(map[string]protov1.TreatmentPayload, len(res))
 	for feature, evaluationResult := range res {
 		currentPayload := protov1.TreatmentPayload{
 			Treatment: evaluationResult.Treatment,
