@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/splitio/go-split-commons/v4/dtos"
+	"github.com/splitio/go-split-commons/v5/dtos"
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio/sdk/conf"
 	"github.com/splitio/splitd/splitio/sdk/types"
@@ -103,7 +103,7 @@ func TestInstantiationAndGetTreatmentE2E(t *testing.T) {
 	client, err := New(logger, "someApikey", sdkConf)
 	assert.Nil(t, err)
 
-	res, err := client.Treatment(&types.ClientConfig{}, "aaaaaaklmnbv", nil, "split", nil)
+	res, _ := client.Treatment(&types.ClientConfig{}, "aaaaaaklmnbv", nil, "split", nil)
 	assert.Equal(t, "on", res.Treatment)
 
 	assert.Nil(t, client.Shutdown())

@@ -3,7 +3,7 @@ package conf
 import (
 	"time"
 
-	"github.com/splitio/go-split-commons/v4/conf"
+	"github.com/splitio/go-split-commons/v5/conf"
 )
 
 const (
@@ -19,6 +19,7 @@ type Config struct {
 	Impressions      Impressions
 	Events           Events
 	URLs             URLs
+	FlagSetsFilter   []string
 }
 
 type Splits struct {
@@ -66,6 +67,7 @@ func (c *Config) ToAdvancedConfig() *conf.AdvancedConfig {
 	d.SegmentUpdateQueueSize = int64(c.Segments.UpdateBufferSize)
 	d.SegmentWorkers = c.Segments.WorkerCount
 	d.StreamingEnabled = c.StreamingEnabled
+	d.FlagSetsFilter = c.FlagSetsFilter
 
 	d.AuthServiceURL = c.URLs.Auth
 	d.SdkURL = c.URLs.SDK
@@ -100,11 +102,11 @@ func DefaultConfig() *Config {
 			CountSyncPeriod: 60 * time.Minute,
 			PostConcurrency: 1,
 		},
-        Events: Events{
-            QueueSize: 8192,
-            SyncPeriod: 1*time.Minute,
-            PostConcurrency: 1,
-        },
+		Events: Events{
+			QueueSize:       8192,
+			SyncPeriod:      1 * time.Minute,
+			PostConcurrency: 1,
+		},
 		URLs: URLs{
 			Auth:      "https://auth.split.io",
 			SDK:       "https://sdk.split.io/api",
