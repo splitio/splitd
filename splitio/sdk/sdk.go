@@ -72,15 +72,7 @@ func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, 
 	md := dtos.Metadata{SDKVersion: fmt.Sprintf("splitd-%s", splitio.Version)}
 	advCfg := c.ToAdvancedConfig()
 
-	flagSets, errs := flagsets.SanitizeMany(advCfg.FlagSetsFilter)
-	if len(errs) != 0 {
-		for _, err := range errs {
-			if errType, ok := err.(dtos.FlagSetValidatonError); ok {
-				logger.Warning(errType.Message)
-			}
-		}
-	}
-	flagSetsFilter := flagsets.NewFlagSetFilter(flagSets)
+	flagSetsFilter := flagsets.NewFlagSetFilter(advCfg.FlagSetsFilter)
 
 	stores := setupStorages(c, flagSetsFilter)
 	impc, err := setupImpressionsComponents(&c.Impressions, stores.telemetry)
