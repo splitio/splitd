@@ -114,6 +114,7 @@ func DefaultConfig() *Config {
 			Streaming: "https://streaming.split.io/sse",
 			Telemetry: "https://telemetry.split.io/api/v1",
 		},
+		FlagSetsFilter: []string{},
 	}
 }
 
