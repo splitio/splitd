@@ -24,6 +24,7 @@ func main() {
 		fmt.Println("error reading config: ", err.Error())
 		os.Exit(1)
 	}
+	fmt.Println("cfg.SDK.FlagSetsFilter", cfg.SDK.FlagSetsFilter)
 	handleFlags(cfg)
 
 	loggerCfg, err := cfg.Logger.ToLoggerOptions()
