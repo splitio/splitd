@@ -212,7 +212,9 @@ func (s *SDK) ToSDKConf() *sdkConf.Config {
 	lang.MapIfNotNil(&cfg.Events.SyncPeriod, s.Events.RefreshRateSeconds, durationFromSeconds)
 	s.URLs.updateSDKConfURLs(&cfg.URLs)
 	// lang.SetIfNotNil(&cfg.FlagSetsFilter, s.FlagSetsFilter)
-	fmt.Println("TOSDKCONFIG", s.FlagSetsFilter)
+	if len(s.FlagSetsFilter) > 0 {
+		cfg.FlagSetsFilter = s.FlagSetsFilter
+	}
 	return cfg
 }
 
