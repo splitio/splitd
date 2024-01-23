@@ -140,7 +140,6 @@ func (s *SDK) PopulateWithDefaults() {
 	s.FeatureFlags.PopulateWithDefaults()
 	s.Impressions.PopulateWithDefaults()
 	s.Events.PopulateWithDefaults()
-	s.FlagSetsFilter = []string{}
 }
 
 type FeatureFlags struct {
