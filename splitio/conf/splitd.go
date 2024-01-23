@@ -127,7 +127,8 @@ type SDK struct {
 	URLs             URLs         `yaml:"urls"`
 	FeatureFlags     FeatureFlags `yaml:"featureFlags"`
 	Impressions      Impressions  `yaml:"impressions"`
-	Events           Events       `yank:"events"`
+	Events           Events       `yaml:"events"`
+	FlagSetsFilter   []string     `yaml:"flagSetsFilter"`
 }
 
 func (s *SDK) PopulateWithDefaults() {
@@ -139,6 +140,7 @@ func (s *SDK) PopulateWithDefaults() {
 	s.FeatureFlags.PopulateWithDefaults()
 	s.Impressions.PopulateWithDefaults()
 	s.Events.PopulateWithDefaults()
+	s.FlagSetsFilter = []string{}
 }
 
 type FeatureFlags struct {
@@ -209,6 +211,10 @@ func (s *SDK) ToSDKConf() *sdkConf.Config {
 	lang.SetIfNotEmpty(&cfg.Events.QueueSize, s.Events.QueueSize)
 	lang.MapIfNotNil(&cfg.Events.SyncPeriod, s.Events.RefreshRateSeconds, durationFromSeconds)
 	s.URLs.updateSDKConfURLs(&cfg.URLs)
+	// lang.SetIfNotNil(&cfg.FlagSetsFilter, s.FlagSetsFilter)
+	if len(s.FlagSetsFilter) > 0 {
+		cfg.FlagSetsFilter = s.FlagSetsFilter
+	}
 	return cfg
 }
 
