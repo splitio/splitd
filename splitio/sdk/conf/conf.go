@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/splitio/go-split-commons/v5/conf"
+	"github.com/splitio/go-split-commons/v5/dtos"
+	"github.com/splitio/go-split-commons/v5/flagsets"
 )
 
 const (
@@ -114,6 +116,7 @@ func DefaultConfig() *Config {
 			Streaming: "https://streaming.split.io/sse",
 			Telemetry: "https://telemetry.split.io/api/v1",
 		},
+		FlagSetsFilter: []string{},
 	}
 }
 
@@ -123,6 +126,17 @@ func (c *Config) Normalize() []string {
 		warnings = append(warnings, "minimum impressions refresh rate is 30 min. ignoring user config")
 		c.Impressions.SyncPeriod = minimumImpressionsRefreshRate
 	}
+
+	// Sanitize flagsets and append erros into warnings for logging purposes
+	sanitizedFlagSets, warns := flagsets.SanitizeMany(c.FlagSetsFilter)
+	if len(warns) != 0 {
+		for _, err := range warns {
+			if errType, ok := err.(dtos.FlagSetValidatonError); ok {
+				warnings = append(warnings, errType.Message)
+			}
+		}
+	}
+	c.FlagSetsFilter = sanitizedFlagSets
 
 	return warnings
 }
