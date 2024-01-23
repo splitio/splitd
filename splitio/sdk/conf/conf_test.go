@@ -32,4 +32,5 @@ func TestSDKConf(t *testing.T) {
 	assert.Equal(t, int64(dc.Segments.UpdateBufferSize), adv.SegmentUpdateQueueSize)
 	assert.Equal(t, int(dc.Splits.SyncPeriod.Seconds()), adv.SplitsRefreshRate)
 	assert.Equal(t, int(dc.Segments.SyncPeriod.Seconds()), adv.SegmentsRefreshRate)
+	assert.Equal(t, dc.FlagSetsFilter, adv.FlagSetsFilter)
 }
