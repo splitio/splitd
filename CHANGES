@@ -6,7 +6,7 @@
   - Added a new optional Split Filter configuration option. This allows the SDK and Split services to only synchronize the flags in the specified flag sets, avoiding unused or unwanted flags from being synced on the SDK instance, bringing all the benefits from a reduced payload.
 - Updated the following SDK manager method to expose flag sets on flag views:
     - Added `defaultTreatment` property to the `SplitView` object returned by the `split` and `splits` methods of the SDK manager.
-- Added go-split-commons/v5 library as a dependency.
+- Upgraded go-split-commons/v5 library as a dependency.
   - Added evaluator from commons.
 - Removed go-client dependency.
 
