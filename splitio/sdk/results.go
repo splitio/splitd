@@ -1,6 +1,6 @@
 package sdk
 
-import "github.com/splitio/go-split-commons/v4/dtos"
+import "github.com/splitio/go-split-commons/v5/dtos"
 
 type EvaluationResult struct {
 	Treatment  string
@@ -9,10 +9,12 @@ type EvaluationResult struct {
 }
 
 type SplitView struct {
-	Name         string
-	TrafficType  string
-	Killed       bool
-	Treatments   []string
-	ChangeNumber int64
-	Configs      map[string]string
+	Name             string
+	TrafficType      string
+	Killed           bool
+	Treatments       []string
+	ChangeNumber     int64
+	Configs          map[string]string
+	DefaultTreatment string
+	Sets             []string
 }

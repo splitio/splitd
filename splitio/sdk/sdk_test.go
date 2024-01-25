@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/splitio/go-client/v6/splitio/engine/evaluator"
-	"github.com/splitio/go-split-commons/v4/dtos"
-	"github.com/splitio/go-split-commons/v4/storage/inmemory"
-	"github.com/splitio/go-split-commons/v4/synchronizer"
+	"github.com/splitio/go-split-commons/v5/dtos"
+	"github.com/splitio/go-split-commons/v5/engine/evaluator"
+	"github.com/splitio/go-split-commons/v5/storage/inmemory"
+	"github.com/splitio/go-split-commons/v5/synchronizer"
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/external/commons/mocks"
 	"github.com/splitio/splitd/splitio/common/lang"
@@ -206,6 +206,160 @@ func TestTreatments(t *testing.T) {
 
 }
 
+func TestTreatmentsByFlagSet(t *testing.T) {
+	is, _ := storage.NewImpressionsQueue(100)
+
+	ev := &mocks.EvaluatorMock{}
+	ev.On("EvaluateFeatureByFlagSets", "key1", (*string)(nil), []string{"set"}, Attributes{"a": 1}).
+		Return(evaluator.Results{Evaluations: map[string]evaluator.Result{
+			"f1": {Treatment: "on", Label: "label1", EvaluationTime: 1 * time.Millisecond, SplitChangeNumber: 123},
+			"f2": {Treatment: "on", Label: "label2", EvaluationTime: 2 * time.Millisecond, SplitChangeNumber: 124},
+			"f3": {Treatment: "on", Label: "label3", EvaluationTime: 3 * time.Millisecond, SplitChangeNumber: 125},
+		}}).
+		Once()
+
+	expectedImpressions := []dtos.Impression{
+		{KeyName: "key1", BucketingKey: "", FeatureName: "f1", Treatment: "on", Label: "label1", ChangeNumber: 123},
+		{KeyName: "key1", BucketingKey: "", FeatureName: "f2", Treatment: "on", Label: "label2", ChangeNumber: 124},
+		{KeyName: "key1", BucketingKey: "", FeatureName: "f3", Treatment: "on", Label: "label3", ChangeNumber: 125},
+	}
+	im := &mocks.ImpressionManagerMock{}
+	im.On("ProcessSingle", mock.Anything).
+		Run(func(args mock.Arguments) {
+			assertImpEq(t, &expectedImpressions[0], args.Get(0).(*dtos.Impression))
+		}).
+		Return(true).
+		Once()
+	im.On("ProcessSingle", mock.Anything).
+		Run(func(args mock.Arguments) {
+			assertImpEq(t, &expectedImpressions[1], args.Get(0).(*dtos.Impression))
+		}).
+		Return(true).
+		Once()
+	im.On("ProcessSingle", mock.Anything).
+		Run(func(args mock.Arguments) {
+			assertImpEq(t, &expectedImpressions[2], args.Get(0).(*dtos.Impression))
+		}).
+		Return(true).
+		Once()
+
+	client := &Impl{
+		logger: logging.NewLogger(nil),
+		is:     is,
+		ev:     ev,
+		iq:     im,
+		cfg:    conf.Config{LabelsEnabled: true},
+	}
+
+	res, err := client.TreatmentsByFlagSet(
+		&types.ClientConfig{Metadata: types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}},
+		"key1", nil, "set", Attributes{"a": 1})
+	assert.Nil(t, err)
+	assert.Nil(t, res["f1"].Config)
+	assert.Nil(t, res["f2"].Config)
+	assert.Nil(t, res["f3"].Config)
+	assertImpEq(t, &expectedImpressions[0], res["f1"].Impression)
+	assertImpEq(t, &expectedImpressions[1], res["f2"].Impression)
+	assertImpEq(t, &expectedImpressions[2], res["f3"].Impression)
+
+	err = is.RangeAndClear(func(md types.ClientMetadata, st *storage.LockingQueue[dtos.Impression]) {
+		assert.Equal(t, types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}, md)
+		assert.Equal(t, 3, st.Len())
+
+		var imps []dtos.Impression
+		n, err := st.Pop(3, &imps)
+		assert.Nil(t, nil)
+		assert.Equal(t, 3, n)
+		assert.Equal(t, 3, len(imps))
+		assertImpEq(t, &expectedImpressions[0], &imps[0])
+		assertImpEq(t, &expectedImpressions[1], &imps[1])
+		assertImpEq(t, &expectedImpressions[2], &imps[2])
+		n, err = st.Pop(1, &imps)
+		assert.Equal(t, 0, n)
+		assert.ErrorIs(t, err, storage.ErrQueueEmpty)
+
+	})
+	assert.Nil(t, err)
+
+}
+
+func TestTreatmentsByFlagSets(t *testing.T) {
+	is, _ := storage.NewImpressionsQueue(100)
+
+	ev := &mocks.EvaluatorMock{}
+	ev.On("EvaluateFeatureByFlagSets", "key1", (*string)(nil), []string{"set_1", "set_2"}, Attributes{"a": 1}).
+		Return(evaluator.Results{Evaluations: map[string]evaluator.Result{
+			"f1": {Treatment: "on", Label: "label1", EvaluationTime: 1 * time.Millisecond, SplitChangeNumber: 123},
+			"f2": {Treatment: "on", Label: "label2", EvaluationTime: 2 * time.Millisecond, SplitChangeNumber: 124},
+			"f3": {Treatment: "on", Label: "label3", EvaluationTime: 3 * time.Millisecond, SplitChangeNumber: 125},
+		}}).
+		Once()
+
+	expectedImpressions := []dtos.Impression{
+		{KeyName: "key1", BucketingKey: "", FeatureName: "f1", Treatment: "on", Label: "label1", ChangeNumber: 123},
+		{KeyName: "key1", BucketingKey: "", FeatureName: "f2", Treatment: "on", Label: "label2", ChangeNumber: 124},
+		{KeyName: "key1", BucketingKey: "", FeatureName: "f3", Treatment: "on", Label: "label3", ChangeNumber: 125},
+	}
+	im := &mocks.ImpressionManagerMock{}
+	im.On("ProcessSingle", mock.Anything).
+		Run(func(args mock.Arguments) {
+			assertImpEq(t, &expectedImpressions[0], args.Get(0).(*dtos.Impression))
+		}).
+		Return(true).
+		Once()
+	im.On("ProcessSingle", mock.Anything).
+		Run(func(args mock.Arguments) {
+			assertImpEq(t, &expectedImpressions[1], args.Get(0).(*dtos.Impression))
+		}).
+		Return(true).
+		Once()
+	im.On("ProcessSingle", mock.Anything).
+		Run(func(args mock.Arguments) {
+			assertImpEq(t, &expectedImpressions[2], args.Get(0).(*dtos.Impression))
+		}).
+		Return(true).
+		Once()
+
+	client := &Impl{
+		logger: logging.NewLogger(nil),
+		is:     is,
+		ev:     ev,
+		iq:     im,
+		cfg:    conf.Config{LabelsEnabled: true},
+	}
+
+	res, err := client.TreatmentsByFlagSets(
+		&types.ClientConfig{Metadata: types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}},
+		"key1", nil, []string{"set_1", "set_2"}, Attributes{"a": 1})
+	assert.Nil(t, err)
+	assert.Nil(t, res["f1"].Config)
+	assert.Nil(t, res["f2"].Config)
+	assert.Nil(t, res["f3"].Config)
+	assertImpEq(t, &expectedImpressions[0], res["f1"].Impression)
+	assertImpEq(t, &expectedImpressions[1], res["f2"].Impression)
+	assertImpEq(t, &expectedImpressions[2], res["f3"].Impression)
+
+	err = is.RangeAndClear(func(md types.ClientMetadata, st *storage.LockingQueue[dtos.Impression]) {
+		assert.Equal(t, types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}, md)
+		assert.Equal(t, 3, st.Len())
+
+		var imps []dtos.Impression
+		n, err := st.Pop(3, &imps)
+		assert.Nil(t, nil)
+		assert.Equal(t, 3, n)
+		assert.Equal(t, 3, len(imps))
+		assertImpEq(t, &expectedImpressions[0], &imps[0])
+		assertImpEq(t, &expectedImpressions[1], &imps[1])
+		assertImpEq(t, &expectedImpressions[2], &imps[2])
+		n, err = st.Pop(1, &imps)
+		assert.Equal(t, 0, n)
+		assert.ErrorIs(t, err, storage.ErrQueueEmpty)
+
+	})
+	assert.Nil(t, err)
+
+}
+
 func TestImpressionsQueueFull(t *testing.T) {
 
 	logger := logging.NewLogger(nil)
@@ -221,7 +375,7 @@ func TestImpressionsQueueFull(t *testing.T) {
 	ts, _ := inmemory.NewTelemetryStorage()
 	iw := workers.NewImpressionsWorker(logger, ts, impRecorder, is, &conf.Impressions{Mode: "optimized", SyncPeriod: 100 * time.Second})
 	sworkers := synchronizer.Workers{ImpressionRecorder: iw}
-	sy := synchronizer.NewSynchronizer(*conf.DefaultConfig().ToAdvancedConfig(), synchronizer.SplitTasks{}, sworkers, logger, queueFullChan, nil)
+	sy := synchronizer.NewSynchronizer(*conf.DefaultConfig().ToAdvancedConfig(), synchronizer.SplitTasks{}, sworkers, logger, queueFullChan)
 	sy.StartPeriodicDataRecording()
 	// @}
 
@@ -411,13 +565,21 @@ func TestSplitNames(t *testing.T) {
 func TestSplits(t *testing.T) {
 	var ss mocks.SplitStorageMock
 	ss.On("All").Return([]dtos.SplitDTO{
-		{Name: "s1", TrafficTypeName: "tt1", ChangeNumber: 1, Conditions: []dtos.ConditionDTO{{Partitions: []dtos.PartitionDTO{{Treatment: "a"}, {Treatment: "b"}}}}},
 		{
-			Name:            "s2",
-			TrafficTypeName: "tt1",
-			ChangeNumber:    1,
-			Conditions:      []dtos.ConditionDTO{{Partitions: []dtos.PartitionDTO{{Treatment: "a"}, {Treatment: "b"}}}},
-			Configurations:  map[string]string{"a": "conf1", "b": "conf2"},
+			Name:             "s1",
+			TrafficTypeName:  "tt1",
+			ChangeNumber:     1,
+			Conditions:       []dtos.ConditionDTO{{Partitions: []dtos.PartitionDTO{{Treatment: "a"}, {Treatment: "b"}}}},
+			DefaultTreatment: "a",
+			Sets:             []string{"s1", "s2"},
+		},
+		{
+			Name:             "s2",
+			TrafficTypeName:  "tt1",
+			ChangeNumber:     1,
+			Conditions:       []dtos.ConditionDTO{{Partitions: []dtos.PartitionDTO{{Treatment: "a"}, {Treatment: "b"}}}},
+			Configurations:   map[string]string{"a": "conf1", "b": "conf2"},
+			DefaultTreatment: "a",
 		},
 	}).Once()
 
@@ -426,8 +588,8 @@ func TestSplits(t *testing.T) {
 	splits, err := c.Splits()
 	assert.Nil(t, err)
 	assert.Equal(t, []SplitView{
-		{Name: "s1", TrafficType: "tt1", Killed: false, Treatments: []string{"a", "b"}, ChangeNumber: 1},
-		{Name: "s2", TrafficType: "tt1", Killed: false, Treatments: []string{"a", "b"}, ChangeNumber: 1, Configs: map[string]string{"a": "conf1", "b": "conf2"}},
+		{Name: "s1", TrafficType: "tt1", Killed: false, Treatments: []string{"a", "b"}, ChangeNumber: 1, DefaultTreatment: "a", Sets: []string{"s1", "s2"}},
+		{Name: "s2", TrafficType: "tt1", Killed: false, Treatments: []string{"a", "b"}, ChangeNumber: 1, Configs: map[string]string{"a": "conf1", "b": "conf2"}, DefaultTreatment: "a"},
 	}, splits)
 }
 
