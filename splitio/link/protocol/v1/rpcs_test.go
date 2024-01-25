@@ -16,6 +16,10 @@ func TestOpStringify(t *testing.T) {
 	assert.Equal(t, "treatment-with-config", OCTreatmentWithConfig.String())
 	assert.Equal(t, "treatments", OCTreatments.String())
 	assert.Equal(t, "treatments-with-config", OCTreatmentsWithConfig.String())
+	assert.Equal(t, "treatments-by-flag-set", OCTreatmentsByFlagSet.String())
+	assert.Equal(t, "treatments-with-config-by-flag-set", OCTreatmentsWithConfigByFlagSet.String())
+	assert.Equal(t, "treatments-by-flag-sets", OCTreatmentsByFlagSets.String())
+	assert.Equal(t, "treatments-with-config-by-flag-sets", OCTreatmentsWithConfigByFlagSets.String())
 	assert.Equal(t, "track", OCTrack.String())
 	assert.Equal(t, "split-names", OCSplitNames.String())
 	assert.Equal(t, "split", OCSplit.String())
@@ -174,6 +178,132 @@ func TestTreatmentsRPCParsing(t *testing.T) {
 	assert.Equal(t, "key", r.Key)
 	assert.Equal(t, lang.Ref("bk"), r.BucketingKey)
 	assert.Equal(t, []string{"feat1", "feat2"}, r.Features)
+	assert.Nil(t, r.Attributes)
+}
+
+func TestTreatmentsByFlagSetRPCParsing(t *testing.T) {
+	var r TreatmentsByFlagSetArgs
+	assert.Equal(t,
+		RPCParseError{Code: PECOpCodeMismatch},
+		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCRegister, Args: nil}),
+	)
+	assert.Equal(t,
+		RPCParseError{Code: PECWrongArgCount},
+		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCTreatmentsByFlagSet, Args: []interface{}{}}),
+	)
+	assert.Equal(t,
+		RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsByFlagSetArgKeyIdx)},
+		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCTreatmentsByFlagSet, Args: []interface{}{nil, nil, nil, nil}}),
+	)
+	assert.Equal(t,
+		RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsByFlagSetArgBucketingKeyIdx)},
+		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCTreatmentsByFlagSet, Args: []interface{}{"key", 123, nil, nil}}),
+	)
+	assert.Equal(t,
+		RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsByFlagSetArgFlagSetIdx)},
+		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCTreatmentsByFlagSet, Args: []interface{}{"key", "bk", 123, nil}}),
+	)
+	assert.Equal(t,
+		RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsByFlagSetArgAttributesIdx)},
+		r.PopulateFromRPC(&RPC{
+			RPCBase: protocol.RPCBase{Version: protocol.V1},
+			OpCode:  OCTreatmentsByFlagSet,
+			Args:    []interface{}{"key", "bk", "set", 123}}),
+	)
+
+	err := r.PopulateFromRPC(&RPC{
+		RPCBase: protocol.RPCBase{Version: protocol.V1},
+		OpCode:  OCTreatmentsByFlagSet,
+		Args:    []interface{}{"key", "bk", "set", map[string]interface{}{"a": 1}}})
+	assert.Nil(t, err)
+	assert.Equal(t, "key", r.Key)
+	assert.Equal(t, lang.Ref("bk"), r.BucketingKey)
+	assert.Equal(t, "set", r.FlagSet)
+	assert.Equal(t, map[string]interface{}{"a": int64(1)}, r.Attributes)
+
+	// nil bucketing key
+	err = r.PopulateFromRPC(&RPC{
+		RPCBase: protocol.RPCBase{Version: protocol.V1},
+		OpCode:  OCTreatmentsByFlagSet,
+		Args:    []interface{}{"key", nil, "set", map[string]interface{}{"a": 1}}})
+	assert.Nil(t, err)
+	assert.Equal(t, "key", r.Key)
+	assert.Nil(t, r.BucketingKey)
+	assert.Equal(t, "set", r.FlagSet)
+	assert.Equal(t, map[string]interface{}{"a": int64(1)}, r.Attributes)
+
+	// nil attributes
+	err = r.PopulateFromRPC(&RPC{
+		RPCBase: protocol.RPCBase{Version: protocol.V1},
+		OpCode:  OCTreatmentsByFlagSet,
+		Args:    []interface{}{"key", "bk", "set", nil}})
+	assert.Nil(t, err)
+	assert.Equal(t, "key", r.Key)
+	assert.Equal(t, lang.Ref("bk"), r.BucketingKey)
+	assert.Equal(t, "set", r.FlagSet)
+	assert.Nil(t, r.Attributes)
+}
+
+func TestTreatmentsByFlagSetsRPCParsing(t *testing.T) {
+	var r TreatmentsByFlagSetsArgs
+	assert.Equal(t,
+		RPCParseError{Code: PECOpCodeMismatch},
+		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCRegister, Args: nil}),
+	)
+	assert.Equal(t,
+		RPCParseError{Code: PECWrongArgCount},
+		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCTreatmentsByFlagSets, Args: []interface{}{}}),
+	)
+	assert.Equal(t,
+		RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsByFlagSetsArgKeyIdx)},
+		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCTreatmentsByFlagSets, Args: []interface{}{nil, nil, nil, nil}}),
+	)
+	assert.Equal(t,
+		RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsByFlagSetsArgBucketingKeyIdx)},
+		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCTreatmentsByFlagSets, Args: []interface{}{"key", 123, nil, nil}}),
+	)
+	assert.Equal(t,
+		RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsByFlagSetsArgFlagSetsIdx)},
+		r.PopulateFromRPC(&RPC{RPCBase: protocol.RPCBase{Version: protocol.V1}, OpCode: OCTreatmentsByFlagSets, Args: []interface{}{"key", "bk", 123, nil}}),
+	)
+	assert.Equal(t,
+		RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsByFlagSetsArgAttributesIdx)},
+		r.PopulateFromRPC(&RPC{
+			RPCBase: protocol.RPCBase{Version: protocol.V1},
+			OpCode:  OCTreatmentsByFlagSets,
+			Args:    []interface{}{"key", "bk", []interface{}{"set_1", "set_2"}, 123}}),
+	)
+
+	err := r.PopulateFromRPC(&RPC{
+		RPCBase: protocol.RPCBase{Version: protocol.V1},
+		OpCode:  OCTreatmentsByFlagSets,
+		Args:    []interface{}{"key", "bk", []interface{}{"set_1", "set_2"}, map[string]interface{}{"a": 1}}})
+	assert.Nil(t, err)
+	assert.Equal(t, "key", r.Key)
+	assert.Equal(t, lang.Ref("bk"), r.BucketingKey)
+	assert.Equal(t, []string{"set_1", "set_2"}, r.FlagSets)
+	assert.Equal(t, map[string]interface{}{"a": int64(1)}, r.Attributes)
+
+	// nil bucketing key
+	err = r.PopulateFromRPC(&RPC{
+		RPCBase: protocol.RPCBase{Version: protocol.V1},
+		OpCode:  OCTreatmentsByFlagSets,
+		Args:    []interface{}{"key", nil, []interface{}{"set_1", "set_2"}, map[string]interface{}{"a": 1}}})
+	assert.Nil(t, err)
+	assert.Equal(t, "key", r.Key)
+	assert.Nil(t, r.BucketingKey)
+	assert.Equal(t, []string{"set_1", "set_2"}, r.FlagSets)
+	assert.Equal(t, map[string]interface{}{"a": int64(1)}, r.Attributes)
+
+	// nil attributes
+	err = r.PopulateFromRPC(&RPC{
+		RPCBase: protocol.RPCBase{Version: protocol.V1},
+		OpCode:  OCTreatmentsByFlagSets,
+		Args:    []interface{}{"key", "bk", []interface{}{"set_1", "set_2"}, nil}})
+	assert.Nil(t, err)
+	assert.Equal(t, "key", r.Key)
+	assert.Equal(t, lang.Ref("bk"), r.BucketingKey)
+	assert.Equal(t, []string{"set_1", "set_2"}, r.FlagSets)
 	assert.Nil(t, r.Attributes)
 }
 
@@ -368,6 +498,30 @@ func TestRPCEncoding(t *testing.T) {
 	assert.Equal(t, *tsa.BucketingKey, encodedTsA[TreatmentsArgBucketingKeyIdx].(string))
 	assert.Equal(t, tsa.Features, encodedTsA[TreatmentsArgFeaturesIdx].([]string))
 	assert.Equal(t, tsa.Attributes, encodedTsA[TreatmentsArgAttributesIdx].(map[string]interface{}))
+
+	tsfa := TreatmentsByFlagSetArgs{
+		Key:          "someKey",
+		BucketingKey: lang.Ref("someBucketing"),
+		FlagSet:      "set",
+		Attributes:   map[string]interface{}{"some": "attribute"},
+	}
+	encodedTsfA := tsfa.Encode()
+	assert.Equal(t, tsfa.Key, encodedTsfA[TreatmentsByFlagSetArgKeyIdx].(string))
+	assert.Equal(t, *tsfa.BucketingKey, encodedTsfA[TreatmentsByFlagSetArgBucketingKeyIdx].(string))
+	assert.Equal(t, tsfa.FlagSet, encodedTsfA[TreatmentsByFlagSetArgFlagSetIdx].(string))
+	assert.Equal(t, tsfa.Attributes, encodedTsfA[TreatmentsByFlagSetArgAttributesIdx].(map[string]interface{}))
+
+	tsfsa := TreatmentsByFlagSetsArgs{
+		Key:          "someKey",
+		BucketingKey: lang.Ref("someBucketing"),
+		FlagSets:     []string{"set_1", "set_2"},
+		Attributes:   map[string]interface{}{"some": "attribute"},
+	}
+	encodedTsfsA := tsfsa.Encode()
+	assert.Equal(t, tsfsa.Key, encodedTsfsA[TreatmentsByFlagSetsArgKeyIdx].(string))
+	assert.Equal(t, *tsfsa.BucketingKey, encodedTsfsA[TreatmentsByFlagSetsArgBucketingKeyIdx].(string))
+	assert.Equal(t, tsfsa.FlagSets, encodedTsfsA[TreatmentsByFlagSetsArgFlagSetsIdx].([]string))
+	assert.Equal(t, tsfsa.Attributes, encodedTsfsA[TreatmentsByFlagSetsArgAttributesIdx].(map[string]interface{}))
 
 	tra := TrackArgs{
 		Key:         "someKey",

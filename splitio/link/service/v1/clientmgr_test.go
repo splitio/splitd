@@ -5,7 +5,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/splitio/go-split-commons/v4/dtos"
+	"github.com/splitio/go-split-commons/v5/dtos"
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio/common/lang"
 	"github.com/splitio/splitd/splitio/link/protocol"
@@ -236,6 +236,206 @@ func TestRegisterWithImpsAndTreatmentHappyPath(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestRegisterAndTreatmentsByFlagSetHappyPath(t *testing.T) {
+	rawConnMock := &transferMocks.RawConnMock{}
+	rawConnMock.On("ReceiveMessage").Return([]byte("registrationMessage"), nil).Once()
+	rawConnMock.On("SendMessage", []byte("successRegistration")).Return(nil).Once()
+	rawConnMock.On("ReceiveMessage").Return([]byte("treatmentsByFlagSetMessage"), nil).Once()
+	rawConnMock.On("SendMessage", []byte("successPayload")).Return(nil).Once()
+	rawConnMock.On("ReceiveMessage").Return([]byte(nil), io.EOF).Once()
+
+	serializerMock := &serializerMocks.SerializerMock{}
+	serializerMock.On("Parse", []byte("registrationMessage"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(1).(*v1.RPC) = v1.RPC{
+			RPCBase: protocol.RPCBase{Version: protocol.V1},
+			OpCode:  v1.OCRegister,
+			Args:    []interface{}{"someID", "some_sdk-1.2.3", uint64(0)},
+		}
+	}).Once()
+	serializerMock.On("Serialize", proto1Mocks.NewRegisterResp(true)).Return([]byte("successRegistration"), nil).Once()
+	serializerMock.On("Parse", []byte("treatmentsByFlagSetMessage"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(1).(*v1.RPC) = v1.RPC{
+			RPCBase: protocol.RPCBase{Version: protocol.V1},
+			OpCode:  v1.OCTreatmentsByFlagSet,
+			Args:    []interface{}{"key", nil, "set", map[string]interface{}(nil)},
+		}
+	}).Once()
+	serializerMock.On("Serialize", proto1Mocks.NewTreatmentsByFlagSetResp(true, map[string]sdk.EvaluationResult{
+		"feat1": {Treatment: "on"}, "feat2": {Treatment: "off"}, "feat3": {Treatment: "control"},
+	})).Return([]byte("successPayload"), nil).Once()
+
+	sdkMock := &sdkMocks.SDKMock{}
+	sdkMock.
+		On(
+			"TreatmentsByFlagSet",
+			&types.ClientConfig{Metadata: types.ClientMetadata{ID: "someID", SdkVersion: "some_sdk-1.2.3"}},
+			"key",
+			(*string)(nil),
+			"set",
+			map[string]interface{}(nil),
+		).Return(map[string]sdk.EvaluationResult{
+		"feat1": {Treatment: "on"},
+		"feat2": {Treatment: "off"},
+		"feat3": {Treatment: "control"},
+	}, nil).Once()
+
+	logger := logging.NewLogger(nil)
+	cm := NewClientManager(rawConnMock, logger, sdkMock, serializerMock)
+	err := cm.handleClientInteractions()
+	assert.Nil(t, err)
+}
+
+func TestRegisterAndTreatmentsWithConfigByFlagSetHappyPath(t *testing.T) {
+	rawConnMock := &transferMocks.RawConnMock{}
+	rawConnMock.On("ReceiveMessage").Return([]byte("registrationMessage"), nil).Once()
+	rawConnMock.On("SendMessage", []byte("successRegistration")).Return(nil).Once()
+	rawConnMock.On("ReceiveMessage").Return([]byte("treatmentsWithConfigByFlagSetMessage"), nil).Once()
+	rawConnMock.On("SendMessage", []byte("successPayload")).Return(nil).Once()
+	rawConnMock.On("ReceiveMessage").Return([]byte(nil), io.EOF).Once()
+
+	var strCfg = "what"
+
+	serializerMock := &serializerMocks.SerializerMock{}
+	serializerMock.On("Parse", []byte("registrationMessage"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(1).(*v1.RPC) = v1.RPC{
+			RPCBase: protocol.RPCBase{Version: protocol.V1},
+			OpCode:  v1.OCRegister,
+			Args:    []interface{}{"someID", "some_sdk-1.2.3", uint64(0)},
+		}
+	}).Once()
+	serializerMock.On("Serialize", proto1Mocks.NewRegisterResp(true)).Return([]byte("successRegistration"), nil).Once()
+	serializerMock.On("Parse", []byte("treatmentsWithConfigByFlagSetMessage"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(1).(*v1.RPC) = v1.RPC{
+			RPCBase: protocol.RPCBase{Version: protocol.V1},
+			OpCode:  v1.OCTreatmentsWithConfigByFlagSet,
+			Args:    []interface{}{"key", nil, "set", map[string]interface{}(nil)},
+		}
+	}).Once()
+	serializerMock.On("Serialize", proto1Mocks.NewTreatmentsByFlagSetResp(true, map[string]sdk.EvaluationResult{
+		"feat1": {Treatment: "on"}, "feat2": {Treatment: "off"}, "feat3": {Treatment: "control", Config: &strCfg},
+	})).Return([]byte("successPayload"), nil).Once()
+
+	sdkMock := &sdkMocks.SDKMock{}
+	sdkMock.
+		On(
+			"TreatmentsByFlagSet",
+			&types.ClientConfig{Metadata: types.ClientMetadata{ID: "someID", SdkVersion: "some_sdk-1.2.3"}},
+			"key",
+			(*string)(nil),
+			"set",
+			map[string]interface{}(nil),
+		).Return(map[string]sdk.EvaluationResult{
+		"feat1": {Treatment: "on"},
+		"feat2": {Treatment: "off"},
+		"feat3": {Treatment: "control", Config: &strCfg},
+	}, nil).Once()
+
+	logger := logging.NewLogger(nil)
+	cm := NewClientManager(rawConnMock, logger, sdkMock, serializerMock)
+	err := cm.handleClientInteractions()
+	assert.Nil(t, err)
+}
+
+func TestRegisterAndTreatmentsByFlagSetstHappyPath(t *testing.T) {
+	rawConnMock := &transferMocks.RawConnMock{}
+	rawConnMock.On("ReceiveMessage").Return([]byte("registrationMessage"), nil).Once()
+	rawConnMock.On("SendMessage", []byte("successRegistration")).Return(nil).Once()
+	rawConnMock.On("ReceiveMessage").Return([]byte("treatmentsByFlagSetsMessage"), nil).Once()
+	rawConnMock.On("SendMessage", []byte("successPayload")).Return(nil).Once()
+	rawConnMock.On("ReceiveMessage").Return([]byte(nil), io.EOF).Once()
+
+	serializerMock := &serializerMocks.SerializerMock{}
+	serializerMock.On("Parse", []byte("registrationMessage"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(1).(*v1.RPC) = v1.RPC{
+			RPCBase: protocol.RPCBase{Version: protocol.V1},
+			OpCode:  v1.OCRegister,
+			Args:    []interface{}{"someID", "some_sdk-1.2.3", uint64(0)},
+		}
+	}).Once()
+	serializerMock.On("Serialize", proto1Mocks.NewRegisterResp(true)).Return([]byte("successRegistration"), nil).Once()
+	serializerMock.On("Parse", []byte("treatmentsByFlagSetsMessage"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(1).(*v1.RPC) = v1.RPC{
+			RPCBase: protocol.RPCBase{Version: protocol.V1},
+			OpCode:  v1.OCTreatmentsByFlagSets,
+			Args:    []interface{}{"key", nil, []interface{}{"set_1", "set_2"}, map[string]interface{}(nil)},
+		}
+	}).Once()
+	serializerMock.On("Serialize", proto1Mocks.NewTreatmentsByFlagSetResp(true, map[string]sdk.EvaluationResult{
+		"feat1": {Treatment: "on"}, "feat2": {Treatment: "off"}, "feat3": {Treatment: "control"},
+	})).Return([]byte("successPayload"), nil).Once()
+
+	sdkMock := &sdkMocks.SDKMock{}
+	sdkMock.
+		On(
+			"TreatmentsByFlagSets",
+			&types.ClientConfig{Metadata: types.ClientMetadata{ID: "someID", SdkVersion: "some_sdk-1.2.3"}},
+			"key",
+			(*string)(nil),
+			[]string{"set_1", "set_2"},
+			map[string]interface{}(nil),
+		).Return(map[string]sdk.EvaluationResult{
+		"feat1": {Treatment: "on"},
+		"feat2": {Treatment: "off"},
+		"feat3": {Treatment: "control"},
+	}, nil).Once()
+
+	logger := logging.NewLogger(nil)
+	cm := NewClientManager(rawConnMock, logger, sdkMock, serializerMock)
+	err := cm.handleClientInteractions()
+	assert.Nil(t, err)
+}
+
+func TestRegisterAndTreatmentsWithConfigByFlagSetsHappyPath(t *testing.T) {
+	rawConnMock := &transferMocks.RawConnMock{}
+	rawConnMock.On("ReceiveMessage").Return([]byte("registrationMessage"), nil).Once()
+	rawConnMock.On("SendMessage", []byte("successRegistration")).Return(nil).Once()
+	rawConnMock.On("ReceiveMessage").Return([]byte("treatmentsWithConfigByFlagSetsMessage"), nil).Once()
+	rawConnMock.On("SendMessage", []byte("successPayload")).Return(nil).Once()
+	rawConnMock.On("ReceiveMessage").Return([]byte(nil), io.EOF).Once()
+
+	var strCfg = "what"
+
+	serializerMock := &serializerMocks.SerializerMock{}
+	serializerMock.On("Parse", []byte("registrationMessage"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(1).(*v1.RPC) = v1.RPC{
+			RPCBase: protocol.RPCBase{Version: protocol.V1},
+			OpCode:  v1.OCRegister,
+			Args:    []interface{}{"someID", "some_sdk-1.2.3", uint64(0)},
+		}
+	}).Once()
+	serializerMock.On("Serialize", proto1Mocks.NewRegisterResp(true)).Return([]byte("successRegistration"), nil).Once()
+	serializerMock.On("Parse", []byte("treatmentsWithConfigByFlagSetsMessage"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(1).(*v1.RPC) = v1.RPC{
+			RPCBase: protocol.RPCBase{Version: protocol.V1},
+			OpCode:  v1.OCTreatmentsWithConfigByFlagSets,
+			Args:    []interface{}{"key", nil, []interface{}{"set_1", "set_2"}, map[string]interface{}(nil)},
+		}
+	}).Once()
+	serializerMock.On("Serialize", proto1Mocks.NewTreatmentsByFlagSetResp(true, map[string]sdk.EvaluationResult{
+		"feat1": {Treatment: "on"}, "feat2": {Treatment: "off"}, "feat3": {Treatment: "control", Config: &strCfg},
+	})).Return([]byte("successPayload"), nil).Once()
+
+	sdkMock := &sdkMocks.SDKMock{}
+	sdkMock.
+		On(
+			"TreatmentsByFlagSets",
+			&types.ClientConfig{Metadata: types.ClientMetadata{ID: "someID", SdkVersion: "some_sdk-1.2.3"}},
+			"key",
+			(*string)(nil),
+			[]string{"set_1", "set_2"},
+			map[string]interface{}(nil),
+		).Return(map[string]sdk.EvaluationResult{
+		"feat1": {Treatment: "on"},
+		"feat2": {Treatment: "off"},
+		"feat3": {Treatment: "control", Config: &strCfg},
+	}, nil).Once()
+
+	logger := logging.NewLogger(nil)
+	cm := NewClientManager(rawConnMock, logger, sdkMock, serializerMock)
+	err := cm.handleClientInteractions()
+	assert.Nil(t, err)
+}
+
 func TestTrack(t *testing.T) {
 	rawConnMock := &transferMocks.RawConnMock{}
 	rawConnMock.On("ReceiveMessage").Return([]byte("registrationMessage"), nil).Once()
@@ -323,14 +523,14 @@ func TestSplits(t *testing.T) {
 		*args.Get(1).(*v1.RPC) = *proto1Mocks.NewSplitsRPC()
 	}).Once()
 	serializerMock.On("Serialize", proto1Mocks.NewSplitsResp(true, []v1.SplitPayload{
-		{Name: "s1", TrafficType: "tt1", Killed: true, Treatments: []string{"on", "off"}, ChangeNumber: 1, Configs: map[string]string{"a": "x"}},
-		{Name: "s2", TrafficType: "tt1", Killed: false, Treatments: []string{"on", "off"}, ChangeNumber: 1, Configs: map[string]string{"a": "y"}},
+		{Name: "s1", TrafficType: "tt1", Killed: true, Treatments: []string{"on", "off"}, ChangeNumber: 1, Configs: map[string]string{"a": "x"}, DefaultTreatment: "on"},
+		{Name: "s2", TrafficType: "tt1", Killed: false, Treatments: []string{"on", "off"}, ChangeNumber: 1, Configs: map[string]string{"a": "y"}, DefaultTreatment: "on", Sets: []string{"s1", "s2"}},
 	})).Return([]byte("successPayload"), nil).Once()
 
 	sdkMock := &sdkMocks.SDKMock{}
 	sdkMock.On("Splits").Return([]sdk.SplitView{
-		{Name: "s1", TrafficType: "tt1", Killed: true, Treatments: []string{"on", "off"}, ChangeNumber: 1, Configs: map[string]string{"a": "x"}},
-		{Name: "s2", TrafficType: "tt1", Killed: false, Treatments: []string{"on", "off"}, ChangeNumber: 1, Configs: map[string]string{"a": "y"}},
+		{Name: "s1", TrafficType: "tt1", Killed: true, Treatments: []string{"on", "off"}, ChangeNumber: 1, Configs: map[string]string{"a": "x"}, DefaultTreatment: "on"},
+		{Name: "s2", TrafficType: "tt1", Killed: false, Treatments: []string{"on", "off"}, ChangeNumber: 1, Configs: map[string]string{"a": "y"}, DefaultTreatment: "on", Sets: []string{"s1", "s2"}},
 	}, (error)(nil)).Once()
 
 	logger := logging.NewLogger(nil)
@@ -360,22 +560,26 @@ func TestSplit(t *testing.T) {
 		*args.Get(1).(*v1.RPC) = *proto1Mocks.NewSplitRPC("s1")
 	}).Once()
 	serializerMock.On("Serialize", proto1Mocks.NewSplitResp(true, v1.SplitPayload{
-		Name:         "s1",
-		TrafficType:  "tt1",
-		Killed:       true,
-		Treatments:   []string{"on", "off"},
-		ChangeNumber: 1,
-		Configs:      map[string]string{"a": "x"},
+		Name:             "s1",
+		TrafficType:      "tt1",
+		Killed:           true,
+		Treatments:       []string{"on", "off"},
+		ChangeNumber:     1,
+		Configs:          map[string]string{"a": "x"},
+		DefaultTreatment: "on",
+		Sets:             []string{"s1", "s2"},
 	})).Return([]byte("successPayload"), nil).Once()
 
 	sdkMock := &sdkMocks.SDKMock{}
 	sdkMock.On("Split", "s1").Return(&sdk.SplitView{
-		Name:         "s1",
-		TrafficType:  "tt1",
-		Killed:       true,
-		Treatments:   []string{"on", "off"},
-		ChangeNumber: 1,
-		Configs:      map[string]string{"a": "x"},
+		Name:             "s1",
+		TrafficType:      "tt1",
+		Killed:           true,
+		Treatments:       []string{"on", "off"},
+		ChangeNumber:     1,
+		Configs:          map[string]string{"a": "x"},
+		DefaultTreatment: "on",
+		Sets:             []string{"s1", "s2"},
 	}, (error)(nil)).Once()
 
 	logger := logging.NewLogger(nil)
