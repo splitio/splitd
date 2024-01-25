@@ -6,19 +6,18 @@ import (
 	"time"
 
 	"github.com/splitio/splitd/splitio/sdk/conf"
-	sdkConf "github.com/splitio/splitd/splitio/sdk/conf"
 	"github.com/splitio/splitd/splitio/sdk/storage"
 	"github.com/splitio/splitd/splitio/sdk/types"
 
-	"github.com/splitio/go-client/v6/splitio/engine"
-	"github.com/splitio/go-client/v6/splitio/engine/evaluator"
-
-	"github.com/splitio/go-split-commons/v4/dtos"
-	"github.com/splitio/go-split-commons/v4/healthcheck/application"
-	"github.com/splitio/go-split-commons/v4/provisional"
-	"github.com/splitio/go-split-commons/v4/service/api"
-	commonStorage "github.com/splitio/go-split-commons/v4/storage"
-	"github.com/splitio/go-split-commons/v4/synchronizer"
+	"github.com/splitio/go-split-commons/v5/dtos"
+	"github.com/splitio/go-split-commons/v5/engine"
+	"github.com/splitio/go-split-commons/v5/engine/evaluator"
+	"github.com/splitio/go-split-commons/v5/flagsets"
+	"github.com/splitio/go-split-commons/v5/healthcheck/application"
+	"github.com/splitio/go-split-commons/v5/provisional"
+	"github.com/splitio/go-split-commons/v5/service/api"
+	commonStorage "github.com/splitio/go-split-commons/v5/storage"
+	"github.com/splitio/go-split-commons/v5/synchronizer"
 	"github.com/splitio/go-toolkit/v5/common"
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio"
@@ -39,6 +38,8 @@ type Attributes = map[string]interface{}
 type Interface interface {
 	Treatment(cfg *types.ClientConfig, key string, bucketingKey *string, feature string, attributes map[string]interface{}) (*EvaluationResult, error)
 	Treatments(cfg *types.ClientConfig, key string, bucketingKey *string, features []string, attributes map[string]interface{}) (map[string]EvaluationResult, error)
+	TreatmentsByFlagSet(cfg *types.ClientConfig, key string, bucketingKey *string, flagSet string, attributes map[string]interface{}) (map[string]EvaluationResult, error)
+	TreatmentsByFlagSets(cfg *types.ClientConfig, key string, bucketingKey *string, flagSets []string, attributes map[string]interface{}) (map[string]EvaluationResult, error)
 	Track(cfg *types.ClientConfig, key string, trafficType string, eventType string, value *float64, properties map[string]interface{}) error
 	SplitNames() ([]string, error)
 	Splits() ([]SplitView, error)
@@ -55,8 +56,7 @@ type Impl struct {
 	es            *storage.EventsStorage
 	iq            provisional.ImpressionManager
 	splitStorage  commonStorage.SplitStorage
-	cfg           sdkConf.Config
-	status        chan int
+	cfg           conf.Config
 	queueFullChan chan string
 	validator     Validator
 }
@@ -72,7 +72,9 @@ func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, 
 	md := dtos.Metadata{SDKVersion: fmt.Sprintf("splitd-%s", splitio.Version)}
 	advCfg := c.ToAdvancedConfig()
 
-	stores := setupStorages(c)
+	flagSetsFilter := flagsets.NewFlagSetFilter(advCfg.FlagSetsFilter)
+
+	stores := setupStorages(c, flagSetsFilter)
 	impc, err := setupImpressionsComponents(&c.Impressions, stores.telemetry)
 	if err != nil {
 		return nil, fmt.Errorf("error setting up impressions components")
@@ -82,9 +84,9 @@ func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, 
 
 	queueFullChan := make(chan string, 2)
 	splitApi := api.NewSplitAPI(apikey, *advCfg, logger, md)
-	workers := setupWorkers(logger, splitApi, stores, hc, c)
+	workers := setupWorkers(logger, splitApi, stores, hc, c, flagSetsFilter)
 	tasks := setupTasks(c, stores, logger, workers, impc, md, splitApi)
-	sync := synchronizer.NewSynchronizer(*advCfg, *tasks, *workers, logger, queueFullChan, nil)
+	sync := synchronizer.NewSynchronizer(*advCfg, *tasks, *workers, logger, queueFullChan)
 
 	status := make(chan int, 10)
 	manager, err := synchronizer.NewSynchronizerManager(sync, logger, *advCfg, splitApi.AuthClient, stores.splits, status, stores.telemetry, md, nil, hc)
@@ -142,6 +144,38 @@ func (i *Impl) Treatments(cfg *types.ClientConfig, key string, bk *string, featu
 			continue
 		}
 
+		var eres EvaluationResult
+		eres.Treatment = curr.Treatment
+		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata)
+		eres.Config = curr.Config
+		toRet[feature] = eres
+	}
+
+	return toRet, nil
+}
+
+// TreatmentsByFlagSet implements Interface
+func (i *Impl) TreatmentsByFlagSet(cfg *types.ClientConfig, key string, bk *string, flagSet string, attributes Attributes) (map[string]EvaluationResult, error) {
+
+	res := i.ev.EvaluateFeatureByFlagSets(key, bk, []string{flagSet}, attributes)
+	toRet := make(map[string]EvaluationResult, len(res.Evaluations))
+	for feature, curr := range res.Evaluations {
+		var eres EvaluationResult
+		eres.Treatment = curr.Treatment
+		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata)
+		eres.Config = curr.Config
+		toRet[feature] = eres
+	}
+
+	return toRet, nil
+}
+
+// TreatmentsByFlagSets implements Interface
+func (i *Impl) TreatmentsByFlagSets(cfg *types.ClientConfig, key string, bk *string, flagSets []string, attributes Attributes) (map[string]EvaluationResult, error) {
+
+	res := i.ev.EvaluateFeatureByFlagSets(key, bk, flagSets, attributes)
+	toRet := make(map[string]EvaluationResult, len(res.Evaluations))
+	for feature, curr := range res.Evaluations {
 		var eres EvaluationResult
 		eres.Treatment = curr.Treatment
 		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata)
@@ -262,12 +296,14 @@ func splitToView(s *dtos.SplitDTO) *SplitView {
 	}
 
 	return &SplitView{
-		Name:         s.Name,
-		TrafficType:  s.TrafficTypeName,
-		Killed:       s.Killed,
-		ChangeNumber: s.ChangeNumber,
-		Configs:      s.Configurations,
-		Treatments:   treatments,
+		Name:             s.Name,
+		TrafficType:      s.TrafficTypeName,
+		Killed:           s.Killed,
+		ChangeNumber:     s.ChangeNumber,
+		Configs:          s.Configurations,
+		Treatments:       treatments,
+		DefaultTreatment: s.DefaultTreatment,
+		Sets:             s.Sets,
 	}
 }
 

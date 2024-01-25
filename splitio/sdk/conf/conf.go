@@ -3,7 +3,9 @@ package conf
 import (
 	"time"
 
-	"github.com/splitio/go-split-commons/v4/conf"
+	"github.com/splitio/go-split-commons/v5/conf"
+	"github.com/splitio/go-split-commons/v5/dtos"
+	"github.com/splitio/go-split-commons/v5/flagsets"
 )
 
 const (
@@ -19,6 +21,7 @@ type Config struct {
 	Impressions      Impressions
 	Events           Events
 	URLs             URLs
+	FlagSetsFilter   []string
 }
 
 type Splits struct {
@@ -66,6 +69,7 @@ func (c *Config) ToAdvancedConfig() *conf.AdvancedConfig {
 	d.SegmentUpdateQueueSize = int64(c.Segments.UpdateBufferSize)
 	d.SegmentWorkers = c.Segments.WorkerCount
 	d.StreamingEnabled = c.StreamingEnabled
+	d.FlagSetsFilter = c.FlagSetsFilter
 
 	d.AuthServiceURL = c.URLs.Auth
 	d.SdkURL = c.URLs.SDK
@@ -100,11 +104,11 @@ func DefaultConfig() *Config {
 			CountSyncPeriod: 60 * time.Minute,
 			PostConcurrency: 1,
 		},
-        Events: Events{
-            QueueSize: 8192,
-            SyncPeriod: 1*time.Minute,
-            PostConcurrency: 1,
-        },
+		Events: Events{
+			QueueSize:       8192,
+			SyncPeriod:      1 * time.Minute,
+			PostConcurrency: 1,
+		},
 		URLs: URLs{
 			Auth:      "https://auth.split.io",
 			SDK:       "https://sdk.split.io/api",
@@ -112,6 +116,7 @@ func DefaultConfig() *Config {
 			Streaming: "https://streaming.split.io/sse",
 			Telemetry: "https://telemetry.split.io/api/v1",
 		},
+		FlagSetsFilter: []string{},
 	}
 }
 
@@ -121,6 +126,17 @@ func (c *Config) Normalize() []string {
 		warnings = append(warnings, "minimum impressions refresh rate is 30 min. ignoring user config")
 		c.Impressions.SyncPeriod = minimumImpressionsRefreshRate
 	}
+
+	// Sanitize flagsets and append erros into warnings for logging purposes
+	sanitizedFlagSets, warns := flagsets.SanitizeMany(c.FlagSetsFilter)
+	if len(warns) != 0 {
+		for _, err := range warns {
+			if errType, ok := err.(dtos.FlagSetValidatonError); ok {
+				warnings = append(warnings, errType.Message)
+			}
+		}
+	}
+	c.FlagSetsFilter = sanitizedFlagSets
 
 	return warnings
 }
