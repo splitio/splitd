@@ -24,7 +24,7 @@ jobs:
         run: echo "VERSION=$(cat splitio/version.go | grep 'Version =' | awk '{print $4}' | tr -d '"')" >> $GITHUB_ENV
 
       - name: Docker build and push
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           context: .
           file: "infra/sidecar.Dockerfile"
