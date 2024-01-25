@@ -307,27 +307,39 @@ func TestTreatmentsByFlagSets(t *testing.T) {
 		}}).
 		Once()
 
-	expectedImpressions := []dtos.Impression{
-		{KeyName: "key1", BucketingKey: "", FeatureName: "f1", Treatment: "on", Label: "label1", ChangeNumber: 123},
-		{KeyName: "key1", BucketingKey: "", FeatureName: "f2", Treatment: "on", Label: "label2", ChangeNumber: 124},
-		{KeyName: "key1", BucketingKey: "", FeatureName: "f3", Treatment: "on", Label: "label3", ChangeNumber: 125},
+	expectedImpressions := map[string]*dtos.Impression{
+		"f1": {KeyName: "key1", BucketingKey: "", FeatureName: "f1", Treatment: "on", Label: "label1", ChangeNumber: 123},
+		"f2": {KeyName: "key1", BucketingKey: "", FeatureName: "f2", Treatment: "on", Label: "label2", ChangeNumber: 124},
+		"f3": {KeyName: "key1", BucketingKey: "", FeatureName: "f3", Treatment: "on", Label: "label3", ChangeNumber: 125},
 	}
 	im := &mocks.ImpressionManagerMock{}
 	im.On("ProcessSingle", mock.Anything).
 		Run(func(args mock.Arguments) {
-			assertImpEq(t, &expectedImpressions[0], args.Get(0).(*dtos.Impression))
+			imp, ok := args.Get(0).(*dtos.Impression)
+			if !ok {
+				t.Error("not an impression")
+			}
+			assertImpEq(t, expectedImpressions[imp.FeatureName], args.Get(0).(*dtos.Impression))
 		}).
 		Return(true).
 		Once()
 	im.On("ProcessSingle", mock.Anything).
 		Run(func(args mock.Arguments) {
-			assertImpEq(t, &expectedImpressions[1], args.Get(0).(*dtos.Impression))
+			imp, ok := args.Get(0).(*dtos.Impression)
+			if !ok {
+				t.Error("not an impression")
+			}
+			assertImpEq(t, expectedImpressions[imp.FeatureName], args.Get(0).(*dtos.Impression))
 		}).
 		Return(true).
 		Once()
 	im.On("ProcessSingle", mock.Anything).
 		Run(func(args mock.Arguments) {
-			assertImpEq(t, &expectedImpressions[2], args.Get(0).(*dtos.Impression))
+			imp, ok := args.Get(0).(*dtos.Impression)
+			if !ok {
+				t.Error("not an impression")
+			}
+			assertImpEq(t, expectedImpressions[imp.FeatureName], args.Get(0).(*dtos.Impression))
 		}).
 		Return(true).
 		Once()
@@ -347,9 +359,9 @@ func TestTreatmentsByFlagSets(t *testing.T) {
 	assert.Nil(t, res["f1"].Config)
 	assert.Nil(t, res["f2"].Config)
 	assert.Nil(t, res["f3"].Config)
-	assertImpEq(t, &expectedImpressions[0], res["f1"].Impression)
-	assertImpEq(t, &expectedImpressions[1], res["f2"].Impression)
-	assertImpEq(t, &expectedImpressions[2], res["f3"].Impression)
+	assertImpEq(t, expectedImpressions["f1"], res["f1"].Impression)
+	assertImpEq(t, expectedImpressions["f2"], res["f2"].Impression)
+	assertImpEq(t, expectedImpressions["f3"], res["f3"].Impression)
 
 	err = is.RangeAndClear(func(md types.ClientMetadata, st *storage.LockingQueue[dtos.Impression]) {
 		assert.Equal(t, types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}, md)
@@ -360,9 +372,9 @@ func TestTreatmentsByFlagSets(t *testing.T) {
 		assert.Nil(t, nil)
 		assert.Equal(t, 3, n)
 		assert.Equal(t, 3, len(imps))
-		assertImpEq(t, &expectedImpressions[0], &imps[0])
-		assertImpEq(t, &expectedImpressions[1], &imps[1])
-		assertImpEq(t, &expectedImpressions[2], &imps[2])
+		assertImpEq(t, expectedImpressions[imps[0].FeatureName], &imps[0])
+		assertImpEq(t, expectedImpressions[imps[1].FeatureName], &imps[1])
+		assertImpEq(t, expectedImpressions[imps[2].FeatureName], &imps[2])
 		n, err = st.Pop(1, &imps)
 		assert.Equal(t, 0, n)
 		assert.ErrorIs(t, err, storage.ErrQueueEmpty)
