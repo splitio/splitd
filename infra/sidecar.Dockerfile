@@ -1,5 +1,5 @@
 # ----- Builder image
-FROM golang:1.20.7-alpine3.18 AS builder
+FROM golang:1.21.6-alpine3.19 AS builder
 
 RUN apk add git build-base bash
 
@@ -8,7 +8,7 @@ COPY . .
 RUN make clean splitd splitd.yaml.tpl
 
 # ----- Runner image
-FROM alpine:3.18 AS runner
+FROM alpine:3.19.0 AS runner
 
 RUN apk add gettext yq bash
 RUN mkdir -p /opt/splitd
