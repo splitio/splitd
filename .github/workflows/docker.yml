@@ -9,6 +9,9 @@ jobs:
   build-docker-image:
     name: Build and push Docker image
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        fips-mode: [enabled, disabled]
     steps:
       - name: Login to Artifactory
         uses: docker/login-action@v2
@@ -29,4 +32,7 @@ jobs:
           context: .
           file: "infra/sidecar.Dockerfile"
           push: true
-          tags: splitio-docker.jfrog.io/splitd/sidecar:latest,splitio-docker.jfrog.io/splitd/sidecar:${{ env.VERSION }}
+          tags: splitio-docker.jfrog.io/splitd/sidecar${{ matrix.fips-mode == "enabled" && "-fips" || ""}}:${{ env.VERSION }}
+          build-args: |
+            FIPS_MODE=${{ matrix.fips-mode }}
+,
