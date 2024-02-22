@@ -5,7 +5,7 @@ ARG FIPS_MODE
 ARG COMMIT_SHA
 
 RUN apt update -y
-RUN apt install -y build-essential ca-certificates python3 git
+RUN apt install -y build-essential ca-certificates python3 git socat
 
 WORKDIR /splitd
 COPY . .
