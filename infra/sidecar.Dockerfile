@@ -17,7 +17,6 @@ RUN export GITHUB_SHA="${COMMIT_SHA}" && bash -c '\
     fi'
 
 # ----- Runner image
-
 FROM debian:12.4 AS runner
 
 RUN apt update -y
