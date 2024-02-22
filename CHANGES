@@ -1,5 +1,5 @@
 1.3.4 (Feb 22, 2024):
-- Add FIPS-compliant build for amd64/linux
+- Add boringcrypto-based FIPS-compliant build for amd64/linux
 
 1.2.0 (Jan 25, 2024):
 - Added support for Flag Sets on the SDK, which enables grouping feature flags and interacting with the group rather than individually (more details in our documentation):
