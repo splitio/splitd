@@ -10,11 +10,11 @@ RUN apt install -y build-essential ca-certificates python3 git
 WORKDIR /splitd
 COPY . .
 
-RUN export GITHUB_SHA="${COMMIT_SHA}" && \
+RUN export GITHUB_SHA="${COMMIT_SHA}" && bash -c '\
     if [[ "${FIPS_MODE}" = "enabled" ]]; \
     then echo "building in fips mode"; make clean splitd-fips splitd.yaml.tpl EXTRA_BUILD_ARGS="${EXTRA_BUILD_ARGS}"; mv split-sync-fips split-sync; \
     else echo "building in standard mode"; make clean splitd splitd.yaml.tpl EXTRA_BUILD_ARGS="${EXTRA_BUILD_ARGS}"; \
-    fi
+    fi'
 
 # ----- Runner image
 
