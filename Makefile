@@ -33,7 +33,8 @@ clean:
 		splitd-linux-amd64-$(VERSION).bin \
 		splitd-darwin-amd64-$(VERSION).bin \
 		splitd-linux-arm-$(VERSION).bin \
-		splitd-darwin-arm-$(VERSION).bin
+		splitd-darwin-arm-$(VERSION).bin \
+		splitd-linux-amd64-fips-$(VERSION).bin
 
 ## build binaries for this platform
 build: splitd splitcli sdhelper
@@ -93,7 +94,11 @@ images_release: # entrypoints
 	@echo "$(DOCKER) push splitsoftware/splitd-sidecar-fips:$(VERSION)"
 
 ## build release for binaires
-binaries_release: splitd-linux-amd64-$(VERSION).bin splitd-darwin-amd64-$(VERSION).bin splitd-linux-arm-$(VERSION).bin splitd-darwin-arm-$(VERSION).bin
+binaries_release: splitd-linux-amd64-$(VERSION).bin \
+	splitd-darwin-amd64-$(VERSION).bin \
+	splitd-linux-arm-$(VERSION).bin \
+	splitd-darwin-arm-$(VERSION).bin \
+	splitd-linux-amd64-fips-$(VERSION).bin
 
 $(COVERAGE_FILE): unit-tests
 
