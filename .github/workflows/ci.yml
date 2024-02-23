@@ -83,4 +83,5 @@ jobs:
             splitd-darwin-amd64-${{ env.VERSION }}.bin
             splitd-darwin-arm-${{ env.VERSION }}.bin
             splitd-linux-amd64-${{ env.VERSION }}.bin
+            splitd-linux-amd64-fips-${{ env.VERSION }}.bin
             splitd-linux-arm-${{ env.VERSION }}.bin

@@ -15,6 +15,7 @@
 # vendor/
 
 /splitd
+/splitd-fips
 /splitcli
 /sdhelper
 /splitd.yaml

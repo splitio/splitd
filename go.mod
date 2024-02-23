@@ -1,6 +1,6 @@
 module github.com/splitio/splitd
 
-go 1.20
+go 1.21
 
 require (
 	github.com/splitio/go-split-commons/v5 v5.1.0

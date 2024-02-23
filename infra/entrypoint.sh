@@ -9,6 +9,16 @@ TPL_FILE="${TPL_FILE:-${SCRIPT_DIR}/splitd.yaml.tpl}"
 SPLITD_CFG_OUTPUT="${SPLITD_CFG_OUTPUT:-/etc/splitd.yaml}"
 SPLITD_EXEC="${SPLITD_EXEC:-/opt/splitd/splitd}"
 
+function prepare_sets() {
+    local RES="["
+    local IFS=','
+    read -ra SETS <<< "${1}"
+    for SET in "${SETS[@]}"; do
+        RES="${RES}\"${SET}\","
+    done
+    echo "${RES/%,}]"
+}
+
 # Validate mandatory arguments and initialize the template with those values
 [ -z ${SPLITD_APIKEY+x} ] && echo "SPLITD_APIKEY env var is mandatory." && exit 1
 [ -z ${SPLITD_LINK_ADDRESS+x} ] && echo "SPLITD_LINK_ADDRESS env var is mandatory." && exit 1
@@ -44,6 +54,11 @@ accum=$(yq '.sdk.apikey = env(SPLITD_APIKEY) | .link.address = env(SPLITD_LINK_A
 [ ! -z ${SPLITD_IMPRESSIONS_OBSERVER_SIZE+x} ]          && accum=$(echo "${accum}" | yq '.sdk.impressions.observerSize = env(SPLITD_IMPRESSIONS_OBSERVER_SIZE)')
 [ ! -z ${SPLITD_EVENTS_REFRESH_SECS+x} ]                && accum=$(echo "${accum}" | yq '.sdk.events.refreshRateSeconds = env(SPLITD_EVENTS_REFRESH_SECS)')
 [ ! -z ${SPLITD_EVENTS_QUEUE_SIZE+x} ]                  && accum=$(echo "${accum}" | yq '.sdk.events.queueSize = env(SPLITD_EVENTS_QUEUE_SIZE)')
+
+if [ ! -z ${SPLITD_FLAG_SETS_FILTER+x} ]; then
+    export PARSED_FLAGSETS=$(prepare_sets "${SPLITD_FLAG_SETS_FILTER}")
+    accum=$(echo "${accum}" | yq '.sdk.flagSetsFilter += env(PARSED_FLAGSETS)')
+fi
 
 # link configs
 [ ! -z ${SPLITD_LINK_TYPE+x} ] 		        && accum=$(echo "${accum}" | yq '.link.type = env(SPLITD_LINK_TYPE)')
