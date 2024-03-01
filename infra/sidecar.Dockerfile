@@ -20,7 +20,7 @@ RUN export GITHUB_SHA="${COMMIT_SHA}" && bash -c '\
 FROM debian:12.4 AS runner
 
 RUN apt update -y
-RUN apt install -y bash ca-certificates wget
+RUN apt install -y bash ca-certificates wget socat
 
 RUN wget https://github.com/mikefarah/yq/releases/download/v4.40.5/yq_linux_amd64
 RUN chmod +x yq_linux_amd64
