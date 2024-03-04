@@ -85,7 +85,7 @@ images_release: # entrypoints
 		--build-arg COMMIT_SHA=$(COMMIT_SHA) \
 		-f infra/sidecar.Dockerfile .
 	$(DOCKER) build $(PLATFORM_STR) -t splitsoftware/splitd-sidecar-fips:latest -t splitsoftware/splitd-sidecar-fips:$(VERSION) \
-		--build-arg FIPS_MODE=1 --build-arg COMMIT_SHA=$(COMMIT_SHA) \
+		--build-arg FIPS_MODE=enabled --build-arg COMMIT_SHA=$(COMMIT_SHA) \
 		-f infra/sidecar.Dockerfile .
 	@echo "Image created. Make sure everything works ok, and then run the following commands to push them."
 	@echo "$(DOCKER) push splitsoftware/splitd-sidecar:latest"
