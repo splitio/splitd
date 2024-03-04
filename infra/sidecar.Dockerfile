@@ -12,7 +12,7 @@ COPY . .
 
 RUN export GITHUB_SHA="${COMMIT_SHA}" && bash -c '\
     if [[ "${FIPS_MODE}" = "enabled" ]]; \
-    then echo "building in fips mode"; make clean splitd-fips splitd.yaml.tpl EXTRA_BUILD_ARGS="${EXTRA_BUILD_ARGS}"; mv split-sync-fips split-sync; \
+    then echo "building in fips mode"; make clean splitd-fips splitd.yaml.tpl EXTRA_BUILD_ARGS="${EXTRA_BUILD_ARGS}"; mv splitd-fips splitd; \
     else echo "building in standard mode"; make clean splitd splitd.yaml.tpl EXTRA_BUILD_ARGS="${EXTRA_BUILD_ARGS}"; \
     fi'
 
