@@ -32,3 +32,5 @@ jobs:
           file: "infra/sidecar.Dockerfile"
           push: true
           tags: splitio-docker-dev.jfrog.io/splitd/sidecar${{ matrix.fips_mode == 'enabled' && '-fips' || '' }}:${{ env.SHORT_SHA }}
+          build-args: |
+            FIPS_MODE=${{ matrix.fips_mode }}
