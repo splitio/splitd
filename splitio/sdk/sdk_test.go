@@ -66,7 +66,7 @@ func TestTreatmentLabelsDisabled(t *testing.T) {
 		assert.Equal(t, 1, n)
 		assert.Equal(t, 1, len(imps))
 		assertImpEq(t, expectedImpression, &imps[0])
-		st.Pop(1, &imps)
+		_, err := st.Pop(1, &imps)
 		assert.ErrorIs(t, err, storage.ErrQueueEmpty)
 
 	})
@@ -494,7 +494,7 @@ func TestTrack(t *testing.T) {
 			Value:           lang.Ref(123.4),
 			Properties:      map[string]interface{}{"a": 123},
 		}, &evs[0])
-		st.Pop(1, &evs)
+		_, err := st.Pop(1, &evs)
 		assert.ErrorIs(t, err, storage.ErrQueueEmpty)
 
 	})
@@ -561,7 +561,7 @@ func TestTrackEventsFlush(t *testing.T) {
 		expectedEvent.Key = "key3"
 		assertEventEq(t, &expectedEvent, &evs[2])
 
-		st.Pop(1, &evs)
+		_, err := st.Pop(1, &evs)
 		assert.ErrorIs(t, err, storage.ErrQueueEmpty)
 
 	})
