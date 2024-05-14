@@ -1,8 +1,8 @@
 package mocks
 
 import (
-	"github.com/splitio/go-split-commons/v5/dtos"
-	"github.com/splitio/go-split-commons/v5/storage"
+	"github.com/splitio/go-split-commons/v6/dtos"
+	"github.com/splitio/go-split-commons/v6/storage"
 	"github.com/splitio/go-toolkit/v5/datastructures/set"
 	"github.com/stretchr/testify/mock"
 )
@@ -61,6 +61,11 @@ func (m *SplitStorageMock) TrafficTypeExists(trafficType string) bool {
 func (m *SplitStorageMock) GetNamesByFlagSets(sets []string) map[string][]string {
 	args := m.Called(sets)
 	return args.Get(0).(map[string][]string)
+}
+
+func (m *SplitStorageMock) GetAllFlagSetNames() []string {
+	args := m.Called()
+	return args.Get(0).([]string)
 }
 
 var _ storage.SplitStorage = (*SplitStorageMock)(nil)

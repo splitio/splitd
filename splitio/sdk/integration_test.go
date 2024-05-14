@@ -10,7 +10,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/splitio/go-split-commons/v5/dtos"
+	"github.com/splitio/go-split-commons/v6/dtos"
+	"github.com/splitio/go-split-commons/v6/service/api/specs"
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio/sdk/conf"
 	"github.com/splitio/splitd/splitio/sdk/types"
@@ -54,6 +55,9 @@ func TestInstantiationAndGetTreatmentE2E(t *testing.T) {
 			Since:  3,
 			Till:   3,
 		}
+
+		assert.Equal(t, "-1", r.URL.Query().Get("since"))
+		assert.Equal(t, specs.FLAG_V1_1, r.URL.Query().Get("s"))
 
 		raw, err := json.Marshal(splitChanges)
 		assert.Nil(t, err)
