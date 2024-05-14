@@ -1,4 +1,4 @@
-# GO SPLIT COMMONS
+# SPLIT DAEMON
 
 ## What did you accomplish?
 <!-- A brief explanation synthesizing the feature, bug or fix. -->
