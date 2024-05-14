@@ -1,7 +1,7 @@
 package mocks
 
 import (
-	"github.com/splitio/go-split-commons/v5/engine/evaluator"
+	"github.com/splitio/go-split-commons/v6/engine/evaluator"
 	"github.com/stretchr/testify/mock"
 )
 

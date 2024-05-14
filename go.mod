@@ -3,8 +3,8 @@ module github.com/splitio/splitd
 go 1.21
 
 require (
-	github.com/splitio/go-split-commons/v5 v5.1.0
-	github.com/splitio/go-toolkit/v5 v5.3.2
+	github.com/splitio/go-split-commons/v6 v6.0.0
+	github.com/splitio/go-toolkit/v5 v5.4.0
 	github.com/stretchr/testify v1.8.1
 	github.com/vmihailenco/msgpack/v5 v5.3.5
 	golang.org/x/sync v0.3.0

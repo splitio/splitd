@@ -3,7 +3,7 @@ package sdk
 import (
 	"testing"
 
-	"github.com/splitio/go-split-commons/v5/flagsets"
+	"github.com/splitio/go-split-commons/v6/flagsets"
 	sdkConf "github.com/splitio/splitd/splitio/sdk/conf"
 	"github.com/stretchr/testify/assert"
 )
