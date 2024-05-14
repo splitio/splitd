@@ -61,12 +61,12 @@ func TestTreatmentLabelsDisabled(t *testing.T) {
 		assert.Equal(t, 1, st.Len())
 
 		var imps []dtos.Impression
-		n, err := st.Pop(1, &imps)
+		n, _ := st.Pop(1, &imps)
 		assert.Nil(t, nil)
 		assert.Equal(t, 1, n)
 		assert.Equal(t, 1, len(imps))
 		assertImpEq(t, expectedImpression, &imps[0])
-		n, err = st.Pop(1, &imps)
+		st.Pop(1, &imps)
 		assert.ErrorIs(t, err, storage.ErrQueueEmpty)
 
 	})
@@ -116,7 +116,7 @@ func TestTreatmentLabelsEnabled(t *testing.T) {
 		assert.Equal(t, 1, st.Len())
 
 		var imps []dtos.Impression
-		n, err := st.Pop(1, &imps)
+		n, _ := st.Pop(1, &imps)
 		assert.Nil(t, nil)
 		assert.Equal(t, 1, n)
 		assert.Equal(t, 1, len(imps))
@@ -190,7 +190,7 @@ func TestTreatments(t *testing.T) {
 		assert.Equal(t, 3, st.Len())
 
 		var imps []dtos.Impression
-		n, err := st.Pop(3, &imps)
+		n, _ := st.Pop(3, &imps)
 		assert.Nil(t, nil)
 		assert.Equal(t, 3, n)
 		assert.Equal(t, 3, len(imps))
@@ -279,7 +279,7 @@ func TestTreatmentsByFlagSet(t *testing.T) {
 		assert.Equal(t, 3, st.Len())
 
 		var imps []dtos.Impression
-		n, err := st.Pop(3, &imps)
+		n, _ := st.Pop(3, &imps)
 		assert.Nil(t, nil)
 		assert.Equal(t, 3, n)
 		assert.Equal(t, 3, len(imps))
@@ -368,7 +368,7 @@ func TestTreatmentsByFlagSets(t *testing.T) {
 		assert.Equal(t, 3, st.Len())
 
 		var imps []dtos.Impression
-		n, err := st.Pop(3, &imps)
+		n, _ := st.Pop(3, &imps)
 		assert.Nil(t, nil)
 		assert.Equal(t, 3, n)
 		assert.Equal(t, 3, len(imps))
@@ -483,7 +483,7 @@ func TestTrack(t *testing.T) {
 		assert.Equal(t, 1, st.Len())
 
 		var evs []dtos.EventDTO
-		n, err := st.Pop(1, &evs)
+		n, _ := st.Pop(1, &evs)
 		assert.Nil(t, nil)
 		assert.Equal(t, 1, n)
 		assert.Equal(t, 1, len(evs))
@@ -494,7 +494,7 @@ func TestTrack(t *testing.T) {
 			Value:           lang.Ref(123.4),
 			Properties:      map[string]interface{}{"a": 123},
 		}, &evs[0])
-		n, err = st.Pop(1, &evs)
+		st.Pop(1, &evs)
 		assert.ErrorIs(t, err, storage.ErrQueueEmpty)
 
 	})
@@ -542,7 +542,7 @@ func TestTrackEventsFlush(t *testing.T) {
 		assert.Equal(t, 3, st.Len())
 
 		var evs []dtos.EventDTO
-		n, err := st.Pop(10, &evs)
+		n, _ := st.Pop(10, &evs)
 		assert.Nil(t, nil)
 		assert.Equal(t, 3, n)
 		assert.Equal(t, 3, len(evs))
@@ -561,7 +561,7 @@ func TestTrackEventsFlush(t *testing.T) {
 		expectedEvent.Key = "key3"
 		assertEventEq(t, &expectedEvent, &evs[2])
 
-		n, err = st.Pop(1, &evs)
+		st.Pop(1, &evs)
 		assert.ErrorIs(t, err, storage.ErrQueueEmpty)
 
 	})
@@ -658,8 +658,4 @@ func assertEventEq(t *testing.T, e1, e2 *dtos.EventDTO) {
 	assert.Equal(t, e1.EventTypeID, e2.EventTypeID)
 	assert.Equal(t, e1.Value, e2.Value)
 	assert.Equal(t, e1.Properties, e2.Properties)
-}
-
-func ref[T any](t T) *T {
-	return &t
 }
