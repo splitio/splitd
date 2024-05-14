@@ -3,9 +3,10 @@ package conf
 import (
 	"time"
 
-	"github.com/splitio/go-split-commons/v5/conf"
-	"github.com/splitio/go-split-commons/v5/dtos"
-	"github.com/splitio/go-split-commons/v5/flagsets"
+	"github.com/splitio/go-split-commons/v6/conf"
+	"github.com/splitio/go-split-commons/v6/dtos"
+	"github.com/splitio/go-split-commons/v6/flagsets"
+	"github.com/splitio/go-split-commons/v6/service/api/specs"
 )
 
 const (
@@ -78,6 +79,8 @@ func (c *Config) ToAdvancedConfig() *conf.AdvancedConfig {
 	d.TelemetryServiceURL = c.URLs.Telemetry
 
 	d.ImpressionsQueueSize = c.Impressions.QueueSize
+	d.AuthSpecVersion = specs.FLAG_V1_1
+	d.FlagsSpecVersion = specs.FLAG_V1_1
 
 	return &d
 }

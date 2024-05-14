@@ -9,10 +9,10 @@ import (
 	"github.com/splitio/splitd/splitio/sdk/types"
 	serrors "github.com/splitio/splitd/splitio/util/errors"
 
-	"github.com/splitio/go-split-commons/v5/dtos"
-	"github.com/splitio/go-split-commons/v5/service"
-	"github.com/splitio/go-split-commons/v5/storage"
-	"github.com/splitio/go-split-commons/v5/synchronizer/worker/event"
+	"github.com/splitio/go-split-commons/v6/dtos"
+	"github.com/splitio/go-split-commons/v6/service"
+	"github.com/splitio/go-split-commons/v6/storage"
+	"github.com/splitio/go-split-commons/v6/synchronizer/worker/event"
 	"github.com/splitio/go-toolkit/v5/logging"
 	gtsync "github.com/splitio/go-toolkit/v5/sync"
 )
