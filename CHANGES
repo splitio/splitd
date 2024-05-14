@@ -1,3 +1,8 @@
+1.4.0 (May 14, 2024):
+- Updated go-split-commons to v6
+  - Added support for targeting rules based on semantic versions (https://semver.org/).
+  - Added the logic to handle correctly when the SDK receives an unsupported Matcher type.
+
 1.3.1 (March 4, 2024):
 - Add socat in runner image
 
