@@ -7,6 +7,7 @@ import (
 
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio"
+	"github.com/splitio/splitd/splitio/api"
 	"github.com/splitio/splitd/splitio/conf"
 	"github.com/splitio/splitd/splitio/link"
 	"github.com/splitio/splitd/splitio/sdk"
@@ -58,6 +59,9 @@ func main() {
 		}()
 	}
 
+	// launch api in BG (errors will be logged but won't abort execution of app)
+	go startAPI(logger, cfg.API, *linkCFG)
+
 	// Wait for connection to end (either gracefully of because of an error)
 	err = <-errc
 	exitOnErr("shutdown: ", err)
@@ -83,4 +87,15 @@ func exitOnErr(ctxStr string, err error) {
 		os.Exit(1)
 	}
 
+}
+
+func startAPI(logger logging.LoggerInterface, apiCFG conf.API, linkCFG link.ListenerOptions) {
+	server, err := api.Setup(apiCFG.Host, apiCFG.Port, logger, linkCFG)
+	if err != nil {
+		logger.Error("error creating HTTP server:", err.Error())
+	}
+
+	if err = server.ListenAndServe(); err != nil {
+		logger.Error("error starting http server:", err.Error())
+	}
 }

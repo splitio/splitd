@@ -73,6 +73,10 @@ fi
 [ ! -z ${SPLITD_LOG_LEVEL+x} ]  && accum=$(echo "${accum}" | yq '.logging.level = env(SPLITD_LOG_LEVEL)')
 [ ! -z ${SPLITD_LOG_OUTPUT+x} ] && accum=$(echo "${accum}" | yq '.logging.output = env(SPLITD_LOG_OUTPUT)')
 
+# API configs
+[ ! -z ${SPLITD_API_HOST+x} ]  && accum=$(echo "${accum}" | yq '.api.host = env(SPLITD_API_HOST)')
+[ ! -z ${SPLITD_API_PORT+x} ]  && accum=$(echo "${accum}" | yq '.api.port = env(SPLITD_API_PORT)')
+
 # profiling configs
 [ ! -z ${SPLITD_PROFILING_ENABLE+x} ]  && accum=$(echo "${accum}" | yq '.debug.profiling.enable = env(SPLITD_PROFILING_ENABLE)')
 [ ! -z ${SPLITD_PROFILING_HOST+x} ]  && accum=$(echo "${accum}" | yq '.debug.profiling.host = env(SPLITD_PROFILING_HOST)')
