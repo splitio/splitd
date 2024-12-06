@@ -93,6 +93,7 @@ func startAPI(logger logging.LoggerInterface, apiCFG conf.API, linkCFG link.List
 	server, err := api.Setup(apiCFG.Host, apiCFG.Port, logger, linkCFG)
 	if err != nil {
 		logger.Error("error creating HTTP server:", err.Error())
+		return
 	}
 
 	if err = server.ListenAndServe(); err != nil {
