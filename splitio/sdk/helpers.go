@@ -15,6 +15,7 @@ import (
 	"github.com/splitio/go-split-commons/v6/provisional/strategy"
 	"github.com/splitio/go-split-commons/v6/service/api"
 	"github.com/splitio/go-split-commons/v6/storage"
+	"github.com/splitio/go-split-commons/v6/storage/filter"
 	"github.com/splitio/go-split-commons/v6/storage/inmemory"
 	"github.com/splitio/go-split-commons/v6/storage/inmemory/mutexmap"
 	"github.com/splitio/go-split-commons/v6/synchronizer"
@@ -22,7 +23,19 @@ import (
 	"github.com/splitio/go-split-commons/v6/synchronizer/worker/segment"
 	"github.com/splitio/go-split-commons/v6/synchronizer/worker/split"
 	"github.com/splitio/go-split-commons/v6/tasks"
+	"github.com/splitio/go-split-commons/v6/telemetry"
 	"github.com/splitio/go-toolkit/v5/logging"
+)
+
+const (
+	bfExpectedElemenets                = 10000000
+	bfFalsePositiveProbability         = 0.01
+	bfCleaningPeriod                   = 86400 // 24 hours
+	uniqueKeysPeriodTaskInMemory       = 900   // 15 min
+	uniqueKeysPeriodTaskRedis          = 300   // 5 min
+	impressionsCountPeriodTaskInMemory = 1800  // 30 min
+	impressionsCountPeriodTaskRedis    = 300   // 5 min
+	impressionsBulkSizeRedis           = 100
 )
 
 func setupWorkers(
@@ -32,26 +45,28 @@ func setupWorkers(
 	hc application.MonitorProducerInterface,
 	cfg *sdkConf.Config,
 	flagSetsFilter flagsets.FlagSetFilter,
+	md dtos.Metadata,
+	impComponents impComponents,
 ) *synchronizer.Workers {
 	return &synchronizer.Workers{
-		SplitUpdater:       split.NewSplitUpdater(str.splits, api.SplitFetcher, logger, str.telemetry, hc, flagSetsFilter),
-		SegmentUpdater:     segment.NewSegmentUpdater(str.splits, str.segments, api.SegmentFetcher, logger, str.telemetry, hc),
-		ImpressionRecorder: workers.NewImpressionsWorker(logger, str.telemetry, api.ImpressionRecorder, str.impressions, &cfg.Impressions),
-		EventRecorder:      workers.NewEventsWorker(logger, str.telemetry, api.EventRecorder, str.events, &cfg.Events),
+		SplitUpdater:             split.NewSplitUpdater(str.splits, api.SplitFetcher, logger, str.telemetry, hc, flagSetsFilter),
+		SegmentUpdater:           segment.NewSegmentUpdater(str.splits, str.segments, api.SegmentFetcher, logger, str.telemetry, hc),
+		ImpressionRecorder:       workers.NewImpressionsWorker(logger, str.telemetry, api.ImpressionRecorder, str.impressions, &cfg.Impressions),
+		EventRecorder:            workers.NewEventsWorker(logger, str.telemetry, api.EventRecorder, str.events, &cfg.Events),
+		ImpressionsCountRecorder: impressionscount.NewRecorderSingle(impComponents.counter, api.ImpressionRecorder, md, logger, str.telemetry),
+		TelemetryRecorder:        telemetry.NewTelemetrySynchronizer(str.telemetry, api.TelemetryRecorder, str.splits, str.segments, logger, md, str.telemetry),
 	}
 }
 
 func setupTasks(
 	cfg *sdkConf.Config,
-	str *storages,
 	logger logging.LoggerInterface,
 	workers *synchronizer.Workers,
 	impComponents impComponents,
-	md dtos.Metadata,
-	api *api.SplitAPI,
 ) *synchronizer.SplitTasks {
 	impCfg := cfg.Impressions
 	evCfg := cfg.Events
+	dummyHC := &application.Dummy{}
 	tg := &synchronizer.SplitTasks{
 		SplitSyncTask: tasks.NewFetchSplitsTask(workers.SplitUpdater, int(cfg.Splits.SyncPeriod.Seconds()), logger),
 		SegmentSyncTask: tasks.NewFetchSegmentsTask(
@@ -60,21 +75,18 @@ func setupTasks(
 			cfg.Segments.WorkerCount,
 			cfg.Segments.QueueSize,
 			logger,
+			dummyHC,
 		),
-		ImpressionSyncTask:    tasks.NewRecordImpressionsTask(workers.ImpressionRecorder, int(impCfg.SyncPeriod.Seconds()), logger, 5000),
-		EventSyncTask:         tasks.NewRecordEventsTask(workers.EventRecorder, 5000, int(evCfg.SyncPeriod.Seconds()), logger),
-		TelemetrySyncTask:     &NoOpTask{},
-		UniqueKeysTask:        &NoOpTask{},
-		CleanFilterTask:       &NoOpTask{},
-		ImpsCountConsumerTask: &NoOpTask{},
-	}
-
-	if impCfg.Mode == "optimized" {
-		tg.ImpressionsCountSyncTask = tasks.NewRecordImpressionsCountTask(
-			impressionscount.NewRecorderSingle(impComponents.counter, api.ImpressionRecorder, md, logger, str.telemetry),
+		ImpressionSyncTask: tasks.NewRecordImpressionsTask(workers.ImpressionRecorder, int(impCfg.SyncPeriod.Seconds()), logger, 5000),
+		EventSyncTask:      tasks.NewRecordEventsTask(workers.EventRecorder, 5000, int(evCfg.SyncPeriod.Seconds()), logger),
+		TelemetrySyncTask:  &NoOpTask{},
+		UniqueKeysTask:     tasks.NewRecordUniqueKeysTask(workers.TelemetryRecorder, *impComponents.tracker, uniqueKeysPeriodTaskInMemory, logger),
+		CleanFilterTask:    tasks.NewCleanFilterTask(*impComponents.filter, logger, bfCleaningPeriod),
+		ImpsCountConsumerTask: tasks.NewRecordImpressionsCountTask(
+			workers.ImpressionsCountRecorder,
 			logger,
 			int(impCfg.CountSyncPeriod.Seconds()),
-		)
+		),
 	}
 
 	return tg
@@ -83,6 +95,8 @@ func setupTasks(
 type impComponents struct {
 	manager provisional.ImpressionManager
 	counter *strategy.ImpressionsCounter
+	tracker *strategy.UniqueKeysTracker
+	filter  *storage.Filter
 }
 
 func setupImpressionsComponents(c *sdkConf.Impressions, telemetry storage.TelemetryRuntimeProducer) (impComponents, error) {
@@ -92,20 +106,27 @@ func setupImpressionsComponents(c *sdkConf.Impressions, telemetry storage.Teleme
 		return impComponents{}, fmt.Errorf("error building impressions observer: %w", err)
 	}
 
+	counter := strategy.NewImpressionsCounter()
+	bf := filter.NewBloomFilter(bfExpectedElemenets, bfFalsePositiveProbability)
+	tracker := strategy.NewUniqueKeysTracker(bf)
+	none := strategy.NewNoneImpl(counter, tracker, false)
+
 	var s strategy.ProcessStrategyInterface
-	var counter *strategy.ImpressionsCounter
 	switch c.Mode {
 	case conf.ImpressionsModeDebug:
 		s = strategy.NewDebugImpl(observer, false)
 	case conf.ImpressionsModeNone:
 	default: // optimized
-		counter = strategy.NewImpressionsCounter()
 		s = strategy.NewOptimizedImpl(observer, counter, telemetry, false)
 	}
 
+	impManager := provisional.NewImpressionManagerImp(none, s)
+
 	return impComponents{
-		manager: provisional.NewImpressionManager(s),
+		manager: impManager,
 		counter: counter,
+		tracker: &tracker,
+		filter:  &bf,
 	}, nil
 }
 
