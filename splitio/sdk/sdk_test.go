@@ -21,6 +21,59 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+func TestTreatmentsWithImpressionsDisabled(t *testing.T) {
+	is, _ := storage.NewImpressionsQueue(100)
+
+	ev := &mocks.EvaluatorMock{}
+	ev.On("EvaluateFeatures", "key1", (*string)(nil), []string{"f1", "f2", "f3"}, Attributes{"a": 1}).
+		Return(evaluator.Results{Evaluations: map[string]evaluator.Result{
+			"f1": {Treatment: "on", Label: "label1", EvaluationTime: 1 * time.Millisecond, SplitChangeNumber: 123},
+			"f2": {Treatment: "on", Label: "label2", EvaluationTime: 2 * time.Millisecond, SplitChangeNumber: 124, ImpressionsDisabled: true},
+			"f3": {Treatment: "on", Label: "label3", EvaluationTime: 3 * time.Millisecond, SplitChangeNumber: 125, ImpressionsDisabled: true},
+		}}).
+		Once()
+
+	expectedImpressions := []dtos.Impression{{KeyName: "key1", BucketingKey: "", FeatureName: "f1", Treatment: "on", Label: "label1", ChangeNumber: 123}}
+
+	im := &mocks.ImpressionManagerMock{}
+	im.On("Process", mock.Anything).
+		Run(func(args mock.Arguments) {
+			assertImpDecoratedEq(t, dtos.ImpressionDecorated{
+				Impression: expectedImpressions[0],
+				Disabled:   false,
+			}, args.Get(0).([]dtos.ImpressionDecorated)[0])
+		}).
+		Return([]dtos.Impression{expectedImpressions[0]}, []dtos.Impression{}).
+		Once()
+
+	im.On("Process", mock.Anything).
+		Return([]dtos.Impression{}, []dtos.Impression{}).
+		Once()
+
+	im.On("Process", mock.Anything).
+		Return([]dtos.Impression{}, []dtos.Impression{}).
+		Once()
+
+	client := &Impl{
+		logger: logging.NewLogger(nil),
+		is:     is,
+		ev:     ev,
+		iq:     im,
+		cfg:    conf.Config{LabelsEnabled: true},
+	}
+
+	res, err := client.Treatments(
+		&types.ClientConfig{Metadata: types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}},
+		"key1", nil, []string{"f1", "f2", "f3"}, Attributes{"a": 1})
+	assert.Nil(t, err)
+	assert.Nil(t, res["f1"].Config)
+	assert.Nil(t, res["f2"].Config)
+	assert.Nil(t, res["f3"].Config)
+	assertImpEq(t, &expectedImpressions[0], res["f1"].Impression)
+	// assertImpEq(t, &expectedImpressions[1], res["f2"].Impression)
+	// assertImpEq(t, &expectedImpressions[2], res["f3"].Impression)
+}
+
 func TestTreatmentLabelsDisabled(t *testing.T) {
 	is, _ := storage.NewImpressionsQueue(100)
 
