@@ -22,4 +22,9 @@ func (m *ImpressionManagerMock) ProcessSingle(impression *dtos.Impression) bool 
 	return args.Bool(0)
 }
 
+func (m *ImpressionManagerMock) Process(values []dtos.ImpressionDecorated, listenerEnabled bool) ([]dtos.Impression, []dtos.Impression) {
+	args := m.Called(values)
+	return args.Get(0).([]dtos.Impression), args.Get(1).([]dtos.Impression)
+}
+
 var _ provisional.ImpressionManager = (*ImpressionManagerMock)(nil)
