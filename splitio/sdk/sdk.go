@@ -265,14 +265,10 @@ func (i *Impl) handleImpression(key string, bk *string, f string, r *evaluator.R
 		Label:        label,
 		Treatment:    r.Treatment,
 		Time:         timeMillis(),
+		Disabled:     r.ImpressionsDisabled,
 	}
 
-	impd := dtos.ImpressionDecorated{
-		Impression: imp,
-		Disabled:   r.ImpressionsDisabled,
-	}
-
-	forLog, _ := i.iq.Process([]dtos.ImpressionDecorated{impd}, false)
+	forLog, _ := i.iq.Process([]dtos.Impression{imp}, false)
 	if len(forLog) == 1 {
 		_, err := i.is.Push(cm, forLog[0])
 		if err != nil {

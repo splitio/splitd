@@ -116,6 +116,7 @@ func setupImpressionsComponents(c *sdkConf.Impressions, telemetry storage.Teleme
 	case conf.ImpressionsModeDebug:
 		s = strategy.NewDebugImpl(observer, false)
 	case conf.ImpressionsModeNone:
+		s = none
 	default: // optimized
 		s = strategy.NewOptimizedImpl(observer, counter, telemetry, false)
 	}

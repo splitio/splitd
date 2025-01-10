@@ -38,10 +38,7 @@ func TestTreatmentsWithImpressionsDisabled(t *testing.T) {
 	im := &mocks.ImpressionManagerMock{}
 	im.On("Process", mock.Anything).
 		Run(func(args mock.Arguments) {
-			assertImpDecoratedEq(t, dtos.ImpressionDecorated{
-				Impression: expectedImpressions[0],
-				Disabled:   false,
-			}, args.Get(0).([]dtos.ImpressionDecorated)[0])
+			assertImpEq(t, &expectedImpressions[0], &args.Get(0).([]dtos.Impression)[0])
 		}).
 		Return([]dtos.Impression{expectedImpressions[0]}, []dtos.Impression{}).
 		Once()
@@ -89,16 +86,10 @@ func TestTreatmentLabelsDisabled(t *testing.T) {
 		Treatment:    "on",
 		ChangeNumber: 123,
 	}
-
 	im := &mocks.ImpressionManagerMock{}
 	im.On("Process", mock.Anything).
 		// hay que hacer el assert aca en lugar del matcher por el timestamp
-		Run(func(a mock.Arguments) {
-			assertImpDecoratedEq(t, dtos.ImpressionDecorated{
-				Impression: *expectedImpression,
-				Disabled:   false,
-			}, a.Get(0).([]dtos.ImpressionDecorated)[0])
-		}).
+		Run(func(a mock.Arguments) { assertImpEq(t, expectedImpression, &a.Get(0).([]dtos.Impression)[0]) }).
 		Return([]dtos.Impression{*expectedImpression}, []dtos.Impression{}).
 		Once()
 
@@ -152,10 +143,7 @@ func TestTreatmentLabelsEnabled(t *testing.T) {
 	im.On("Process", mock.Anything).
 		Run(func(args mock.Arguments) {
 			// hay que hacer el assert aca en lugar del matcher por el timestamp
-			assertImpDecoratedEq(t, dtos.ImpressionDecorated{
-				Impression: *expectedImpression,
-				Disabled:   false,
-			}, args.Get(0).([]dtos.ImpressionDecorated)[0])
+			assertImpEq(t, expectedImpression, &args.Get(0).([]dtos.Impression)[0])
 		}).
 		Return([]dtos.Impression{*expectedImpression}, []dtos.Impression{}).
 		Once()
@@ -211,30 +199,19 @@ func TestTreatments(t *testing.T) {
 	im := &mocks.ImpressionManagerMock{}
 	im.On("Process", mock.Anything).
 		Run(func(args mock.Arguments) {
-			assertImpDecoratedEq(t, dtos.ImpressionDecorated{
-				Impression: expectedImpressions[0],
-				Disabled:   false,
-			}, args.Get(0).([]dtos.ImpressionDecorated)[0])
+			assertImpEq(t, &expectedImpressions[0], &args.Get(0).([]dtos.Impression)[0])
 		}).
 		Return([]dtos.Impression{expectedImpressions[0]}, []dtos.Impression{}).
 		Once()
-
 	im.On("Process", mock.Anything).
 		Run(func(args mock.Arguments) {
-			assertImpDecoratedEq(t, dtos.ImpressionDecorated{
-				Impression: expectedImpressions[1],
-				Disabled:   false,
-			}, args.Get(0).([]dtos.ImpressionDecorated)[0])
+			assertImpEq(t, &expectedImpressions[1], &args.Get(0).([]dtos.Impression)[0])
 		}).
 		Return([]dtos.Impression{expectedImpressions[1]}, []dtos.Impression{}).
 		Once()
-
 	im.On("Process", mock.Anything).
 		Run(func(args mock.Arguments) {
-			assertImpDecoratedEq(t, dtos.ImpressionDecorated{
-				Impression: expectedImpressions[2],
-				Disabled:   false,
-			}, args.Get(0).([]dtos.ImpressionDecorated)[0])
+			assertImpEq(t, &expectedImpressions[2], &args.Get(0).([]dtos.Impression)[0])
 		}).
 		Return([]dtos.Impression{expectedImpressions[2]}, []dtos.Impression{}).
 		Once()
@@ -296,46 +273,34 @@ func TestTreatmentsByFlagSet(t *testing.T) {
 		"f2": {KeyName: "key1", BucketingKey: "", FeatureName: "f2", Treatment: "on", Label: "label2", ChangeNumber: 124},
 		"f3": {KeyName: "key1", BucketingKey: "", FeatureName: "f3", Treatment: "on", Label: "label3", ChangeNumber: 125},
 	}
-
 	im := &mocks.ImpressionManagerMock{}
 	im.On("Process", mock.Anything).
 		Run(func(args mock.Arguments) {
-			dec, ok := args.Get(0).([]dtos.ImpressionDecorated)
+			imp, ok := args.Get(0).([]dtos.Impression)
 			if !ok {
 				t.Error("not an impression")
 			}
-			assertImpDecoratedEq(t, dtos.ImpressionDecorated{
-				Impression: *expectedImpressions[dec[0].Impression.FeatureName],
-				Disabled:   false,
-			}, args.Get(0).([]dtos.ImpressionDecorated)[0])
+			assertImpEq(t, expectedImpressions[imp[0].FeatureName], &args.Get(0).([]dtos.Impression)[0])
 		}).
 		Return([]dtos.Impression{*expectedImpressions["f1"]}, []dtos.Impression{}).
 		Once()
-
 	im.On("Process", mock.Anything).
 		Run(func(args mock.Arguments) {
-			dec, ok := args.Get(0).([]dtos.ImpressionDecorated)
+			imp, ok := args.Get(0).([]dtos.Impression)
 			if !ok {
 				t.Error("not an impression")
 			}
-			assertImpDecoratedEq(t, dtos.ImpressionDecorated{
-				Impression: *expectedImpressions[dec[0].Impression.FeatureName],
-				Disabled:   false,
-			}, args.Get(0).([]dtos.ImpressionDecorated)[0])
+			assertImpEq(t, expectedImpressions[imp[0].FeatureName], &args.Get(0).([]dtos.Impression)[0])
 		}).
 		Return([]dtos.Impression{*expectedImpressions["f2"]}, []dtos.Impression{}).
 		Once()
-
 	im.On("Process", mock.Anything).
 		Run(func(args mock.Arguments) {
-			dec, ok := args.Get(0).([]dtos.ImpressionDecorated)
+			imp, ok := args.Get(0).([]dtos.Impression)
 			if !ok {
 				t.Error("not an impression")
 			}
-			assertImpDecoratedEq(t, dtos.ImpressionDecorated{
-				Impression: *expectedImpressions[dec[0].Impression.FeatureName],
-				Disabled:   false,
-			}, args.Get(0).([]dtos.ImpressionDecorated)[0])
+			assertImpEq(t, expectedImpressions[imp[0].FeatureName], &args.Get(0).([]dtos.Impression)[0])
 		}).
 		Return([]dtos.Impression{*expectedImpressions["f3"]}, []dtos.Impression{}).
 		Once()
@@ -397,46 +362,34 @@ func TestTreatmentsByFlagSets(t *testing.T) {
 		"f2": {KeyName: "key1", BucketingKey: "", FeatureName: "f2", Treatment: "on", Label: "label2", ChangeNumber: 124},
 		"f3": {KeyName: "key1", BucketingKey: "", FeatureName: "f3", Treatment: "on", Label: "label3", ChangeNumber: 125},
 	}
-
 	im := &mocks.ImpressionManagerMock{}
 	im.On("Process", mock.Anything).
 		Run(func(args mock.Arguments) {
-			dec, ok := args.Get(0).([]dtos.ImpressionDecorated)
+			imp, ok := args.Get(0).([]dtos.Impression)
 			if !ok {
 				t.Error("not an impression")
 			}
-			assertImpDecoratedEq(t, dtos.ImpressionDecorated{
-				Impression: *expectedImpressions[dec[0].Impression.FeatureName],
-				Disabled:   false,
-			}, args.Get(0).([]dtos.ImpressionDecorated)[0])
+			assertImpEq(t, expectedImpressions[imp[0].FeatureName], &args.Get(0).([]dtos.Impression)[0])
 		}).
 		Return([]dtos.Impression{*expectedImpressions["f1"]}, []dtos.Impression{}).
 		Once()
-
 	im.On("Process", mock.Anything).
 		Run(func(args mock.Arguments) {
-			dec, ok := args.Get(0).([]dtos.ImpressionDecorated)
+			imp, ok := args.Get(0).([]dtos.Impression)
 			if !ok {
 				t.Error("not an impression")
 			}
-			assertImpDecoratedEq(t, dtos.ImpressionDecorated{
-				Impression: *expectedImpressions[dec[0].Impression.FeatureName],
-				Disabled:   false,
-			}, args.Get(0).([]dtos.ImpressionDecorated)[0])
+			assertImpEq(t, expectedImpressions[imp[0].FeatureName], &args.Get(0).([]dtos.Impression)[0])
 		}).
 		Return([]dtos.Impression{*expectedImpressions["f2"]}, []dtos.Impression{}).
 		Once()
-
 	im.On("Process", mock.Anything).
 		Run(func(args mock.Arguments) {
-			dec, ok := args.Get(0).([]dtos.ImpressionDecorated)
+			imp, ok := args.Get(0).([]dtos.Impression)
 			if !ok {
 				t.Error("not an impression")
 			}
-			assertImpDecoratedEq(t, dtos.ImpressionDecorated{
-				Impression: *expectedImpressions[dec[0].Impression.FeatureName],
-				Disabled:   false,
-			}, args.Get(0).([]dtos.ImpressionDecorated)[0])
+			assertImpEq(t, expectedImpressions[imp[0].FeatureName], &args.Get(0).([]dtos.Impression)[0])
 		}).
 		Return([]dtos.Impression{*expectedImpressions["f3"]}, []dtos.Impression{}).
 		Once()
@@ -505,16 +458,11 @@ func TestImpressionsQueueFull(t *testing.T) {
 		Return(&evaluator.Result{Treatment: "on", Label: "label1", EvaluationTime: 1 * time.Millisecond, SplitChangeNumber: 123}).
 		Times(9)
 
-	expectedImpression := &dtos.Impression{KeyName: "key1", BucketingKey: "", FeatureName: "f1", Treatment: "on", Label: "label1", ChangeNumber: 123}
+	expectedImpression := &dtos.Impression{KeyName: "key1", BucketingKey: "", FeatureName: "f1", Treatment: "on", Label: "label1", ChangeNumber: 123, Disabled: false}
 	im := &mocks.ImpressionManagerMock{}
 	im.On("Process", mock.Anything).
 		// hay que hacer el assert aca en lugar del matcher por el timestamp
-		Run(func(args mock.Arguments) {
-			assertImpDecoratedEq(t, dtos.ImpressionDecorated{
-				Impression: *expectedImpression,
-				Disabled:   false,
-			}, args.Get(0).([]dtos.ImpressionDecorated)[0])
-		}).
+		Run(func(args mock.Arguments) { assertImpEq(t, expectedImpression, &args.Get(0).([]dtos.Impression)[0]) }).
 		Return([]dtos.Impression{*expectedImpression}, []dtos.Impression{}).
 		Times(9)
 
@@ -741,18 +689,6 @@ func TestSplit(t *testing.T) {
 		ChangeNumber: 1,
 		Configs:      map[string]string{"a": "conf1", "b": "conf2"},
 	}, split)
-}
-
-func assertImpDecoratedEq(t *testing.T, i1 dtos.ImpressionDecorated, i2 dtos.ImpressionDecorated) {
-	t.Helper()
-
-	assert.Equal(t, i1.Impression.KeyName, i2.Impression.KeyName)
-	assert.Equal(t, i1.Impression.BucketingKey, i2.Impression.BucketingKey)
-	assert.Equal(t, i1.Impression.FeatureName, i2.Impression.FeatureName)
-	assert.Equal(t, i1.Impression.Treatment, i2.Impression.Treatment)
-	assert.Equal(t, i1.Impression.Label, i2.Impression.Label)
-	assert.Equal(t, i1.Impression.ChangeNumber, i2.Impression.ChangeNumber)
-	assert.Equal(t, i1.Disabled, i2.Disabled)
 }
 
 func assertImpEq(t *testing.T, i1, i2 *dtos.Impression) {
