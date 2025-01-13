@@ -682,12 +682,39 @@ func TestSplit(t *testing.T) {
 	split, err := c.Split("s2")
 	assert.Nil(t, err)
 	assert.Equal(t, &SplitView{
-		Name:         "s2",
-		TrafficType:  "tt1",
-		Killed:       false,
-		Treatments:   []string{"a", "b"},
-		ChangeNumber: 1,
-		Configs:      map[string]string{"a": "conf1", "b": "conf2"},
+		Name:                "s2",
+		TrafficType:         "tt1",
+		Killed:              false,
+		Treatments:          []string{"a", "b"},
+		ChangeNumber:        1,
+		Configs:             map[string]string{"a": "conf1", "b": "conf2"},
+		ImpressionsDisabled: false,
+	}, split)
+}
+
+func TestSplitWithImpressionsDiabledInTrue(t *testing.T) {
+	var ss mocks.SplitStorageMock
+	ss.On("Split", "s2").Return(&dtos.SplitDTO{
+		Name:                "s2",
+		TrafficTypeName:     "tt1",
+		ChangeNumber:        1,
+		Conditions:          []dtos.ConditionDTO{{Partitions: []dtos.PartitionDTO{{Treatment: "a"}, {Treatment: "b"}}}},
+		Configurations:      map[string]string{"a": "conf1", "b": "conf2"},
+		ImpressionsDisabled: true,
+	}).Once()
+
+	c := Impl{splitStorage: &ss}
+
+	split, err := c.Split("s2")
+	assert.Nil(t, err)
+	assert.Equal(t, &SplitView{
+		Name:                "s2",
+		TrafficType:         "tt1",
+		Killed:              false,
+		Treatments:          []string{"a", "b"},
+		ChangeNumber:        1,
+		Configs:             map[string]string{"a": "conf1", "b": "conf2"},
+		ImpressionsDisabled: true,
 	}, split)
 }
 

@@ -9,12 +9,13 @@ type EvaluationResult struct {
 }
 
 type SplitView struct {
-	Name             string
-	TrafficType      string
-	Killed           bool
-	Treatments       []string
-	ChangeNumber     int64
-	Configs          map[string]string
-	DefaultTreatment string
-	Sets             []string
+	Name                string
+	TrafficType         string
+	Killed              bool
+	Treatments          []string
+	ChangeNumber        int64
+	Configs             map[string]string
+	DefaultTreatment    string
+	Sets                []string
+	ImpressionsDisabled bool
 }
