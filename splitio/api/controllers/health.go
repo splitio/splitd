@@ -81,6 +81,11 @@ func (c *HealthCheckController) checkFlag(ctx *gin.Context) {
 		return
 	}
 
+	if result == nil {
+		ctx.AbortWithStatus(404)
+		return
+	}
+
 	ctx.JSON(200, SplitViewDTO(*result))
 }
 

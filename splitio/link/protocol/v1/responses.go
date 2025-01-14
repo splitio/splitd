@@ -9,7 +9,7 @@ const (
 
 type ResponseWrapper[T validPayloadsConstraint] struct {
 	Status  Result `msgpack:"s"`
-	Payload T      `msgpack:"p"`
+	Payload T      `msgpack:"p,omitempty"`
 }
 
 type RegisterPayload struct{}
