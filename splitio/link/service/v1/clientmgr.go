@@ -203,7 +203,7 @@ func (m *ClientManager) handleGetTreatments(rpc *protov1.RPC, withConfig bool) (
 
 	res, err := m.splitSDK.Treatments(m.clientConfig, args.Key, args.BucketingKey, args.Features, args.Attributes)
 	if err != nil {
-		return &protov1.ResponseWrapper[protov1.TreatmentPayload]{Status: protov1.ResultInternalError}, err
+		return &protov1.ResponseWrapper[protov1.TreatmentsPayload]{Status: protov1.ResultInternalError}, err
 	}
 
 	results := make([]protov1.TreatmentPayload, len(args.Features))
@@ -327,7 +327,7 @@ func (m *ClientManager) handleTrack(rpc *protov1.RPC) (interface{}, error) {
 
 	err := m.splitSDK.Track(m.clientConfig, args.Key, args.TrafficType, args.EventType, args.Value, args.Properties)
 	if err != nil && !errors.Is(err, sdk.ErrEventsQueueFull) {
-		return &protov1.ResponseWrapper[protov1.TreatmentPayload]{Status: protov1.ResultInternalError}, err
+		return &protov1.ResponseWrapper[protov1.TrackPayload]{Status: protov1.ResultInternalError}, err
 	}
 
 	response := &protov1.ResponseWrapper[protov1.TrackPayload]{
@@ -367,15 +367,16 @@ func (m *ClientManager) handleSplit(rpc *protov1.RPC) (interface{}, error) {
 
 	view, err := m.splitSDK.Split(args.Name)
 	if err != nil {
-		return &protov1.ResponseWrapper[protov1.TreatmentPayload]{Status: protov1.ResultInternalError}, err
+		if errors.Is(err, sdk.ErrSplitNotFound) {
+			return &protov1.ResponseWrapper[protov1.SplitPayload]{Status: protov1.ResultOk}, nil
+		}
+		return &protov1.ResponseWrapper[protov1.SplitPayload]{Status: protov1.ResultInternalError}, err
 	}
 
-	response := &protov1.ResponseWrapper[protov1.SplitPayload]{
+	return &protov1.ResponseWrapper[protov1.SplitPayload]{
 		Status:  protov1.ResultOk,
 		Payload: protov1.SplitPayload(*view),
-	}
-
-	return response, nil
+	}, nil
 }
 
 func (m *ClientManager) handleSplits(rpc *protov1.RPC) (interface{}, error) {
