@@ -68,4 +68,8 @@ func (m *SplitStorageMock) GetAllFlagSetNames() []string {
 	return args.Get(0).([]string)
 }
 
+func (m *SplitStorageMock) LargeSegmentNames() *set.ThreadUnsafeSet {
+	return m.Called().Get(0).(*set.ThreadUnsafeSet)
+}
+
 var _ storage.SplitStorage = (*SplitStorageMock)(nil)
