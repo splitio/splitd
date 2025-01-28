@@ -21,6 +21,56 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+func TestTreatmentsWithImpressionsDisabled(t *testing.T) {
+	is, _ := storage.NewImpressionsQueue(100)
+
+	ev := &mocks.EvaluatorMock{}
+	ev.On("EvaluateFeatures", "key1", (*string)(nil), []string{"f1", "f2", "f3"}, Attributes{"a": 1}).
+		Return(evaluator.Results{Evaluations: map[string]evaluator.Result{
+			"f1": {Treatment: "on", Label: "label1", EvaluationTime: 1 * time.Millisecond, SplitChangeNumber: 123},
+			"f2": {Treatment: "on", Label: "label2", EvaluationTime: 2 * time.Millisecond, SplitChangeNumber: 124, ImpressionsDisabled: true},
+			"f3": {Treatment: "on", Label: "label3", EvaluationTime: 3 * time.Millisecond, SplitChangeNumber: 125, ImpressionsDisabled: true},
+		}}).
+		Once()
+
+	expectedImpressions := []dtos.Impression{{KeyName: "key1", BucketingKey: "", FeatureName: "f1", Treatment: "on", Label: "label1", ChangeNumber: 123}}
+
+	im := &mocks.ImpressionManagerMock{}
+	im.On("Process", mock.Anything).
+		Run(func(args mock.Arguments) {
+			assertImpEq(t, &expectedImpressions[0], &args.Get(0).([]dtos.Impression)[0])
+		}).
+		Return([]dtos.Impression{expectedImpressions[0]}, []dtos.Impression{}).
+		Once()
+
+	im.On("Process", mock.Anything).
+		Return([]dtos.Impression{}, []dtos.Impression{}).
+		Once()
+
+	im.On("Process", mock.Anything).
+		Return([]dtos.Impression{}, []dtos.Impression{}).
+		Once()
+
+	client := &Impl{
+		logger: logging.NewLogger(nil),
+		is:     is,
+		ev:     ev,
+		iq:     im,
+		cfg:    conf.Config{LabelsEnabled: true},
+	}
+
+	res, err := client.Treatments(
+		&types.ClientConfig{Metadata: types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}},
+		"key1", nil, []string{"f1", "f2", "f3"}, Attributes{"a": 1})
+	assert.Nil(t, err)
+	assert.Nil(t, res["f1"].Config)
+	assert.Nil(t, res["f2"].Config)
+	assert.Nil(t, res["f3"].Config)
+	assertImpEq(t, &expectedImpressions[0], res["f1"].Impression)
+	// assertImpEq(t, &expectedImpressions[1], res["f2"].Impression)
+	// assertImpEq(t, &expectedImpressions[2], res["f3"].Impression)
+}
+
 func TestTreatmentLabelsDisabled(t *testing.T) {
 	is, _ := storage.NewImpressionsQueue(100)
 
@@ -37,10 +87,10 @@ func TestTreatmentLabelsDisabled(t *testing.T) {
 		ChangeNumber: 123,
 	}
 	im := &mocks.ImpressionManagerMock{}
-	im.On("ProcessSingle", mock.Anything).
+	im.On("Process", mock.Anything).
 		// hay que hacer el assert aca en lugar del matcher por el timestamp
-		Run(func(a mock.Arguments) { assertImpEq(t, expectedImpression, a.Get(0).(*dtos.Impression)) }).
-		Return(true).
+		Run(func(a mock.Arguments) { assertImpEq(t, expectedImpression, &a.Get(0).([]dtos.Impression)[0]) }).
+		Return([]dtos.Impression{*expectedImpression}, []dtos.Impression{}).
 		Once()
 
 	client := &Impl{
@@ -90,12 +140,12 @@ func TestTreatmentLabelsEnabled(t *testing.T) {
 		ChangeNumber: 123,
 	}
 	im := &mocks.ImpressionManagerMock{}
-	im.On("ProcessSingle", mock.Anything).
+	im.On("Process", mock.Anything).
 		Run(func(args mock.Arguments) {
 			// hay que hacer el assert aca en lugar del matcher por el timestamp
-			assertImpEq(t, expectedImpression, args.Get(0).(*dtos.Impression))
+			assertImpEq(t, expectedImpression, &args.Get(0).([]dtos.Impression)[0])
 		}).
-		Return(true).
+		Return([]dtos.Impression{*expectedImpression}, []dtos.Impression{}).
 		Once()
 
 	client := &Impl{
@@ -147,23 +197,23 @@ func TestTreatments(t *testing.T) {
 		{KeyName: "key1", BucketingKey: "", FeatureName: "f3", Treatment: "on", Label: "label3", ChangeNumber: 125},
 	}
 	im := &mocks.ImpressionManagerMock{}
-	im.On("ProcessSingle", mock.Anything).
+	im.On("Process", mock.Anything).
 		Run(func(args mock.Arguments) {
-			assertImpEq(t, &expectedImpressions[0], args.Get(0).(*dtos.Impression))
+			assertImpEq(t, &expectedImpressions[0], &args.Get(0).([]dtos.Impression)[0])
 		}).
-		Return(true).
+		Return([]dtos.Impression{expectedImpressions[0]}, []dtos.Impression{}).
 		Once()
-	im.On("ProcessSingle", mock.Anything).
+	im.On("Process", mock.Anything).
 		Run(func(args mock.Arguments) {
-			assertImpEq(t, &expectedImpressions[1], args.Get(0).(*dtos.Impression))
+			assertImpEq(t, &expectedImpressions[1], &args.Get(0).([]dtos.Impression)[0])
 		}).
-		Return(true).
+		Return([]dtos.Impression{expectedImpressions[1]}, []dtos.Impression{}).
 		Once()
-	im.On("ProcessSingle", mock.Anything).
+	im.On("Process", mock.Anything).
 		Run(func(args mock.Arguments) {
-			assertImpEq(t, &expectedImpressions[2], args.Get(0).(*dtos.Impression))
+			assertImpEq(t, &expectedImpressions[2], &args.Get(0).([]dtos.Impression)[0])
 		}).
-		Return(true).
+		Return([]dtos.Impression{expectedImpressions[2]}, []dtos.Impression{}).
 		Once()
 
 	client := &Impl{
@@ -224,35 +274,35 @@ func TestTreatmentsByFlagSet(t *testing.T) {
 		"f3": {KeyName: "key1", BucketingKey: "", FeatureName: "f3", Treatment: "on", Label: "label3", ChangeNumber: 125},
 	}
 	im := &mocks.ImpressionManagerMock{}
-	im.On("ProcessSingle", mock.Anything).
+	im.On("Process", mock.Anything).
 		Run(func(args mock.Arguments) {
-			imp, ok := args.Get(0).(*dtos.Impression)
+			imp, ok := args.Get(0).([]dtos.Impression)
 			if !ok {
 				t.Error("not an impression")
 			}
-			assertImpEq(t, expectedImpressions[imp.FeatureName], args.Get(0).(*dtos.Impression))
+			assertImpEq(t, expectedImpressions[imp[0].FeatureName], &args.Get(0).([]dtos.Impression)[0])
 		}).
-		Return(true).
+		Return([]dtos.Impression{*expectedImpressions["f1"]}, []dtos.Impression{}).
 		Once()
-	im.On("ProcessSingle", mock.Anything).
+	im.On("Process", mock.Anything).
 		Run(func(args mock.Arguments) {
-			imp, ok := args.Get(0).(*dtos.Impression)
+			imp, ok := args.Get(0).([]dtos.Impression)
 			if !ok {
 				t.Error("not an impression")
 			}
-			assertImpEq(t, expectedImpressions[imp.FeatureName], args.Get(0).(*dtos.Impression))
+			assertImpEq(t, expectedImpressions[imp[0].FeatureName], &args.Get(0).([]dtos.Impression)[0])
 		}).
-		Return(true).
+		Return([]dtos.Impression{*expectedImpressions["f2"]}, []dtos.Impression{}).
 		Once()
-	im.On("ProcessSingle", mock.Anything).
+	im.On("Process", mock.Anything).
 		Run(func(args mock.Arguments) {
-			imp, ok := args.Get(0).(*dtos.Impression)
+			imp, ok := args.Get(0).([]dtos.Impression)
 			if !ok {
 				t.Error("not an impression")
 			}
-			assertImpEq(t, expectedImpressions[imp.FeatureName], args.Get(0).(*dtos.Impression))
+			assertImpEq(t, expectedImpressions[imp[0].FeatureName], &args.Get(0).([]dtos.Impression)[0])
 		}).
-		Return(true).
+		Return([]dtos.Impression{*expectedImpressions["f3"]}, []dtos.Impression{}).
 		Once()
 
 	client := &Impl{
@@ -313,35 +363,35 @@ func TestTreatmentsByFlagSets(t *testing.T) {
 		"f3": {KeyName: "key1", BucketingKey: "", FeatureName: "f3", Treatment: "on", Label: "label3", ChangeNumber: 125},
 	}
 	im := &mocks.ImpressionManagerMock{}
-	im.On("ProcessSingle", mock.Anything).
+	im.On("Process", mock.Anything).
 		Run(func(args mock.Arguments) {
-			imp, ok := args.Get(0).(*dtos.Impression)
+			imp, ok := args.Get(0).([]dtos.Impression)
 			if !ok {
 				t.Error("not an impression")
 			}
-			assertImpEq(t, expectedImpressions[imp.FeatureName], args.Get(0).(*dtos.Impression))
+			assertImpEq(t, expectedImpressions[imp[0].FeatureName], &args.Get(0).([]dtos.Impression)[0])
 		}).
-		Return(true).
+		Return([]dtos.Impression{*expectedImpressions["f1"]}, []dtos.Impression{}).
 		Once()
-	im.On("ProcessSingle", mock.Anything).
+	im.On("Process", mock.Anything).
 		Run(func(args mock.Arguments) {
-			imp, ok := args.Get(0).(*dtos.Impression)
+			imp, ok := args.Get(0).([]dtos.Impression)
 			if !ok {
 				t.Error("not an impression")
 			}
-			assertImpEq(t, expectedImpressions[imp.FeatureName], args.Get(0).(*dtos.Impression))
+			assertImpEq(t, expectedImpressions[imp[0].FeatureName], &args.Get(0).([]dtos.Impression)[0])
 		}).
-		Return(true).
+		Return([]dtos.Impression{*expectedImpressions["f2"]}, []dtos.Impression{}).
 		Once()
-	im.On("ProcessSingle", mock.Anything).
+	im.On("Process", mock.Anything).
 		Run(func(args mock.Arguments) {
-			imp, ok := args.Get(0).(*dtos.Impression)
+			imp, ok := args.Get(0).([]dtos.Impression)
 			if !ok {
 				t.Error("not an impression")
 			}
-			assertImpEq(t, expectedImpressions[imp.FeatureName], args.Get(0).(*dtos.Impression))
+			assertImpEq(t, expectedImpressions[imp[0].FeatureName], &args.Get(0).([]dtos.Impression)[0])
 		}).
-		Return(true).
+		Return([]dtos.Impression{*expectedImpressions["f3"]}, []dtos.Impression{}).
 		Once()
 
 	client := &Impl{
@@ -408,12 +458,12 @@ func TestImpressionsQueueFull(t *testing.T) {
 		Return(&evaluator.Result{Treatment: "on", Label: "label1", EvaluationTime: 1 * time.Millisecond, SplitChangeNumber: 123}).
 		Times(9)
 
-	expectedImpression := &dtos.Impression{KeyName: "key1", BucketingKey: "", FeatureName: "f1", Treatment: "on", Label: "label1", ChangeNumber: 123}
+	expectedImpression := &dtos.Impression{KeyName: "key1", BucketingKey: "", FeatureName: "f1", Treatment: "on", Label: "label1", ChangeNumber: 123, Disabled: false}
 	im := &mocks.ImpressionManagerMock{}
-	im.On("ProcessSingle", mock.Anything).
+	im.On("Process", mock.Anything).
 		// hay que hacer el assert aca en lugar del matcher por el timestamp
-		Run(func(args mock.Arguments) { assertImpEq(t, expectedImpression, args.Get(0).(*dtos.Impression)) }).
-		Return(true).
+		Run(func(args mock.Arguments) { assertImpEq(t, expectedImpression, &args.Get(0).([]dtos.Impression)[0]) }).
+		Return([]dtos.Impression{*expectedImpression}, []dtos.Impression{}).
 		Times(9)
 
 	client := &Impl{logger: logging.NewLogger(nil), ss: nil, is: is, ev: ev, iq: im, cfg: conf.Config{LabelsEnabled: true}, queueFullChan: queueFullChan}
@@ -632,12 +682,39 @@ func TestSplit(t *testing.T) {
 	split, err := c.Split("s2")
 	assert.Nil(t, err)
 	assert.Equal(t, &SplitView{
-		Name:         "s2",
-		TrafficType:  "tt1",
-		Killed:       false,
-		Treatments:   []string{"a", "b"},
-		ChangeNumber: 1,
-		Configs:      map[string]string{"a": "conf1", "b": "conf2"},
+		Name:                "s2",
+		TrafficType:         "tt1",
+		Killed:              false,
+		Treatments:          []string{"a", "b"},
+		ChangeNumber:        1,
+		Configs:             map[string]string{"a": "conf1", "b": "conf2"},
+		ImpressionsDisabled: false,
+	}, split)
+}
+
+func TestSplitWithImpressionsDiabledInTrue(t *testing.T) {
+	var ss mocks.SplitStorageMock
+	ss.On("Split", "s2").Return(&dtos.SplitDTO{
+		Name:                "s2",
+		TrafficTypeName:     "tt1",
+		ChangeNumber:        1,
+		Conditions:          []dtos.ConditionDTO{{Partitions: []dtos.PartitionDTO{{Treatment: "a"}, {Treatment: "b"}}}},
+		Configurations:      map[string]string{"a": "conf1", "b": "conf2"},
+		ImpressionsDisabled: true,
+	}).Once()
+
+	c := Impl{splitStorage: &ss}
+
+	split, err := c.Split("s2")
+	assert.Nil(t, err)
+	assert.Equal(t, &SplitView{
+		Name:                "s2",
+		TrafficType:         "tt1",
+		Killed:              false,
+		Treatments:          []string{"a", "b"},
+		ChangeNumber:        1,
+		Configs:             map[string]string{"a": "conf1", "b": "conf2"},
+		ImpressionsDisabled: true,
 	}, split)
 }
 

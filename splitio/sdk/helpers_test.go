@@ -16,11 +16,15 @@ func TestSetupImpressionsComponents(t *testing.T) {
 	ic, err := setupImpressionsComponents(&sdkCfg.Impressions, storages.telemetry)
 	assert.Nil(t, err)
 	assert.NotNil(t, ic.counter)
+	assert.NotNil(t, ic.tracker)
+	assert.NotNil(t, ic.filter)
 
 	sdkCfg.Impressions.Mode = "debug"
 	ic, err = setupImpressionsComponents(&sdkCfg.Impressions, storages.telemetry)
 	assert.Nil(t, err)
-	assert.Nil(t, ic.counter)
+	assert.NotNil(t, ic.counter)
+	assert.NotNil(t, ic.tracker)
+	assert.NotNil(t, ic.filter)
 }
 
 func TestNoOpTask(t *testing.T) {
