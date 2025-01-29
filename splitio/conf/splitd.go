@@ -3,7 +3,6 @@ package conf
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -29,6 +28,7 @@ type Config struct {
 	SDK    SDK    `yaml:"sdk"`
 	Link   Link   `yaml:"link"`
 	Debug  Debug  `yaml:"debug"`
+	API    API    `yaml:"api"`
 }
 
 func (c Config) String() string {
@@ -42,7 +42,7 @@ func (c Config) String() string {
 
 func (c *Config) parse(fn string) error {
 
-	raw, err := ioutil.ReadFile(fn)
+	raw, err := os.ReadFile(fn)
 	if err != nil {
 		return fmt.Errorf("error reading yaml file: %w", err)
 	}
@@ -60,6 +60,7 @@ func (c *Config) PopulateWithDefaults() {
 	c.Link.PopulateWithDefaults()
 	c.Logger.PopulateWithDefaults()
 	c.Debug.PopulateWithDefaults()
+	c.API.PopulateWithDefaults()
 }
 
 type Link struct {
@@ -140,6 +141,7 @@ func (s *SDK) PopulateWithDefaults() {
 	s.FeatureFlags.PopulateWithDefaults()
 	s.Impressions.PopulateWithDefaults()
 	s.Events.PopulateWithDefaults()
+	s.FlagSetsFilter = []string{}
 }
 
 type FeatureFlags struct {
@@ -278,6 +280,16 @@ func (l *Logger) ToLoggerOptions() (*logging.LoggerOptions, error) {
 	return opts, nil
 }
 
+type API struct {
+	Host string `yaml:"host"`
+	Port int    `yaml:"port"`
+}
+
+func (a *API) PopulateWithDefaults() {
+	a.Host = "0.0.0.0"
+	a.Port = 8887
+}
+
 type Debug struct {
 	Profiling Profiling `yaml:"profiling"`
 }
@@ -305,5 +317,6 @@ func ReadConfig() (*Config, error) {
 	}
 
 	var c Config
+	c.PopulateWithDefaults()
 	return &c, c.parse(cfgFN)
 }
