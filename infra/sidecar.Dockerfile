@@ -1,32 +1,39 @@
 # ----- Builder image
-FROM golang:1.21.6-bookworm AS builder
+ARG GOLANG_VERSION=1.23.5
+FROM golang:${GOLANG_VERSION}-bookworm AS builder
 
 ARG FIPS_MODE
 ARG COMMIT_SHA
 
-RUN apt update -y
-RUN apt install -y build-essential ca-certificates python3 git socat
+RUN DEBIAN_FRONTEND=noninteractive \
+  apt-get update && \
+  apt-get install --no-install-recommends -y \
+  build-essential ca-certificates python3 git socat
 
 WORKDIR /splitd
 COPY . .
 
 RUN export GITHUB_SHA="${COMMIT_SHA}" && bash -c '\
-    if [[ "${FIPS_MODE}" = "enabled" ]]; \
-    then echo "building in fips mode"; make clean splitd-fips splitd.yaml.tpl EXTRA_BUILD_ARGS="${EXTRA_BUILD_ARGS}"; mv splitd-fips splitd; \
-    else echo "building in standard mode"; make clean splitd splitd.yaml.tpl EXTRA_BUILD_ARGS="${EXTRA_BUILD_ARGS}"; \
-    fi'
+  if [[ "${FIPS_MODE}" = "enabled" ]]; \
+  then echo "building in fips mode"; make clean splitd-fips splitd.yaml.tpl EXTRA_BUILD_ARGS="${EXTRA_BUILD_ARGS}"; mv splitd-fips splitd; \
+  else echo "building in standard mode"; make clean splitd splitd.yaml.tpl EXTRA_BUILD_ARGS="${EXTRA_BUILD_ARGS}"; \
+  fi'
 
 # ----- Runner image
-FROM debian:12.4 AS runner
+FROM debian:bookworm-20250203-slim AS runner
 
-RUN apt update -y
-RUN apt install -y bash ca-certificates wget socat
+ARG YQ_VERSION=v4.44.6
 
-RUN wget https://github.com/mikefarah/yq/releases/download/v4.40.5/yq_linux_amd64
-RUN chmod +x yq_linux_amd64
-RUN mv yq_linux_amd64 /usr/local/bin/yq
+RUN DEBIAN_FRONTEND=noninteractive \
+  apt-get update && \
+  apt-get install --no-install-recommends -y \
+  bash ca-certificates wget socat && \
+  wget -O /usr/local/bin/yq \
+  "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64" && \
+  chmod +x /usr/local/bin/yq && \
+  mkdir -p /opt/splitd && \
+  rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /opt/splitd
 COPY --from=builder /splitd/splitd /opt/splitd
 COPY --from=builder /splitd/splitd.yaml.tpl /opt/splitd
 COPY infra/entrypoint.sh /opt/splitd
