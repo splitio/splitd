@@ -1,10 +1,9 @@
 module github.com/splitio/splitd
 
-go 1.21
+go 1.23.5
 
 require (
 	github.com/gin-gonic/gin v1.10.0
-	github.com/go-playground/assert/v2 v2.2.0
 	github.com/splitio/go-split-commons/v6 v6.1.0
 	github.com/splitio/go-toolkit/v5 v5.4.0
 	github.com/stretchr/testify v1.9.0
