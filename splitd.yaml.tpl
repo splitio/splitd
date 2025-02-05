@@ -30,6 +30,7 @@ sdk:
     events:
         refreshRateSeconds: 60
         queueSize: 8192
+    flagSetsFilter: []
 link:
     type: unix-seqpacket
     address: /var/run/splitd.sock
@@ -45,4 +46,7 @@ debug:
         enable: false
         host: localhost
         port: 8888
+api:
+    host: 0.0.0.0
+    port: 8887
 
