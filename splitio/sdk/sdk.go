@@ -84,8 +84,8 @@ func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, 
 
 	queueFullChan := make(chan string, 2)
 	splitApi := api.NewSplitAPI(apikey, *advCfg, logger, md)
-	workers := setupWorkers(logger, splitApi, stores, hc, c, flagSetsFilter)
-	tasks := setupTasks(c, stores, logger, workers, impc, md, splitApi)
+	workers := setupWorkers(logger, splitApi, stores, hc, c, flagSetsFilter, md, impc)
+	tasks := setupTasks(c, logger, workers, impc)
 	sync := synchronizer.NewSynchronizer(*advCfg, *tasks, *workers, logger, queueFullChan)
 
 	status := make(chan int, 10)
@@ -257,7 +257,7 @@ func (i *Impl) handleImpression(key string, bk *string, f string, r *evaluator.R
 		label = r.Label
 	}
 
-	imp := &dtos.Impression{
+	imp := dtos.Impression{
 		FeatureName:  f,
 		BucketingKey: common.StringFromRef(bk),
 		ChangeNumber: r.SplitChangeNumber,
@@ -265,11 +265,12 @@ func (i *Impl) handleImpression(key string, bk *string, f string, r *evaluator.R
 		Label:        label,
 		Treatment:    r.Treatment,
 		Time:         timeMillis(),
+		Disabled:     r.ImpressionsDisabled,
 	}
 
-	shouldStore := i.iq.ProcessSingle(imp)
-	if shouldStore {
-		_, err := i.is.Push(cm, *imp)
+	forLog, _ := i.iq.Process([]dtos.Impression{imp}, false)
+	if len(forLog) == 1 {
+		_, err := i.is.Push(cm, forLog[0])
 		if err != nil {
 			if err == storage.ErrQueueFull {
 				select {
@@ -283,7 +284,7 @@ func (i *Impl) handleImpression(key string, bk *string, f string, r *evaluator.R
 		}
 	}
 
-	return imp
+	return &imp
 }
 
 func splitToView(s *dtos.SplitDTO) *SplitView {
@@ -296,14 +297,15 @@ func splitToView(s *dtos.SplitDTO) *SplitView {
 	}
 
 	return &SplitView{
-		Name:             s.Name,
-		TrafficType:      s.TrafficTypeName,
-		Killed:           s.Killed,
-		ChangeNumber:     s.ChangeNumber,
-		Configs:          s.Configurations,
-		Treatments:       treatments,
-		DefaultTreatment: s.DefaultTreatment,
-		Sets:             s.Sets,
+		Name:                s.Name,
+		TrafficType:         s.TrafficTypeName,
+		Killed:              s.Killed,
+		ChangeNumber:        s.ChangeNumber,
+		Configs:             s.Configurations,
+		Treatments:          treatments,
+		DefaultTreatment:    s.DefaultTreatment,
+		Sets:                s.Sets,
+		ImpressionsDisabled: s.ImpressionsDisabled,
 	}
 }
 

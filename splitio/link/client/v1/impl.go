@@ -6,6 +6,7 @@ import (
 	"github.com/splitio/go-split-commons/v6/dtos"
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio"
+	"github.com/splitio/splitd/splitio/common/lang"
 	"github.com/splitio/splitd/splitio/link/client/types"
 	"github.com/splitio/splitd/splitio/link/protocol"
 	protov1 "github.com/splitio/splitd/splitio/link/protocol/v1"
@@ -112,8 +113,11 @@ func (c *Impl) Split(name string) (*sdk.SplitView, error) { // TODO(mredolatti):
 		return nil, fmt.Errorf("server responded split rpc with error %d", resp.Status)
 	}
 
-	p := sdk.SplitView(resp.Payload)
-	return &p, nil
+	if resp.Payload.Name == "" {
+		return nil, nil
+	}
+
+	return lang.Ref(sdk.SplitView(resp.Payload)), nil
 }
 
 func (c *Impl) Splits() ([]sdk.SplitView, error) {
