@@ -1,5 +1,6 @@
 1.6.0 (Feb 5, 2025)
-- Added Health & Readiness endpoints
+- Added Health & Readiness endpoints.
+- Fixing vulnerabilities.
 
 1.5.0 (Jan 29, 2025):
 - Added support for the new impressions tracking toggle available on feature flags, both respecting the setting and including the new field being returned on SplitView type objects. Read more in our docs.
