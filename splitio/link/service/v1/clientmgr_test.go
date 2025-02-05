@@ -588,6 +588,39 @@ func TestSplit(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestSplitNotFound(t *testing.T) {
+	rawConnMock := &transferMocks.RawConnMock{}
+	rawConnMock.On("ReceiveMessage").Return([]byte("registrationMessage"), nil).Once()
+	rawConnMock.On("SendMessage", []byte("successRegistration")).Return(nil).Once()
+	rawConnMock.On("ReceiveMessage").Return([]byte("split"), nil).Once()
+	rawConnMock.On("SendMessage", []byte("successPayload")).Return(nil).Once()
+	rawConnMock.On("ReceiveMessage").Return([]byte(nil), io.EOF).Once()
+
+	serializerMock := &serializerMocks.SerializerMock{}
+	serializerMock.On("Parse", []byte("registrationMessage"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(1).(*v1.RPC) = v1.RPC{
+			RPCBase: protocol.RPCBase{Version: protocol.V1},
+			OpCode:  v1.OCRegister,
+			Args:    []interface{}{"someID", "some_sdk-1.2.3", uint64(0)},
+		}
+	}).Once()
+	serializerMock.On("Serialize", proto1Mocks.NewRegisterResp(true)).Return([]byte("successRegistration"), nil).Once()
+	serializerMock.On("Parse", []byte("split"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
+		*args.Get(1).(*v1.RPC) = *proto1Mocks.NewSplitRPC("s1")
+	}).Once()
+	serializerMock.On("Serialize", proto1Mocks.NewSplitResp(true, v1.SplitPayload{})).
+		Return([]byte("successPayload"), nil).
+		Once()
+
+	sdkMock := &sdkMocks.SDKMock{}
+	sdkMock.On("Split", "s1").Return((*sdk.SplitView)(nil), sdk.ErrSplitNotFound).Once()
+
+	logger := logging.NewLogger(nil)
+	cm := NewClientManager(rawConnMock, logger, sdkMock, serializerMock)
+	err := cm.handleClientInteractions()
+	assert.Nil(t, err)
+}
+
 func TestTreatmentWithoutRegister(t *testing.T) {
 	rawConnMock := &transferMocks.RawConnMock{}
 	rawConnMock.On("ReceiveMessage").Return([]byte("treatmentMessage"), nil).Once()
