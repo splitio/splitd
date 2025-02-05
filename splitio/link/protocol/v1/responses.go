@@ -9,7 +9,7 @@ const (
 
 type ResponseWrapper[T validPayloadsConstraint] struct {
 	Status  Result `msgpack:"s"`
-	Payload T      `msgpack:"p"`
+	Payload T      `msgpack:"p,omitempty"`
 }
 
 type RegisterPayload struct{}
@@ -37,14 +37,15 @@ type SplitNamesPayload struct {
 }
 
 type SplitPayload struct {
-	Name             string            `msgpack:"n"`
-	TrafficType      string            `msgpack:"t"`
-	Killed           bool              `msgpack:"k"`
-	Treatments       []string          `msgpack:"s"`
-	ChangeNumber     int64             `msgpack:"c"`
-	Configs          map[string]string `msgpack:"f"`
-	DefaultTreatment string            `msgpack:"d"`
-	Sets             []string          `msgpack:"e"`
+	Name                string            `msgpack:"n"`
+	TrafficType         string            `msgpack:"t"`
+	Killed              bool              `msgpack:"k"`
+	Treatments          []string          `msgpack:"s"`
+	ChangeNumber        int64             `msgpack:"c"`
+	Configs             map[string]string `msgpack:"f"`
+	DefaultTreatment    string            `msgpack:"d"`
+	Sets                []string          `msgpack:"e"`
+	ImpressionsDisabled bool              `msgpack:"i"`
 }
 
 type SplitsPayload struct {
