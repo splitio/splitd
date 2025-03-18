@@ -4,6 +4,7 @@ go 1.23.6
 
 require (
 	github.com/gin-gonic/gin v1.10.0
+	github.com/iceber/iouring-go v0.0.0-20230403020409-002cfd2e2a90
 	github.com/splitio/go-split-commons/v6 v6.1.0
 	github.com/splitio/go-toolkit/v5 v5.4.0
 	github.com/stretchr/testify v1.9.0
@@ -46,3 +47,5 @@ require (
 	golang.org/x/text v0.21.0 // indirect
 	google.golang.org/protobuf v1.34.1 // indirect
 )
+
+replace github.com/iceber/iouring-go => /home/martin/Projects/split/iouring-go

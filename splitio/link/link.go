@@ -6,16 +6,16 @@ import (
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio/link/client"
 	"github.com/splitio/splitd/splitio/link/client/types"
+	v1 "github.com/splitio/splitd/splitio/link/csm/v1"
 	"github.com/splitio/splitd/splitio/link/protocol"
 	"github.com/splitio/splitd/splitio/link/serializer"
-	"github.com/splitio/splitd/splitio/link/service"
 	"github.com/splitio/splitd/splitio/link/transfer"
 	"github.com/splitio/splitd/splitio/sdk"
 )
 
 func Listen(logger logging.LoggerInterface, sdkFacade sdk.Interface, opts *ListenerOptions) (<-chan error, func() error, error) {
 
-	acceptor, err := transfer.NewAcceptor(logger, &opts.Transfer, &opts.Acceptor)
+	acceptor, err := transfer.NewAcceptor(false, logger, &opts.Transfer, &opts.Acceptor)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error setting up transfer module: %w", err)
 	}
@@ -25,12 +25,24 @@ func Listen(logger logging.LoggerInterface, sdkFacade sdk.Interface, opts *Liste
 		return nil, nil, fmt.Errorf("error building serializer")
 	}
 
-	svc, err := service.New(logger, sdkFacade, s, opts.Protocol)
+	iourLoop, err := transfer.NewIOUringLoop(opts.Transfer.Address, logger, 1024, 1024)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error setting up service handler: %w", err)
+		return nil, nil, fmt.Errorf("error creating io-uring loop: %w", err)
 	}
 
-	ec, err := acceptor.Start(svc.HandleNewClient)
+	//svc, err := service.New(logger, sdkFacade, s, opts.Protocol)
+	//if err != nil {
+	//	return nil, nil, fmt.Errorf("error setting up service handler: %w", err)
+	//}
+
+	attachCallback := func(rc transfer.RawConn) {
+		csm := v1.NewCSM(s, logger, sdkFacade)
+		if err := iourLoop.TrackConnection(rc, csm); err != nil {
+			panic(err.Error())
+		}
+	}
+	//ec, err := acceptor.Start(svc.HandleNewClient)
+	ec, err := acceptor.Start(attachCallback)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error setting up listener: %w", err)
 	}

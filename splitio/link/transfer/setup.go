@@ -35,7 +35,7 @@ var (
 	ErrServiceAddressInUse = errors.New("provided socket file / address is already in use")
 )
 
-func NewAcceptor(logger logging.LoggerInterface, o *Options, listenerConfig *AcceptorConfig) (*Acceptor, error) {
+func NewAcceptor(forking bool, logger logging.LoggerInterface, o *Options, listenerConfig *AcceptorConfig) (*Acceptor, error) {
 
 	var address net.Addr
 	var ff FramingWrapperFactory
@@ -54,7 +54,7 @@ func NewAcceptor(logger logging.LoggerInterface, o *Options, listenerConfig *Acc
 	}
 
 	cf := func(c net.Conn) RawConn { return newConnWrapper(c, ff, o) }
-	return newAcceptor(address, cf, logger, listenerConfig), nil
+	return newAcceptor(forking, address, cf, logger, listenerConfig), nil
 }
 
 func NewClientConn(logger logging.LoggerInterface, o *Options) (RawConn, error) {

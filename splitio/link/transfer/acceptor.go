@@ -23,6 +23,7 @@ type OnClientAttachedCallback = func(conn RawConn)
 type RawConnFactory = func(conn net.Conn) RawConn
 
 type Acceptor struct {
+	forking        bool
 	listener       atomic.Value
 	rawConnFactory RawConnFactory
 	logger         logging.LoggerInterface
@@ -46,8 +47,15 @@ func DefaultAcceptorConfig() AcceptorConfig {
 	}
 }
 
-func newAcceptor(address net.Addr, rawConnFactory RawConnFactory, logger logging.LoggerInterface, cfg *AcceptorConfig) *Acceptor {
+func newAcceptor(
+	forking bool,
+	address net.Addr,
+	rawConnFactory RawConnFactory,
+	logger logging.LoggerInterface,
+	cfg *AcceptorConfig,
+) *Acceptor {
 	return &Acceptor{
+		forking:        forking,
 		rawConnFactory: rawConnFactory,
 		logger:         logger,
 		address:        address,
@@ -106,11 +114,16 @@ func (a *Acceptor) Start(onClientAttachedCallback OnClientAttachedCallback) (<-c
 				continue
 			}
 
-			go func(rc RawConn) {
+			rc := a.rawConnFactory(conn)
+			if a.forking {
+				go func(rc RawConn) {
+					onClientAttachedCallback(rc)
+					rc.Shutdown()
+					a.sem.Release(1)
+				}(rc)
+			} else {
 				onClientAttachedCallback(rc)
-				rc.Shutdown()
-				a.sem.Release(1)
-			}(a.rawConnFactory(conn))
+			}
 		}
 	}()
 	return ret, nil

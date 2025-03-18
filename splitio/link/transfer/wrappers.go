@@ -21,6 +21,7 @@ type RawConn interface {
 	ReceiveMessage() ([]byte, error)
 	SendMessage(data []byte) error
 	Shutdown() error
+	FD() (int, error)
 }
 
 type BaseConn struct {
@@ -88,9 +89,18 @@ func (c *PacketBasedConnection) SendMessage(data []byte) error {
 	return nil
 }
 
+func (c *PacketBasedConnection) FD() (int, error) {
+	return fdFromUnixConn(c.conn)
+}
+
 type StreamBasedConnection struct {
 	BaseConn
 	framer framing.Interface
+}
+
+// FD implements RawConn.
+func (c *StreamBasedConnection) FD() (int, error) {
+	return fdFromUnixConn(c.conn)
 }
 
 func (c *StreamBasedConnection) ReceiveMessage() ([]byte, error) {
@@ -146,6 +156,15 @@ func newConnWrapper(c net.Conn, f FramingWrapperFactory, o *Options) RawConn {
 		return &PacketBasedConnection{BaseConn: bc}
 	}
 	return &StreamBasedConnection{framer: f(c), BaseConn: bc}
+}
+
+func fdFromUnixConn(c net.Conn) (int, error) {
+	f, err := c.(*net.UnixConn).File()
+	if err != nil {
+		return -1, err
+	}
+
+	return int(f.Fd()), nil
 }
 
 var _ RawConn = (*PacketBasedConnection)(nil)
