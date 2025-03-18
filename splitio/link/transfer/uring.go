@@ -3,7 +3,6 @@ package transfer
 import (
 	"errors"
 	"fmt"
-	"sync"
 	"syscall"
 	"time"
 
@@ -20,9 +19,7 @@ var (
 type ConnState byte
 
 const (
-	StatePendingRead     ConnState = 0x01
 	StateReadInProgress  ConnState = 0x02
-	StatePendingWrite    ConnState = 0x10
 	StateWriteInProgress ConnState = 0x11
 )
 
@@ -34,160 +31,157 @@ type ClientStateMachine interface {
 type IOURingLoop struct {
 	logger     logging.LoggerInterface
 	lAddr      string
+	lfd        int
 	csmFactory CSMFactoryFunc
 	w          *iouring.IOURing
 	conns      map[int]*connWrapper
-	mtx        sync.Mutex
 	maxConns   int
 }
 
 type connWrapper struct { // fd -> conn
 	csm      ClientStateMachine
 	state    ConnState
-	c        RawConn
 	incoming []byte
 	outgoing []byte
 	respSize int
 }
 
-func (r *IOURingLoop) TrackConnection(c RawConn, csm ClientStateMachine) error {
-
-	fd, err := c.FD()
-	if err != nil {
-		return fmt.Errorf("error obtaining file descriptor for new connection: %w", err)
-	}
-	r.mtx.Lock()
-	defer r.mtx.Unlock()
-	if l := len(r.conns); l >= r.maxConns {
-		return ErrNoMoreConns
-	}
-
-	r.conns[fd] = &connWrapper{
-		c:        c,
-		csm:      csm,
-		state:    StatePendingRead,
-		incoming: make([]byte, 1024),
-		outgoing: make([]byte, 1024),
-	}
-
-	r.logger.Info("started tracking fd=", fd)
-	return nil
-
-}
-
 func (r *IOURingLoop) loop() {
 	sqes := make([]iouring.PrepRequest, 0, 1024)
-	ch := make(chan iouring.Result, 1024)
-
-	lfd := listenSocket(r.lAddr)
-	r.w.SubmitRequest(iouring.Accept(lfd), ch)
+	results := make(chan iouring.Result, 1024)
+	r.w.SubmitRequest(iouring.Accept(r.lfd), results)
 
 	for {
 		sqes = sqes[:0]
-		r.mtx.Lock()
-		for fd, wc := range r.conns {
-			switch wc.state {
-			case StatePendingRead:
-				r.logger.Info("scheduling read for fd=", fd)
-				sqes = append(sqes, iouring.Read(fd, wc.incoming))
-				wc.state = StateReadInProgress
-
-			case StatePendingWrite:
-				r.logger.Info("scheduling write for fd=", fd)
-				sqes = append(sqes, iouring.Write(fd, wc.outgoing[:wc.respSize]))
-				wc.state = StateWriteInProgress
-			}
+		handledCount := r.handlePendingEvents(results, &sqes)
+		if handledCount == 0 {
+			time.Sleep(1 * time.Millisecond) // TODO(mredolatti): how long to wait here?
 		}
-		r.mtx.Unlock()
-
+		// handle pending messages
 		if len(sqes) > 0 {
-			r.logger.Info("scheduling transfer requests")
-			_, err := r.w.SubmitRequests(sqes, ch)
+			_, err := r.w.SubmitRequests(sqes, results)
 			if err != nil {
 				panic(err.Error()) // TODO
 			}
 		}
-		r.awaitAndHandleCompletions(ch)
 	}
-
 }
 
-func (r *IOURingLoop) awaitAndHandleCompletions(ch chan iouring.Result) {
+func (r *IOURingLoop) handlePendingEvents(results <-chan iouring.Result, sqes *[]iouring.PrepRequest) int {
 	operationsCompleted := 0
 	for {
 		select {
-		case result, ok := <-ch:
+		case result, ok := <-results:
 			if !ok {
 				panic("CHAN CLOSED")
 			}
+
 			operationsCompleted++
 
 			if err := result.Err(); err != nil {
-				panic(err.Error())
-			}
-
-			forFd, ok := r.conns[result.Fd()]
-			if !ok {
-				panic(fmt.Sprintf("requested metadata for fd=%d which was not found", result.Fd()))
+				r.logger.Error(fmt.Sprintf("%+v\n", result))
 			}
 
 			switch result.Opcode() {
 			case iouring_syscall.IORING_OP_ACCEPT:
-				panic("ACCEPTED!")
+				if err := r.handleAcceptDone(result, sqes); err != nil {
+				}
 			case iouring_syscall.IORING_OP_READ:
-				r.logger.Info("READ COMPLETED")
-				assertCurrentStatus(forFd, StateReadInProgress)
-				bytesRead := result.ReturnValue0().(int)
-				if bytesRead == 0 {
-					// possibly connection closed. retry read
-					forFd.state = StatePendingRead
-					continue
+				if err := r.handleReadDone(result, sqes); err != nil {
 				}
-
-				n, err := forFd.csm.HandleIncomingData(forFd.incoming[:bytesRead], &forFd.outgoing)
-				if err != nil {
-					panic(fmt.Sprintf("error handling received data: %w", err))
-				}
-
-				forFd.state = StatePendingWrite // indicate that response is ready to be written now
-				forFd.respSize = n
-
 			case iouring_syscall.IORING_OP_WRITE:
-				r.logger.Info("WRITE COMPLETED")
-				assertCurrentStatus(forFd, StateWriteInProgress)
-				forFd.state = StatePendingRead // ready for accepting next op
-				forFd.respSize = 0
-
-			case iouring_syscall.IORING_OP_CLOSE:
-				if err := forFd.c.Shutdown(); err != nil {
-					r.logger.Error("error shutting down client connection: %w", err)
+				if err := r.handleWriteDone(result, sqes); err != nil {
 				}
+			case iouring_syscall.IORING_OP_CLOSE:
+				// TODO!
+				panic("conn closed!")
 
 			default:
 				panic("unexpected event")
 			}
 		default:
-			if operationsCompleted == 0 {
-				// nothing got completed so far. wait a while before re-iterating
-				time.Sleep(100 * time.Millisecond)
-			}
-			return
+			return operationsCompleted
 		}
 	}
 }
 
-func NewIOUringLoop(addr string, logger logging.LoggerInterface, entries uint, maxConns int) (*IOURingLoop, error) {
+func (r *IOURingLoop) handleAcceptDone(result iouring.Result, sqes *[]iouring.PrepRequest) error {
+	fd := result.ReturnValue0().(int)
+	if l := len(r.conns); l >= r.maxConns {
+		r.logger.Error("connection limit exceeded")
+		return nil
+	}
+
+	cw := &connWrapper{
+		csm:      r.csmFactory(),
+		state:    StateReadInProgress,
+		incoming: make([]byte, 1024),
+		outgoing: make([]byte, 1024),
+	}
+
+	r.conns[fd] = cw
+	r.logger.Info("started tracking fd=", fd)
+	*sqes = append(*sqes, iouring.Accept(r.lfd), iouring.Read(fd, cw.incoming))
+	return nil
+}
+
+func (r *IOURingLoop) handleReadDone(result iouring.Result, sqes *[]iouring.PrepRequest) error {
+	forFd, ok := r.conns[result.Fd()]
+	if !ok {
+		panic(fmt.Sprintf("requested metadata for fd=%d which was not found", result.Fd()))
+	}
+
+	// TODO(mredolatti): this works for seqpacket-type sockets. stream-based ones will need more work.
+	assertCurrentStatus(forFd, StateReadInProgress)
+	bytesRead := result.ReturnValue0().(int)
+	if bytesRead == 0 { // EOF
+		delete(r.conns, result.Fd())
+		return nil
+	}
+
+	n, err := forFd.csm.HandleIncomingData(forFd.incoming[:bytesRead], &forFd.outgoing)
+	if err != nil {
+		panic(fmt.Sprintf("error handling received data: %w", err))
+	}
+
+	*sqes = append(*sqes, iouring.Write(result.Fd(), forFd.outgoing[:n]))
+	forFd.state = StateWriteInProgress // indicate that response is ready to be written now
+	return nil
+}
+
+func (r *IOURingLoop) handleWriteDone(result iouring.Result, sqes *[]iouring.PrepRequest) error {
+	forFd, ok := r.conns[result.Fd()]
+	if !ok {
+		panic(fmt.Sprintf("requested metadata for fd=%d which was not found", result.Fd()))
+	}
+
+	assertCurrentStatus(forFd, StateWriteInProgress)
+	*sqes = append(*sqes, iouring.Read(result.Fd(), forFd.incoming))
+	forFd.state = StateReadInProgress
+	return nil
+
+}
+
+func NewIOUringLoop(
+	addr string,
+	csmFactory CSMFactoryFunc,
+	logger logging.LoggerInterface,
+	entries uint,
+	maxConns int,
+) (*IOURingLoop, error) {
 	iou, err := iouring.New(entries)
 	if err != nil {
 		return nil, fmt.Errorf("error setting up io-uring: %w", err)
 	}
 
 	l := &IOURingLoop{
-		lAddr:    addr,
-		logger:   logger,
-		w:        iou,
-		conns:    make(map[int]*connWrapper, maxConns),
-		maxConns: maxConns,
+		csmFactory: csmFactory,
+		lAddr:      addr,
+		lfd:        listenSocket(addr),
+		logger:     logger,
+		w:          iou,
+		conns:      make(map[int]*connWrapper, maxConns),
+		maxConns:   maxConns,
 	}
 
 	go l.loop()

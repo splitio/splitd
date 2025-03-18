@@ -21,8 +21,6 @@ type UnBufferedClientStateMachineImpl struct {
 // HandleIncomingData implements ClientStateMachine.
 func (u *UnBufferedClientStateMachineImpl) HandleIncomingData(in []byte, out *[]byte) (int, error) {
 
-	u.logger.Error("ENTRO")
-
 	var rpc protov1.RPC
 	if err := u.serializer.Parse(in, &rpc); err != nil {
 		return 0, fmt.Errorf("error parsing message: %w", err)
