@@ -32,7 +32,7 @@ jobs:
           role-to-assume: ${{ vars.ECR_TESTING_ROLE_ARN }}
           aws-region: us-east-1
 
-      - name: Login to Amazon ECR
+      - name: Login to ECR
         if: ${{ github.event_name == 'push' }}
         uses: aws-actions/amazon-ecr-login@v2
 
