@@ -5,6 +5,10 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   build-docker-image:
     name: Build and push Docker image
@@ -13,25 +17,45 @@ jobs:
       matrix:
         fips_mode: [enabled, disabled]
     steps:
-      - name: Login to Artifactory
-        uses: docker/login-action@v3
-        with:
-          registry: splitio-docker.jfrog.io
-          username: ${{ secrets.ARTIFACTORY_DOCKER_USER }}
-          password: ${{ secrets.ARTIFACTORY_DOCKER_PASS }}
-
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_RO_TOKEN }}
+
+      - name: Configure AWS credentials
+        if: ${{ github.event_name == 'push' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.ECR_TESTING_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR
+        if: ${{ github.event_name == 'push' }}
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Login to Artifactory
+        if: ${{ github.event_name == 'push' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ vars.ARTIFACTORY_DOCKER_REGISTRY }}
+          username: ${{ vars.ARTIFACTORY_DOCKER_USER }}
+          password: ${{ secrets.ARTIFACTORY_DOCKER_PASS }}
 
       - name: Set VERSION env
         run: echo "VERSION=$(cat splitio/version.go | grep 'Version =' | awk '{print $4}' | tr -d '"')" >> $GITHUB_ENV
 
-      - name: Docker build and push
-        uses: docker/build-push-action@v5
+      - name: Docker Build and Push
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: "infra/sidecar.Dockerfile"
           push: true
-          tags: splitio-docker.jfrog.io/splitd/sidecar${{ matrix.fips_mode == 'enabled' && '-fips' || ''}}:${{ env.VERSION }}
+          tags: |
+            ${{ vars.ARTIFACTORY_DOCKER_REGISTRY }}/splitd/sidecar${{ matrix.fips_mode == 'enabled' && '-fips' || ''}}:${{ env.VERSION }}
+            ${{ vars.ECR_TESTING_URL }}/splitd/sidecar${{ matrix.fips_mode == 'enabled' && '-fips' || ''}}:${{ env.VERSION }}
           build-args: |
             FIPS_MODE=${{ matrix.fips_mode }}
