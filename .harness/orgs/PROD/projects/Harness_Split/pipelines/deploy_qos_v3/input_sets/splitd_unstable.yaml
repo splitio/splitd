@@ -1,11 +1,18 @@
 inputSet:
   name: splitd_unstable
+  tags: {}
   identifier: splitd_unstable
   orgIdentifier: PROD
   projectIdentifier: Harness_Split
   pipeline:
     identifier: deploy_qos_v3
     stages:
+      - stage:
+          identifier: code_artifact
+          type: Deployment
+          spec:
+            service:
+              serviceRef: <+<+expression.isResolved(<+trigger.payload.repository.name>)>?<+trigger.payload.repository.name.replace("-", "")>:<+trigger.payload.artifacts[0].service.replace("-", "")>>
       - parallel:
           - stage:
               identifier: CI
@@ -32,6 +39,7 @@ inputSet:
                           context: ""
                           buildArgs:
                             FIPS_MODE: <+matrix.fips_mode>
+                          envVariables: <+input>
               strategy:
                 matrix:
                   fips_mode:
@@ -62,11 +70,20 @@ inputSet:
                           context: ""
                           buildArgs:
                             FIPS_MODE: <+matrix.fips_mode>
+                          envVariables: <+input>
               strategy:
                 matrix:
                   fips_mode:
                     - enabled
                     - disabled
+      - stage:
+          identifier: deploy
+          type: Deployment
+          spec:
+            services:
+              values: <+input>
+              metadata:
+                parallel: <+input>
     properties:
       ci:
         codebase:
