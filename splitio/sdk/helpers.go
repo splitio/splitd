@@ -200,7 +200,7 @@ func SanitizeByFlagFallBackTreatment(byFlag map[string]dtos.FallbackTreatment, l
 			continue
 		}
 		if !isValidTreatment(&treatment) {
-			logger.Error(fmt.Sprintf("Fallback treatments - Discarded global fallback: Invalid treatment (max %d chars and comply with %s)", MaxTreatmentLength, TreatmentRegexp))
+			logger.Error(fmt.Sprintf("Fallback treatments -  Discarded treatment for flag '%s': Invalid treatment (max %d chars and comply with %s)", flagName, MaxTreatmentLength, TreatmentRegexp))
 			continue
 		}
 		sanitized[flagName] = dtos.FallbackTreatment{
