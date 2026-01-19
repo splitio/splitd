@@ -3,10 +3,10 @@ package conf
 import (
 	"time"
 
-	"github.com/splitio/go-split-commons/v6/conf"
-	"github.com/splitio/go-split-commons/v6/dtos"
-	"github.com/splitio/go-split-commons/v6/flagsets"
-	"github.com/splitio/go-split-commons/v6/service/api/specs"
+	"github.com/splitio/go-split-commons/v9/conf"
+	"github.com/splitio/go-split-commons/v9/dtos"
+	"github.com/splitio/go-split-commons/v9/flagsets"
+	"github.com/splitio/go-split-commons/v9/service/api/specs"
 )
 
 const (

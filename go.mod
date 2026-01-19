@@ -4,9 +4,9 @@ go 1.23.6
 
 require (
 	github.com/gin-gonic/gin v1.10.0
-	github.com/splitio/go-split-commons/v6 v6.1.0
-	github.com/splitio/go-toolkit/v5 v5.4.0
-	github.com/stretchr/testify v1.9.0
+	github.com/splitio/go-split-commons/v9 v9.1.0
+	github.com/splitio/go-toolkit/v5 v5.4.1
+	github.com/stretchr/testify v1.11.1
 	github.com/vmihailenco/msgpack/v5 v5.3.5
 	golang.org/x/sync v0.10.0
 	gopkg.in/yaml.v3 v3.0.1

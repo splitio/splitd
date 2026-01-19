@@ -9,15 +9,17 @@ import (
 	"github.com/splitio/splitd/splitio/sdk/storage"
 	"github.com/splitio/splitd/splitio/sdk/types"
 
-	"github.com/splitio/go-split-commons/v6/dtos"
-	"github.com/splitio/go-split-commons/v6/engine"
-	"github.com/splitio/go-split-commons/v6/engine/evaluator"
-	"github.com/splitio/go-split-commons/v6/flagsets"
-	"github.com/splitio/go-split-commons/v6/healthcheck/application"
-	"github.com/splitio/go-split-commons/v6/provisional"
-	"github.com/splitio/go-split-commons/v6/service/api"
-	commonStorage "github.com/splitio/go-split-commons/v6/storage"
-	"github.com/splitio/go-split-commons/v6/synchronizer"
+	"github.com/splitio/go-split-commons/v9/dtos"
+	"github.com/splitio/go-split-commons/v9/engine"
+	"github.com/splitio/go-split-commons/v9/engine/evaluator"
+	"github.com/splitio/go-split-commons/v9/engine/grammar"
+	"github.com/splitio/go-split-commons/v9/engine/grammar/constants"
+	"github.com/splitio/go-split-commons/v9/flagsets"
+	"github.com/splitio/go-split-commons/v9/healthcheck/application"
+	"github.com/splitio/go-split-commons/v9/provisional"
+	"github.com/splitio/go-split-commons/v9/service/api"
+	commonStorage "github.com/splitio/go-split-commons/v9/storage"
+	"github.com/splitio/go-split-commons/v9/synchronizer"
 	"github.com/splitio/go-toolkit/v5/common"
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio"
@@ -32,6 +34,16 @@ var (
 	ErrEventsQueueFull = errors.New("events queue full")
 	ErrSplitNotFound   = errors.New("split not found")
 )
+
+var featureFlagsRules = []string{constants.MatcherTypeAllKeys, constants.MatcherTypeInSegment, constants.MatcherTypeWhitelist, constants.MatcherTypeEqualTo, constants.MatcherTypeGreaterThanOrEqualTo, constants.MatcherTypeLessThanOrEqualTo, constants.MatcherTypeBetween,
+	constants.MatcherTypeEqualToSet, constants.MatcherTypePartOfSet, constants.MatcherTypeContainsAllOfSet, constants.MatcherTypeContainsAnyOfSet, constants.MatcherTypeStartsWith, constants.MatcherTypeEndsWith, constants.MatcherTypeContainsString, constants.MatcherTypeInSplitTreatment,
+	constants.MatcherTypeEqualToBoolean, constants.MatcherTypeMatchesString, constants.MatcherEqualToSemver, constants.MatcherTypeGreaterThanOrEqualToSemver, constants.MatcherTypeLessThanOrEqualToSemver, constants.MatcherTypeBetweenSemver, constants.MatcherTypeInListSemver,
+	constants.MatcherTypeInRuleBasedSegment}
+
+var ruleBasedSegmentRules = []string{constants.MatcherTypeAllKeys, constants.MatcherTypeInSegment, constants.MatcherTypeWhitelist, constants.MatcherTypeEqualTo, constants.MatcherTypeGreaterThanOrEqualTo, constants.MatcherTypeLessThanOrEqualTo, constants.MatcherTypeBetween,
+	constants.MatcherTypeEqualToSet, constants.MatcherTypePartOfSet, constants.MatcherTypeContainsAllOfSet, constants.MatcherTypeContainsAnyOfSet, constants.MatcherTypeStartsWith, constants.MatcherTypeEndsWith, constants.MatcherTypeContainsString,
+	constants.MatcherTypeEqualToBoolean, constants.MatcherTypeMatchesString, constants.MatcherEqualToSemver, constants.MatcherTypeGreaterThanOrEqualToSemver, constants.MatcherTypeLessThanOrEqualToSemver, constants.MatcherTypeBetweenSemver, constants.MatcherTypeInListSemver,
+	constants.MatcherTypeInRuleBasedSegment}
 
 type Attributes = map[string]interface{}
 
@@ -84,7 +96,10 @@ func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, 
 
 	queueFullChan := make(chan string, 2)
 	splitApi := api.NewSplitAPI(apikey, *advCfg, logger, md)
-	workers := setupWorkers(logger, splitApi, stores, hc, c, flagSetsFilter, md, impc)
+	fallbackTreatmentCalculator := createFallbackTreatmentCalculator(&advCfg.FallbackTreatment, logger)
+	evaluator := evaluator.NewEvaluator(stores.splits, stores.segments, stores.ruleBasedSegments, nil, engine.NewEngine(logger), logger, featureFlagsRules, ruleBasedSegmentRules, fallbackTreatmentCalculator)
+	ruleBuilder := grammar.NewRuleBuilder(stores.segments, stores.ruleBasedSegments, nil, featureFlagsRules, ruleBasedSegmentRules, logger, evaluator)
+	workers := setupWorkers(logger, splitApi, stores, hc, c, flagSetsFilter, md, impc, ruleBuilder)
 	tasks := setupTasks(c, logger, workers, impc)
 	sync := synchronizer.NewSynchronizer(*advCfg, *tasks, *workers, logger, queueFullChan)
 
@@ -105,7 +120,7 @@ func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, 
 		logger:        logger,
 		sm:            manager,
 		ss:            sync,
-		ev:            evaluator.NewEvaluator(stores.splits, stores.segments, engine.NewEngine(logger), logger),
+		ev:            evaluator,
 		is:            stores.impressions,
 		es:            stores.events,
 		iq:            impc.manager,
@@ -311,6 +326,15 @@ func splitToView(s *dtos.SplitDTO) *SplitView {
 
 func timeMillis() int64 {
 	return time.Now().UTC().UnixMilli()
+}
+
+func createFallbackTreatmentCalculator(fallbackTreatmentConfig *dtos.FallbackTreatmentConfig, logger logging.LoggerInterface) dtos.FallbackTreatmentCalculator {
+	fallbackTreatmentConf := dtos.FallbackTreatmentConfig{}
+	if fallbackTreatmentConfig != nil {
+		fallbackTreatmentConf.GlobalFallbackTreatment = SanitizeGlobalFallbackTreatment(fallbackTreatmentConfig.GlobalFallbackTreatment, logger)
+		fallbackTreatmentConf.ByFlagFallbackTreatment = SanitizeByFlagFallBackTreatment(fallbackTreatmentConfig.ByFlagFallbackTreatment, logger)
+	}
+	return dtos.NewFallbackTreatmentCalculatorImp(&fallbackTreatmentConf)
 }
 
 var _ Interface = (*Impl)(nil)
