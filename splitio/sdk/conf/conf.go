@@ -15,14 +15,15 @@ const (
 )
 
 type Config struct {
-	LabelsEnabled    bool
-	StreamingEnabled bool
-	Splits           Splits
-	Segments         Segments
-	Impressions      Impressions
-	Events           Events
-	URLs             URLs
-	FlagSetsFilter   []string
+	LabelsEnabled     bool
+	StreamingEnabled  bool
+	Splits            Splits
+	Segments          Segments
+	Impressions       Impressions
+	Events            Events
+	URLs              URLs
+	FlagSetsFilter    []string
+	FallbackTreatment dtos.FallbackTreatmentConfig
 }
 
 type Splits struct {
@@ -81,6 +82,7 @@ func (c *Config) ToAdvancedConfig() *conf.AdvancedConfig {
 	d.ImpressionsQueueSize = c.Impressions.QueueSize
 	d.AuthSpecVersion = specs.FLAG_V1_1
 	d.FlagsSpecVersion = specs.FLAG_V1_1
+	d.FallbackTreatment = c.FallbackTreatment
 
 	return &d
 }
