@@ -17,6 +17,7 @@ func (m *SDKMock) Treatment(
 	bucketingKey *string,
 	feature string,
 	attributes map[string]interface{},
+	optFns ...sdk.OptFn,
 ) (*sdk.EvaluationResult, error) {
 	args := m.Called(md, key, bucketingKey, feature, attributes)
 	return args.Get(0).(*sdk.EvaluationResult), args.Error(1)
@@ -29,6 +30,7 @@ func (m *SDKMock) Treatments(
 	bucketingKey *string,
 	features []string,
 	attributes map[string]interface{},
+	optFns ...sdk.OptFn,
 ) (map[string]sdk.EvaluationResult, error) {
 	args := m.Called(md, key, bucketingKey, features, attributes)
 	return args.Get(0).(map[string]sdk.EvaluationResult), args.Error(1)
@@ -41,6 +43,7 @@ func (m *SDKMock) TreatmentsByFlagSet(
 	bucketingKey *string,
 	flagSet string,
 	attributes map[string]interface{},
+	optFns ...sdk.OptFn,
 ) (map[string]sdk.EvaluationResult, error) {
 	args := m.Called(md, key, bucketingKey, flagSet, attributes)
 	return args.Get(0).(map[string]sdk.EvaluationResult), args.Error(1)
@@ -53,6 +56,7 @@ func (m *SDKMock) TreatmentsByFlagSets(
 	bucketingKey *string,
 	flagSets []string,
 	attributes map[string]interface{},
+	optFns ...sdk.OptFn,
 ) (map[string]sdk.EvaluationResult, error) {
 	args := m.Called(md, key, bucketingKey, flagSets, attributes)
 	return args.Get(0).(map[string]sdk.EvaluationResult), args.Error(1)

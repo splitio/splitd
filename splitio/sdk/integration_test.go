@@ -235,8 +235,15 @@ func TestInstantiationAndGetTreatmentE2EWithFallbackTreatment(t *testing.T) {
 	client, err := New(logger, "someApikey", sdkConf)
 	assert.Nil(t, err)
 
-	res1, _ := client.Treatment(&types.ClientConfig{}, "aaaaaaklmnbv", nil, "not_exist", nil)
+	opts := dtos.EvaluationOptions{
+		Properties: map[string]interface{}{
+			"pleassssse": "holaaaaa",
+		},
+	}
+
+	res1, _ := client.Treatment(&types.ClientConfig{}, "aaaaaaklmnbv", nil, "not_exist", nil, client.WithEvaluationOptions(&opts))
 	assert.Equal(t, "global_treatment", res1.Treatment)
+	assert.Equal(t, "{\"pleassssse\":\"holaaaaa\"}", res1.Impression.Properties)
 
 	assert.Nil(t, client.Shutdown())
 	assert.Equal(t, int32(1), atomic.LoadInt32(&eventsCalls))
