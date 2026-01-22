@@ -144,7 +144,12 @@ func TestClientGetTreatmentWithImpression(t *testing.T) {
 	assert.NotNil(t, client)
 	assert.Nil(t, err)
 
-	res, err := client.Treatment("key1", "buck1", "feat1", map[string]interface{}{"a": 1})
+	opts := dtos.EvaluationOptions{
+		Properties: map[string]interface{}{
+			"pleassssse": "holaaaaa",
+		},
+	}
+	res, err := client.Treatment("key1", "buck1", "feat1", map[string]interface{}{"a": 1}, client.WithEvaluationOptions(&opts))
 	assert.Nil(t, err)
 	assert.Equal(t, "on", res.Treatment)
 	validateImpression(t, &dtos.Impression{
@@ -155,6 +160,7 @@ func TestClientGetTreatmentWithImpression(t *testing.T) {
 		Label:        "l1",
 		ChangeNumber: 1234,
 		Time:         123,
+		Properties:   "{\"pleassssse\":\"holaaaaa\"}",
 	}, res.Impression)
 
 }
@@ -435,5 +441,6 @@ func validateImpression(t *testing.T, expected *dtos.Impression, actual *dtos.Im
 	assert.Equal(t, expected.Time, actual.Time)
 	assert.Equal(t, expected.Treatment, actual.Treatment)
 	assert.Equal(t, expected.Label, actual.Label)
+	assert.Equal(t, expected.Properties, actual.Properties)
 
 }

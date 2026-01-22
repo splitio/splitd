@@ -156,7 +156,7 @@ func (i *Impl) Treatment(cfg *types.ClientConfig, key string, bk *string, featur
 		return nil, fmt.Errorf("nil result")
 	}
 
-	imp := i.handleImpression(key, bk, feature, res, cfg.Metadata, serializeProperties(options.evaluationOptions))
+	imp := i.handleImpression(key, bk, feature, res, cfg.Metadata, SerializeProperties(options.evaluationOptions))
 	return &EvaluationResult{
 		Treatment:  res.Treatment,
 		Impression: imp,
@@ -188,7 +188,7 @@ func (i *Impl) Treatments(cfg *types.ClientConfig, key string, bk *string, featu
 
 		var eres EvaluationResult
 		eres.Treatment = curr.Treatment
-		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata, serializeProperties(options.evaluationOptions))
+		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata, SerializeProperties(options.evaluationOptions))
 		eres.Config = curr.Config
 		toRet[feature] = eres
 	}
@@ -205,7 +205,7 @@ func (i *Impl) TreatmentsByFlagSet(cfg *types.ClientConfig, key string, bk *stri
 	for feature, curr := range res.Evaluations {
 		var eres EvaluationResult
 		eres.Treatment = curr.Treatment
-		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata, serializeProperties(options.evaluationOptions))
+		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata, SerializeProperties(options.evaluationOptions))
 		eres.Config = curr.Config
 		toRet[feature] = eres
 	}
@@ -222,7 +222,7 @@ func (i *Impl) TreatmentsByFlagSets(cfg *types.ClientConfig, key string, bk *str
 	for feature, curr := range res.Evaluations {
 		var eres EvaluationResult
 		eres.Treatment = curr.Treatment
-		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata, serializeProperties(options.evaluationOptions))
+		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata, SerializeProperties(options.evaluationOptions))
 		eres.Config = curr.Config
 		toRet[feature] = eres
 	}
@@ -367,7 +367,7 @@ func createFallbackTreatmentCalculator(fallbackTreatmentConfig *dtos.FallbackTre
 	return dtos.NewFallbackTreatmentCalculatorImp(&fallbackTreatmentConf)
 }
 
-func serializeProperties(opts *dtos.EvaluationOptions) string {
+func SerializeProperties(opts *dtos.EvaluationOptions) string {
 	if opts == nil {
 		return ""
 	}
