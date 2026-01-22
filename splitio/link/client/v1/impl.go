@@ -3,7 +3,7 @@ package v1
 import (
 	"fmt"
 
-	"github.com/splitio/go-split-commons/v6/dtos"
+	"github.com/splitio/go-split-commons/v9/dtos"
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio"
 	"github.com/splitio/splitd/splitio/common/lang"
