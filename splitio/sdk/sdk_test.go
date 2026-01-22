@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/splitio/go-split-commons/v6/dtos"
-	"github.com/splitio/go-split-commons/v6/engine/evaluator"
-	"github.com/splitio/go-split-commons/v6/storage/inmemory"
-	"github.com/splitio/go-split-commons/v6/synchronizer"
+	"github.com/splitio/go-split-commons/v9/dtos"
+	"github.com/splitio/go-split-commons/v9/engine/evaluator"
+	"github.com/splitio/go-split-commons/v9/storage/inmemory"
+	"github.com/splitio/go-split-commons/v9/synchronizer"
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/external/commons/mocks"
 	"github.com/splitio/splitd/splitio/common/lang"
@@ -227,6 +227,88 @@ func TestTreatments(t *testing.T) {
 	res, err := client.Treatments(
 		&types.ClientConfig{Metadata: types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}},
 		"key1", nil, []string{"f1", "f2", "f3"}, Attributes{"a": 1})
+	assert.Nil(t, err)
+	assert.Nil(t, res["f1"].Config)
+	assert.Nil(t, res["f2"].Config)
+	assert.Nil(t, res["f3"].Config)
+	assertImpEq(t, &expectedImpressions[0], res["f1"].Impression)
+	assertImpEq(t, &expectedImpressions[1], res["f2"].Impression)
+	assertImpEq(t, &expectedImpressions[2], res["f3"].Impression)
+
+	err = is.RangeAndClear(func(md types.ClientMetadata, st *storage.LockingQueue[dtos.Impression]) {
+		assert.Equal(t, types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}, md)
+		assert.Equal(t, 3, st.Len())
+
+		var imps []dtos.Impression
+		n, _ := st.Pop(3, &imps)
+		assert.Nil(t, nil)
+		assert.Equal(t, 3, n)
+		assert.Equal(t, 3, len(imps))
+		assertImpEq(t, &expectedImpressions[0], &imps[0])
+		assertImpEq(t, &expectedImpressions[1], &imps[1])
+		assertImpEq(t, &expectedImpressions[2], &imps[2])
+		n, err = st.Pop(1, &imps)
+		assert.Equal(t, 0, n)
+		assert.ErrorIs(t, err, storage.ErrQueueEmpty)
+
+	})
+	assert.Nil(t, err)
+
+}
+
+func TestTreatmentsWithImpressionProperties(t *testing.T) {
+	is, _ := storage.NewImpressionsQueue(100)
+
+	ev := &mocks.EvaluatorMock{}
+	ev.On("EvaluateFeatures", "key1", (*string)(nil), []string{"f1", "f2", "f3"}, Attributes{"a": 1}).
+		Return(evaluator.Results{Evaluations: map[string]evaluator.Result{
+			"f1": {Treatment: "on", Label: "label1", EvaluationTime: 1 * time.Millisecond, SplitChangeNumber: 123},
+			"f2": {Treatment: "on", Label: "label2", EvaluationTime: 2 * time.Millisecond, SplitChangeNumber: 124},
+			"f3": {Treatment: "on", Label: "label3", EvaluationTime: 3 * time.Millisecond, SplitChangeNumber: 125},
+		}}).
+		Once()
+
+	expectedImpressions := []dtos.Impression{
+		{KeyName: "key1", BucketingKey: "", FeatureName: "f1", Treatment: "on", Label: "label1", ChangeNumber: 123, Properties: "{\"pleassssse\":\"holaaaaa\"}"},
+		{KeyName: "key1", BucketingKey: "", FeatureName: "f2", Treatment: "on", Label: "label2", ChangeNumber: 124, Properties: "{\"pleassssse\":\"holaaaaa\"}"},
+		{KeyName: "key1", BucketingKey: "", FeatureName: "f3", Treatment: "on", Label: "label3", ChangeNumber: 125, Properties: "{\"pleassssse\":\"holaaaaa\"}"},
+	}
+	im := &mocks.ImpressionManagerMock{}
+	im.On("Process", mock.Anything).
+		Run(func(args mock.Arguments) {
+			assertImpEq(t, &expectedImpressions[0], &args.Get(0).([]dtos.Impression)[0])
+		}).
+		Return([]dtos.Impression{expectedImpressions[0]}, []dtos.Impression{}).
+		Once()
+	im.On("Process", mock.Anything).
+		Run(func(args mock.Arguments) {
+			assertImpEq(t, &expectedImpressions[1], &args.Get(0).([]dtos.Impression)[0])
+		}).
+		Return([]dtos.Impression{expectedImpressions[1]}, []dtos.Impression{}).
+		Once()
+	im.On("Process", mock.Anything).
+		Run(func(args mock.Arguments) {
+			assertImpEq(t, &expectedImpressions[2], &args.Get(0).([]dtos.Impression)[0])
+		}).
+		Return([]dtos.Impression{expectedImpressions[2]}, []dtos.Impression{}).
+		Once()
+
+	client := &Impl{
+		logger: logging.NewLogger(nil),
+		is:     is,
+		ev:     ev,
+		iq:     im,
+		cfg:    conf.Config{LabelsEnabled: true},
+	}
+
+	opts := dtos.EvaluationOptions{
+		Properties: map[string]interface{}{
+			"pleassssse": "holaaaaa",
+		},
+	}
+	res, err := client.Treatments(
+		&types.ClientConfig{Metadata: types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}},
+		"key1", nil, []string{"f1", "f2", "f3"}, Attributes{"a": 1}, client.WithEvaluationOptions(&opts))
 	assert.Nil(t, err)
 	assert.Nil(t, res["f1"].Config)
 	assert.Nil(t, res["f2"].Config)
@@ -726,6 +808,7 @@ func assertImpEq(t *testing.T, i1, i2 *dtos.Impression) {
 	assert.Equal(t, i1.Treatment, i2.Treatment)
 	assert.Equal(t, i1.Label, i2.Label)
 	assert.Equal(t, i1.ChangeNumber, i2.ChangeNumber)
+	assert.Equal(t, i1.Properties, i2.Properties)
 }
 
 func assertEventEq(t *testing.T, e1, e2 *dtos.EventDTO) {
