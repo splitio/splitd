@@ -1,6 +1,7 @@
 package sdk
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -9,15 +10,17 @@ import (
 	"github.com/splitio/splitd/splitio/sdk/storage"
 	"github.com/splitio/splitd/splitio/sdk/types"
 
-	"github.com/splitio/go-split-commons/v6/dtos"
-	"github.com/splitio/go-split-commons/v6/engine"
-	"github.com/splitio/go-split-commons/v6/engine/evaluator"
-	"github.com/splitio/go-split-commons/v6/flagsets"
-	"github.com/splitio/go-split-commons/v6/healthcheck/application"
-	"github.com/splitio/go-split-commons/v6/provisional"
-	"github.com/splitio/go-split-commons/v6/service/api"
-	commonStorage "github.com/splitio/go-split-commons/v6/storage"
-	"github.com/splitio/go-split-commons/v6/synchronizer"
+	"github.com/splitio/go-split-commons/v9/dtos"
+	"github.com/splitio/go-split-commons/v9/engine"
+	"github.com/splitio/go-split-commons/v9/engine/evaluator"
+	"github.com/splitio/go-split-commons/v9/engine/grammar"
+	"github.com/splitio/go-split-commons/v9/engine/grammar/constants"
+	"github.com/splitio/go-split-commons/v9/flagsets"
+	"github.com/splitio/go-split-commons/v9/healthcheck/application"
+	"github.com/splitio/go-split-commons/v9/provisional"
+	"github.com/splitio/go-split-commons/v9/service/api"
+	commonStorage "github.com/splitio/go-split-commons/v9/storage"
+	"github.com/splitio/go-split-commons/v9/synchronizer"
 	"github.com/splitio/go-toolkit/v5/common"
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio"
@@ -33,13 +36,23 @@ var (
 	ErrSplitNotFound   = errors.New("split not found")
 )
 
+var featureFlagsRules = []string{constants.MatcherTypeAllKeys, constants.MatcherTypeInSegment, constants.MatcherTypeWhitelist, constants.MatcherTypeEqualTo, constants.MatcherTypeGreaterThanOrEqualTo, constants.MatcherTypeLessThanOrEqualTo, constants.MatcherTypeBetween,
+	constants.MatcherTypeEqualToSet, constants.MatcherTypePartOfSet, constants.MatcherTypeContainsAllOfSet, constants.MatcherTypeContainsAnyOfSet, constants.MatcherTypeStartsWith, constants.MatcherTypeEndsWith, constants.MatcherTypeContainsString, constants.MatcherTypeInSplitTreatment,
+	constants.MatcherTypeEqualToBoolean, constants.MatcherTypeMatchesString, constants.MatcherEqualToSemver, constants.MatcherTypeGreaterThanOrEqualToSemver, constants.MatcherTypeLessThanOrEqualToSemver, constants.MatcherTypeBetweenSemver, constants.MatcherTypeInListSemver,
+	constants.MatcherTypeInRuleBasedSegment}
+
+var ruleBasedSegmentRules = []string{constants.MatcherTypeAllKeys, constants.MatcherTypeInSegment, constants.MatcherTypeWhitelist, constants.MatcherTypeEqualTo, constants.MatcherTypeGreaterThanOrEqualTo, constants.MatcherTypeLessThanOrEqualTo, constants.MatcherTypeBetween,
+	constants.MatcherTypeEqualToSet, constants.MatcherTypePartOfSet, constants.MatcherTypeContainsAllOfSet, constants.MatcherTypeContainsAnyOfSet, constants.MatcherTypeStartsWith, constants.MatcherTypeEndsWith, constants.MatcherTypeContainsString,
+	constants.MatcherTypeEqualToBoolean, constants.MatcherTypeMatchesString, constants.MatcherEqualToSemver, constants.MatcherTypeGreaterThanOrEqualToSemver, constants.MatcherTypeLessThanOrEqualToSemver, constants.MatcherTypeBetweenSemver, constants.MatcherTypeInListSemver,
+	constants.MatcherTypeInRuleBasedSegment}
+
 type Attributes = map[string]interface{}
 
 type Interface interface {
-	Treatment(cfg *types.ClientConfig, key string, bucketingKey *string, feature string, attributes map[string]interface{}) (*EvaluationResult, error)
-	Treatments(cfg *types.ClientConfig, key string, bucketingKey *string, features []string, attributes map[string]interface{}) (map[string]EvaluationResult, error)
-	TreatmentsByFlagSet(cfg *types.ClientConfig, key string, bucketingKey *string, flagSet string, attributes map[string]interface{}) (map[string]EvaluationResult, error)
-	TreatmentsByFlagSets(cfg *types.ClientConfig, key string, bucketingKey *string, flagSets []string, attributes map[string]interface{}) (map[string]EvaluationResult, error)
+	Treatment(cfg *types.ClientConfig, key string, bucketingKey *string, feature string, attributes map[string]interface{}, optFns ...OptFn) (*EvaluationResult, error)
+	Treatments(cfg *types.ClientConfig, key string, bucketingKey *string, features []string, attributes map[string]interface{}, optFns ...OptFn) (map[string]EvaluationResult, error)
+	TreatmentsByFlagSet(cfg *types.ClientConfig, key string, bucketingKey *string, flagSet string, attributes map[string]interface{}, optFns ...OptFn) (map[string]EvaluationResult, error)
+	TreatmentsByFlagSets(cfg *types.ClientConfig, key string, bucketingKey *string, flagSets []string, attributes map[string]interface{}, optFns ...OptFn) (map[string]EvaluationResult, error)
 	Track(cfg *types.ClientConfig, key string, trafficType string, eventType string, value *float64, properties map[string]interface{}) error
 	SplitNames() ([]string, error)
 	Splits() ([]SplitView, error)
@@ -59,6 +72,22 @@ type Impl struct {
 	cfg           conf.Config
 	queueFullChan chan string
 	validator     Validator
+}
+
+type options struct {
+	evaluationOptions *dtos.EvaluationOptions
+}
+
+type OptFn = func(o *options)
+
+func (c *Impl) WithEvaluationOptions(e *dtos.EvaluationOptions) OptFn {
+	return func(o *options) { o.evaluationOptions = e }
+}
+
+func defaultOpts() options {
+	return options{
+		evaluationOptions: nil,
+	}
 }
 
 func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, error) {
@@ -84,7 +113,10 @@ func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, 
 
 	queueFullChan := make(chan string, 2)
 	splitApi := api.NewSplitAPI(apikey, *advCfg, logger, md)
-	workers := setupWorkers(logger, splitApi, stores, hc, c, flagSetsFilter, md, impc)
+	fallbackTreatmentCalculator := createFallbackTreatmentCalculator(&advCfg.FallbackTreatment, logger)
+	evaluator := evaluator.NewEvaluator(stores.splits, stores.segments, stores.ruleBasedSegments, nil, engine.NewEngine(logger), logger, featureFlagsRules, ruleBasedSegmentRules, fallbackTreatmentCalculator)
+	ruleBuilder := grammar.NewRuleBuilder(stores.segments, stores.ruleBasedSegments, nil, featureFlagsRules, ruleBasedSegmentRules, logger, evaluator)
+	workers := setupWorkers(logger, splitApi, stores, hc, c, flagSetsFilter, md, impc, ruleBuilder)
 	tasks := setupTasks(c, logger, workers, impc)
 	sync := synchronizer.NewSynchronizer(*advCfg, *tasks, *workers, logger, queueFullChan)
 
@@ -105,7 +137,7 @@ func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, 
 		logger:        logger,
 		sm:            manager,
 		ss:            sync,
-		ev:            evaluator.NewEvaluator(stores.splits, stores.segments, engine.NewEngine(logger), logger),
+		ev:            evaluator,
 		is:            stores.impressions,
 		es:            stores.events,
 		iq:            impc.manager,
@@ -117,13 +149,14 @@ func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, 
 }
 
 // Treatment implements Interface
-func (i *Impl) Treatment(cfg *types.ClientConfig, key string, bk *string, feature string, attributes Attributes) (*EvaluationResult, error) {
+func (i *Impl) Treatment(cfg *types.ClientConfig, key string, bk *string, feature string, attributes Attributes, optFns ...OptFn) (*EvaluationResult, error) {
+	options := getOptions(optFns...)
 	res := i.ev.EvaluateFeature(key, bk, feature, attributes)
 	if res == nil {
 		return nil, fmt.Errorf("nil result")
 	}
 
-	imp := i.handleImpression(key, bk, feature, res, cfg.Metadata)
+	imp := i.handleImpression(key, bk, feature, res, cfg.Metadata, serializeProperties(options.evaluationOptions))
 	return &EvaluationResult{
 		Treatment:  res.Treatment,
 		Impression: imp,
@@ -131,9 +164,18 @@ func (i *Impl) Treatment(cfg *types.ClientConfig, key string, bk *string, featur
 	}, nil
 }
 
-// Treatment implements Interface
-func (i *Impl) Treatments(cfg *types.ClientConfig, key string, bk *string, features []string, attributes Attributes) (map[string]EvaluationResult, error) {
+func getOptions(optFns ...OptFn) options {
+	options := defaultOpts()
+	for _, optFn := range optFns {
+		optFn(&options)
+	}
+	return options
+}
 
+// Treatment implements Interface
+func (i *Impl) Treatments(cfg *types.ClientConfig, key string, bk *string, features []string, attributes Attributes, optFns ...OptFn) (map[string]EvaluationResult, error) {
+
+	options := getOptions(optFns...)
 	res := i.ev.EvaluateFeatures(key, bk, features, attributes)
 	toRet := make(map[string]EvaluationResult, len(res.Evaluations))
 	for _, feature := range features {
@@ -146,7 +188,7 @@ func (i *Impl) Treatments(cfg *types.ClientConfig, key string, bk *string, featu
 
 		var eres EvaluationResult
 		eres.Treatment = curr.Treatment
-		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata)
+		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata, serializeProperties(options.evaluationOptions))
 		eres.Config = curr.Config
 		toRet[feature] = eres
 	}
@@ -155,14 +197,15 @@ func (i *Impl) Treatments(cfg *types.ClientConfig, key string, bk *string, featu
 }
 
 // TreatmentsByFlagSet implements Interface
-func (i *Impl) TreatmentsByFlagSet(cfg *types.ClientConfig, key string, bk *string, flagSet string, attributes Attributes) (map[string]EvaluationResult, error) {
+func (i *Impl) TreatmentsByFlagSet(cfg *types.ClientConfig, key string, bk *string, flagSet string, attributes Attributes, optFns ...OptFn) (map[string]EvaluationResult, error) {
 
+	options := getOptions(optFns...)
 	res := i.ev.EvaluateFeatureByFlagSets(key, bk, []string{flagSet}, attributes)
 	toRet := make(map[string]EvaluationResult, len(res.Evaluations))
 	for feature, curr := range res.Evaluations {
 		var eres EvaluationResult
 		eres.Treatment = curr.Treatment
-		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata)
+		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata, serializeProperties(options.evaluationOptions))
 		eres.Config = curr.Config
 		toRet[feature] = eres
 	}
@@ -171,14 +214,15 @@ func (i *Impl) TreatmentsByFlagSet(cfg *types.ClientConfig, key string, bk *stri
 }
 
 // TreatmentsByFlagSets implements Interface
-func (i *Impl) TreatmentsByFlagSets(cfg *types.ClientConfig, key string, bk *string, flagSets []string, attributes Attributes) (map[string]EvaluationResult, error) {
+func (i *Impl) TreatmentsByFlagSets(cfg *types.ClientConfig, key string, bk *string, flagSets []string, attributes Attributes, optFns ...OptFn) (map[string]EvaluationResult, error) {
 
+	options := getOptions(optFns...)
 	res := i.ev.EvaluateFeatureByFlagSets(key, bk, flagSets, attributes)
 	toRet := make(map[string]EvaluationResult, len(res.Evaluations))
 	for feature, curr := range res.Evaluations {
 		var eres EvaluationResult
 		eres.Treatment = curr.Treatment
-		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata)
+		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata, serializeProperties(options.evaluationOptions))
 		eres.Config = curr.Config
 		toRet[feature] = eres
 	}
@@ -251,7 +295,7 @@ func (i *Impl) Shutdown() error {
 	return nil
 }
 
-func (i *Impl) handleImpression(key string, bk *string, f string, r *evaluator.Result, cm types.ClientMetadata) *dtos.Impression {
+func (i *Impl) handleImpression(key string, bk *string, f string, r *evaluator.Result, cm types.ClientMetadata, properties string) *dtos.Impression {
 	var label string
 	if i.cfg.LabelsEnabled {
 		label = r.Label
@@ -266,6 +310,7 @@ func (i *Impl) handleImpression(key string, bk *string, f string, r *evaluator.R
 		Treatment:    r.Treatment,
 		Time:         timeMillis(),
 		Disabled:     r.ImpressionsDisabled,
+		Properties:   properties,
 	}
 
 	forLog, _ := i.iq.Process([]dtos.Impression{imp}, false)
@@ -311,6 +356,31 @@ func splitToView(s *dtos.SplitDTO) *SplitView {
 
 func timeMillis() int64 {
 	return time.Now().UTC().UnixMilli()
+}
+
+func createFallbackTreatmentCalculator(fallbackTreatmentConfig *dtos.FallbackTreatmentConfig, logger logging.LoggerInterface) dtos.FallbackTreatmentCalculator {
+	fallbackTreatmentConf := dtos.FallbackTreatmentConfig{}
+	if fallbackTreatmentConfig != nil {
+		fallbackTreatmentConf.GlobalFallbackTreatment = SanitizeGlobalFallbackTreatment(fallbackTreatmentConfig.GlobalFallbackTreatment, logger)
+		fallbackTreatmentConf.ByFlagFallbackTreatment = SanitizeByFlagFallBackTreatment(fallbackTreatmentConfig.ByFlagFallbackTreatment, logger)
+	}
+	return dtos.NewFallbackTreatmentCalculatorImp(&fallbackTreatmentConf)
+}
+
+func serializeProperties(opts *dtos.EvaluationOptions) string {
+	if opts == nil {
+		return ""
+	}
+	if len(opts.Properties) == 0 {
+		return ""
+	}
+
+	properties, err := json.Marshal(opts.Properties)
+	if err != nil {
+		return ""
+	}
+
+	return string(properties)
 }
 
 var _ Interface = (*Impl)(nil)
