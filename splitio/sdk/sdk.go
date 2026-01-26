@@ -49,10 +49,10 @@ var ruleBasedSegmentRules = []string{constants.MatcherTypeAllKeys, constants.Mat
 type Attributes = map[string]interface{}
 
 type Interface interface {
-	Treatment(cfg *types.ClientConfig, key string, bucketingKey *string, feature string, attributes map[string]interface{}, optFns ...OptFn) (*EvaluationResult, error)
-	Treatments(cfg *types.ClientConfig, key string, bucketingKey *string, features []string, attributes map[string]interface{}, optFns ...OptFn) (map[string]EvaluationResult, error)
-	TreatmentsByFlagSet(cfg *types.ClientConfig, key string, bucketingKey *string, flagSet string, attributes map[string]interface{}, optFns ...OptFn) (map[string]EvaluationResult, error)
-	TreatmentsByFlagSets(cfg *types.ClientConfig, key string, bucketingKey *string, flagSets []string, attributes map[string]interface{}, optFns ...OptFn) (map[string]EvaluationResult, error)
+	Treatment(cfg *types.ClientConfig, key string, bucketingKey *string, feature string, attributes map[string]interface{}, evaluationOptions *dtos.EvaluationOptions) (*EvaluationResult, error)
+	Treatments(cfg *types.ClientConfig, key string, bucketingKey *string, features []string, attributes map[string]interface{}, evaluationOptions *dtos.EvaluationOptions) (map[string]EvaluationResult, error)
+	TreatmentsByFlagSet(cfg *types.ClientConfig, key string, bucketingKey *string, flagSet string, attributes map[string]interface{}, evaluationOptions *dtos.EvaluationOptions) (map[string]EvaluationResult, error)
+	TreatmentsByFlagSets(cfg *types.ClientConfig, key string, bucketingKey *string, flagSets []string, attributes map[string]interface{}, evaluationOptions *dtos.EvaluationOptions) (map[string]EvaluationResult, error)
 	Track(cfg *types.ClientConfig, key string, trafficType string, eventType string, value *float64, properties map[string]interface{}) error
 	SplitNames() ([]string, error)
 	Splits() ([]SplitView, error)
@@ -72,22 +72,6 @@ type Impl struct {
 	cfg           conf.Config
 	queueFullChan chan string
 	validator     Validator
-}
-
-type options struct {
-	evaluationOptions *dtos.EvaluationOptions
-}
-
-type OptFn = func(o *options)
-
-func (c *Impl) WithEvaluationOptions(e *dtos.EvaluationOptions) OptFn {
-	return func(o *options) { o.evaluationOptions = e }
-}
-
-func defaultOpts() options {
-	return options{
-		evaluationOptions: nil,
-	}
 }
 
 func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, error) {
@@ -149,14 +133,13 @@ func New(logger logging.LoggerInterface, apikey string, c *conf.Config) (*Impl, 
 }
 
 // Treatment implements Interface
-func (i *Impl) Treatment(cfg *types.ClientConfig, key string, bk *string, feature string, attributes Attributes, optFns ...OptFn) (*EvaluationResult, error) {
-	options := getOptions(optFns...)
+func (i *Impl) Treatment(cfg *types.ClientConfig, key string, bk *string, feature string, attributes Attributes, evaluationOptions *dtos.EvaluationOptions) (*EvaluationResult, error) {
 	res := i.ev.EvaluateFeature(key, bk, feature, attributes)
 	if res == nil {
 		return nil, fmt.Errorf("nil result")
 	}
 
-	imp := i.handleImpression(key, bk, feature, res, cfg.Metadata, SerializeProperties(options.evaluationOptions))
+	imp := i.handleImpression(key, bk, feature, res, cfg.Metadata, SerializeProperties(evaluationOptions))
 	return &EvaluationResult{
 		Treatment:  res.Treatment,
 		Impression: imp,
@@ -164,18 +147,9 @@ func (i *Impl) Treatment(cfg *types.ClientConfig, key string, bk *string, featur
 	}, nil
 }
 
-func getOptions(optFns ...OptFn) options {
-	options := defaultOpts()
-	for _, optFn := range optFns {
-		optFn(&options)
-	}
-	return options
-}
-
 // Treatment implements Interface
-func (i *Impl) Treatments(cfg *types.ClientConfig, key string, bk *string, features []string, attributes Attributes, optFns ...OptFn) (map[string]EvaluationResult, error) {
+func (i *Impl) Treatments(cfg *types.ClientConfig, key string, bk *string, features []string, attributes Attributes, evaluationOptions *dtos.EvaluationOptions) (map[string]EvaluationResult, error) {
 
-	options := getOptions(optFns...)
 	res := i.ev.EvaluateFeatures(key, bk, features, attributes)
 	toRet := make(map[string]EvaluationResult, len(res.Evaluations))
 	for _, feature := range features {
@@ -188,7 +162,7 @@ func (i *Impl) Treatments(cfg *types.ClientConfig, key string, bk *string, featu
 
 		var eres EvaluationResult
 		eres.Treatment = curr.Treatment
-		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata, SerializeProperties(options.evaluationOptions))
+		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata, SerializeProperties(evaluationOptions))
 		eres.Config = curr.Config
 		toRet[feature] = eres
 	}
@@ -197,15 +171,14 @@ func (i *Impl) Treatments(cfg *types.ClientConfig, key string, bk *string, featu
 }
 
 // TreatmentsByFlagSet implements Interface
-func (i *Impl) TreatmentsByFlagSet(cfg *types.ClientConfig, key string, bk *string, flagSet string, attributes Attributes, optFns ...OptFn) (map[string]EvaluationResult, error) {
+func (i *Impl) TreatmentsByFlagSet(cfg *types.ClientConfig, key string, bk *string, flagSet string, attributes Attributes, evaluationOptions *dtos.EvaluationOptions) (map[string]EvaluationResult, error) {
 
-	options := getOptions(optFns...)
 	res := i.ev.EvaluateFeatureByFlagSets(key, bk, []string{flagSet}, attributes)
 	toRet := make(map[string]EvaluationResult, len(res.Evaluations))
 	for feature, curr := range res.Evaluations {
 		var eres EvaluationResult
 		eres.Treatment = curr.Treatment
-		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata, SerializeProperties(options.evaluationOptions))
+		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata, SerializeProperties(evaluationOptions))
 		eres.Config = curr.Config
 		toRet[feature] = eres
 	}
@@ -214,15 +187,14 @@ func (i *Impl) TreatmentsByFlagSet(cfg *types.ClientConfig, key string, bk *stri
 }
 
 // TreatmentsByFlagSets implements Interface
-func (i *Impl) TreatmentsByFlagSets(cfg *types.ClientConfig, key string, bk *string, flagSets []string, attributes Attributes, optFns ...OptFn) (map[string]EvaluationResult, error) {
+func (i *Impl) TreatmentsByFlagSets(cfg *types.ClientConfig, key string, bk *string, flagSets []string, attributes Attributes, evaluationOptions *dtos.EvaluationOptions) (map[string]EvaluationResult, error) {
 
-	options := getOptions(optFns...)
 	res := i.ev.EvaluateFeatureByFlagSets(key, bk, flagSets, attributes)
 	toRet := make(map[string]EvaluationResult, len(res.Evaluations))
 	for feature, curr := range res.Evaluations {
 		var eres EvaluationResult
 		eres.Treatment = curr.Treatment
-		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata, SerializeProperties(options.evaluationOptions))
+		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata, SerializeProperties(evaluationOptions))
 		eres.Config = curr.Config
 		toRet[feature] = eres
 	}

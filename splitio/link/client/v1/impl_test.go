@@ -31,7 +31,7 @@ func TestClientGetTreatmentNoImpression(t *testing.T) {
 		*args.Get(1).(*v1.ResponseWrapper[v1.RegisterPayload]) = v1.ResponseWrapper[v1.RegisterPayload]{Status: v1.ResultOk}
 	}).Once()
 
-	serializerMock.On("Serialize", proto1Mocks.NewTreatmentRPC("key1", "buck1", "feat1", map[string]interface{}{"a": 1}, false)).
+	serializerMock.On("Serialize", proto1Mocks.NewTreatmentRPC("key1", "buck1", "feat1", map[string]interface{}{"a": 1}, nil, false)).
 		Return([]byte("treatmentMessage"), nil).Once()
 	serializerMock.On("Parse", []byte("treatmentResult"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args.Get(1).(*v1.ResponseWrapper[v1.TreatmentPayload]) = v1.ResponseWrapper[v1.TreatmentPayload]{
@@ -65,7 +65,7 @@ func TestClientGetTreatmentWithConfig(t *testing.T) {
 		*args.Get(1).(*v1.ResponseWrapper[v1.RegisterPayload]) = v1.ResponseWrapper[v1.RegisterPayload]{Status: v1.ResultOk}
 	}).Once()
 
-	serializerMock.On("Serialize", proto1Mocks.NewTreatmentRPC("key1", "buck1", "feat1", map[string]interface{}{"a": 1}, true)).
+	serializerMock.On("Serialize", proto1Mocks.NewTreatmentRPC("key1", "buck1", "feat1", map[string]interface{}{"a": 1}, nil, true)).
 		Return([]byte("treatmentWithConfigMessage"), nil).Once()
 	serializerMock.On("Parse", []byte("treatmentWithConfigResult"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args.Get(1).(*v1.ResponseWrapper[v1.TreatmentPayload]) = v1.ResponseWrapper[v1.TreatmentPayload]{
@@ -129,7 +129,7 @@ func TestClientGetTreatmentWithImpression(t *testing.T) {
 		*args.Get(1).(*v1.ResponseWrapper[v1.RegisterPayload]) = v1.ResponseWrapper[v1.RegisterPayload]{Status: v1.ResultOk}
 	}).Once()
 
-	serializerMock.On("Serialize", proto1Mocks.NewTreatmentRPC("key1", "buck1", "feat1", map[string]interface{}{"a": 1}, false)).
+	serializerMock.On("Serialize", proto1Mocks.NewTreatmentRPC("key1", "buck1", "feat1", map[string]interface{}{"a": 1}, nil, false)).
 		Return([]byte("treatmentMessage"), nil).Once()
 	serializerMock.On("Parse", []byte("treatmentResult"), mock.Anything).Return(nil).Run(func(args mock.Arguments) {
 		*args.Get(1).(*v1.ResponseWrapper[v1.TreatmentPayload]) = v1.ResponseWrapper[v1.TreatmentPayload]{
