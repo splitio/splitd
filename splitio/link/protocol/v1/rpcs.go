@@ -218,7 +218,7 @@ func (t *TreatmentsArgs) PopulateFromRPC(rpc *RPC) error {
 	if rpc.OpCode != OCTreatments && rpc.OpCode != OCTreatmentsWithConfig {
 		return RPCParseError{Code: PECOpCodeMismatch}
 	}
-	if len(rpc.Args) != 4 {
+	if len(rpc.Args) < 4 {
 		return RPCParseError{Code: PECWrongArgCount}
 	}
 
