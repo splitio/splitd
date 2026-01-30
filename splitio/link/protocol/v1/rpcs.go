@@ -150,7 +150,7 @@ func (t *TreatmentArgs) PopulateFromRPC(rpc *RPC) error {
 	if rpc.OpCode != OCTreatment && rpc.OpCode != OCTreatmentWithConfig {
 		return RPCParseError{Code: PECOpCodeMismatch}
 	}
-	if len(rpc.Args) != 4 {
+	if len(rpc.Args) < 4 {
 		return RPCParseError{Code: PECWrongArgCount}
 	}
 
@@ -289,7 +289,7 @@ func (t *TreatmentsByFlagSetArgs) PopulateFromRPC(rpc *RPC) error {
 	if rpc.OpCode != OCTreatmentsByFlagSet && rpc.OpCode != OCTreatmentsWithConfigByFlagSet {
 		return RPCParseError{Code: PECOpCodeMismatch}
 	}
-	if len(rpc.Args) != 4 {
+	if len(rpc.Args) < 4 {
 		return RPCParseError{Code: PECWrongArgCount}
 	}
 
@@ -353,7 +353,7 @@ func (t *TreatmentsByFlagSetsArgs) PopulateFromRPC(rpc *RPC) error {
 	if rpc.OpCode != OCTreatmentsByFlagSets && rpc.OpCode != OCTreatmentsWithConfigByFlagSets {
 		return RPCParseError{Code: PECOpCodeMismatch}
 	}
-	if len(rpc.Args) != 4 {
+	if len(rpc.Args) < 4 {
 		return RPCParseError{Code: PECWrongArgCount}
 	}
 
