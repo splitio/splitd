@@ -179,7 +179,7 @@ func (t *TreatmentArgs) PopulateFromRPC(rpc *RPC) error {
 		t.Attributes = sanitizeAttributes(rawAttrs)
 	}
 
-	if len(rpc.Args) == 5 && rpc.Args[TreatmentArgImpressionPropertiesIdx] != nil {
+	if len(rpc.Args) >= 5 && rpc.Args[TreatmentArgImpressionPropertiesIdx] != nil {
 		rawAttrs, err := getOptional[map[string]interface{}](rpc.Args[TreatmentArgImpressionPropertiesIdx])
 		if err != nil {
 			return RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentArgImpressionPropertiesIdx)}
@@ -250,7 +250,7 @@ func (t *TreatmentsArgs) PopulateFromRPC(rpc *RPC) error {
 	}
 	t.Attributes = sanitizeAttributes(rawAttrs)
 
-	if len(rpc.Args) == 5 && rpc.Args[TreatmentsArgImpressionPropertiesIdx] != nil {
+	if len(rpc.Args) >= 5 && rpc.Args[TreatmentsArgImpressionPropertiesIdx] != nil {
 		rawAttrs, err := getOptional[map[string]interface{}](rpc.Args[TreatmentsArgImpressionPropertiesIdx])
 		if err != nil {
 			return RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsArgImpressionPropertiesIdx)}
@@ -314,7 +314,7 @@ func (t *TreatmentsByFlagSetArgs) PopulateFromRPC(rpc *RPC) error {
 	}
 	t.Attributes = sanitizeAttributes(rawAttrs)
 
-	if len(rpc.Args) == 5 && rpc.Args[TreatmentsByFlagSetArgImpressionPropertiesIdx] != nil {
+	if len(rpc.Args) >= 5 && rpc.Args[TreatmentsByFlagSetArgImpressionPropertiesIdx] != nil {
 		rawAttrs, err := getOptional[map[string]interface{}](rpc.Args[TreatmentsByFlagSetArgImpressionPropertiesIdx])
 		if err != nil {
 			return RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsByFlagSetArgImpressionPropertiesIdx)}
@@ -384,7 +384,7 @@ func (t *TreatmentsByFlagSetsArgs) PopulateFromRPC(rpc *RPC) error {
 	}
 	t.Attributes = sanitizeAttributes(rawAttrs)
 
-	if len(rpc.Args) == 5 && rpc.Args[TreatmentsByFlagSetsArgImpressionPropertiesIdx] != nil {
+	if len(rpc.Args) >= 5 && rpc.Args[TreatmentsByFlagSetsArgImpressionPropertiesIdx] != nil {
 		rawAttrs, err := getOptional[map[string]interface{}](rpc.Args[TreatmentsByFlagSetsArgImpressionPropertiesIdx])
 		if err != nil {
 			return RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsByFlagSetsArgImpressionPropertiesIdx)}
