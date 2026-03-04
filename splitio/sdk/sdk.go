@@ -138,12 +138,18 @@ func (i *Impl) Treatment(cfg *types.ClientConfig, key string, bk *string, featur
 	if res == nil {
 		return nil, fmt.Errorf("nil result")
 	}
-
+	treatment := res.Treatment
+	config := res.Config
+	if treatment == defaultFallbackTreatment {
+		if t, c := i.getFallbackTreatment(feature); t != defaultFallbackTreatment {
+			treatment, config = t, c
+		}
+	}
 	imp := i.handleImpression(key, bk, feature, res, cfg.Metadata, SerializeProperties(evaluationOptions))
 	return &EvaluationResult{
-		Treatment:  res.Treatment,
+		Treatment:  treatment,
 		Impression: imp,
-		Config:     res.Config,
+		Config:     config,
 	}, nil
 }
 
@@ -156,14 +162,21 @@ func (i *Impl) Treatments(cfg *types.ClientConfig, key string, bk *string, featu
 
 		curr, ok := res.Evaluations[feature]
 		if !ok {
-			toRet[feature] = EvaluationResult{Treatment: "control"}
+			treatment, config := i.getFallbackTreatment(feature)
+			toRet[feature] = EvaluationResult{Treatment: treatment, Config: config}
 			continue
 		}
-
+		treatment := curr.Treatment
+		config := curr.Config
+		if treatment == defaultFallbackTreatment {
+			if t, c := i.getFallbackTreatment(feature); t != defaultFallbackTreatment {
+				treatment, config = t, c
+			}
+		}
 		var eres EvaluationResult
-		eres.Treatment = curr.Treatment
+		eres.Treatment = treatment
 		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata, SerializeProperties(evaluationOptions))
-		eres.Config = curr.Config
+		eres.Config = config
 		toRet[feature] = eres
 	}
 
@@ -176,10 +189,16 @@ func (i *Impl) TreatmentsByFlagSet(cfg *types.ClientConfig, key string, bk *stri
 	res := i.ev.EvaluateFeatureByFlagSets(key, bk, []string{flagSet}, attributes)
 	toRet := make(map[string]EvaluationResult, len(res.Evaluations))
 	for feature, curr := range res.Evaluations {
+		treatment, config := curr.Treatment, curr.Config
+		if treatment == defaultFallbackTreatment {
+			if t, c := i.getFallbackTreatment(feature); t != defaultFallbackTreatment {
+				treatment, config = t, c
+			}
+		}
 		var eres EvaluationResult
-		eres.Treatment = curr.Treatment
+		eres.Treatment = treatment
 		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata, SerializeProperties(evaluationOptions))
-		eres.Config = curr.Config
+		eres.Config = config
 		toRet[feature] = eres
 	}
 
@@ -192,10 +211,16 @@ func (i *Impl) TreatmentsByFlagSets(cfg *types.ClientConfig, key string, bk *str
 	res := i.ev.EvaluateFeatureByFlagSets(key, bk, flagSets, attributes)
 	toRet := make(map[string]EvaluationResult, len(res.Evaluations))
 	for feature, curr := range res.Evaluations {
+		treatment, config := curr.Treatment, curr.Config
+		if treatment == defaultFallbackTreatment {
+			if t, c := i.getFallbackTreatment(feature); t != defaultFallbackTreatment {
+				treatment, config = t, c
+			}
+		}
 		var eres EvaluationResult
-		eres.Treatment = curr.Treatment
+		eres.Treatment = treatment
 		eres.Impression = i.handleImpression(key, bk, feature, &curr, cfg.Metadata, SerializeProperties(evaluationOptions))
-		eres.Config = curr.Config
+		eres.Config = config
 		toRet[feature] = eres
 	}
 
@@ -324,6 +349,23 @@ func splitToView(s *dtos.SplitDTO) *SplitView {
 		Sets:                s.Sets,
 		ImpressionsDisabled: s.ImpressionsDisabled,
 	}
+}
+
+const defaultFallbackTreatment = "control"
+
+func (i *Impl) getFallbackTreatment(feature string) (treatment string, config *string) {
+	treatment = defaultFallbackTreatment
+	ft := i.cfg.FallbackTreatment
+	if byFlag, ok := ft.ByFlagFallbackTreatment[feature]; ok && byFlag.Treatment != nil {
+		treatment = *byFlag.Treatment
+		config = byFlag.Config
+		return treatment, config
+	}
+	if ft.GlobalFallbackTreatment != nil && ft.GlobalFallbackTreatment.Treatment != nil {
+		treatment = *ft.GlobalFallbackTreatment.Treatment
+		config = ft.GlobalFallbackTreatment.Config
+	}
+	return treatment, config
 }
 
 func timeMillis() int64 {
