@@ -8,6 +8,10 @@ sdk:
     apikey: <server-side-apitoken>
     labelsEnabled: true
     streamingEnabled: true
+    fallbackTreatment:
+        global_fallback_treatment:
+            treatment: other
+        by_flag_fallback_treatment: {}
     urls:
         auth: https://auth.split.io
         sdk: https://sdk.split.io/api
