@@ -86,7 +86,7 @@ func ParseCliArgs() (*CliArgs, error) {
 	et := cliFlags.String("event-type", "", "event type")
 	ev := cliFlags.String("value", "", "event associated value")
 	at := cliFlags.String("attributes", "", "json representation of attributes")
-	pr := cliFlags.String("impression-properties", "", "json representation of")
+	pr := cliFlags.String("impression-properties", "null", "json representation of")
 	err := cliFlags.Parse(os.Args[1:])
 	if err != nil {
 		return nil, fmt.Errorf("error parsing arguments: %w", err)
