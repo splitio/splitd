@@ -123,7 +123,7 @@ func TestInstantiationAndGetTreatmentE2E(t *testing.T) {
 	client, err := New(logger, "someApikey", sdkConf)
 	assert.Nil(t, err)
 
-	res, _ := client.Treatment(&types.ClientConfig{}, "aaaaaaklmnbv", nil, "split", nil)
+	res, _ := client.Treatment(&types.ClientConfig{}, "aaaaaaklmnbv", nil, "split", nil, nil)
 	assert.Equal(t, "on", res.Treatment)
 
 	assert.Nil(t, client.Shutdown())
@@ -241,7 +241,7 @@ func TestInstantiationAndGetTreatmentE2EWithFallbackTreatment(t *testing.T) {
 		},
 	}
 
-	res1, _ := client.Treatment(&types.ClientConfig{}, "aaaaaaklmnbv", nil, "not_exist", nil, client.WithEvaluationOptions(&opts))
+	res1, _ := client.Treatment(&types.ClientConfig{}, "aaaaaaklmnbv", nil, "not_exist", nil, &opts)
 	assert.Equal(t, "global_treatment", res1.Treatment)
 	assert.Equal(t, "{\"pleassssse\":\"holaaaaa\"}", res1.Impression.Properties)
 
@@ -370,7 +370,7 @@ func TestInstantiationAndGetTreatmentE2EWithPrerequistesNotAchive(t *testing.T) 
 	client, err := New(logger, "someApikey", sdkConf)
 	assert.Nil(t, err)
 
-	res1, _ := client.Treatment(&types.ClientConfig{}, "aaaaaaklmnbv", nil, "split", nil)
+	res1, _ := client.Treatment(&types.ClientConfig{}, "aaaaaaklmnbv", nil, "split", nil, nil)
 	assert.Equal(t, "default", res1.Treatment)
 
 	assert.Nil(t, client.Shutdown())
@@ -498,7 +498,7 @@ func TestInstantiationAndGetTreatmentE2EWithPrerequistesAchive(t *testing.T) {
 	client, err := New(logger, "someApikey", sdkConf)
 	assert.Nil(t, err)
 
-	res1, _ := client.Treatment(&types.ClientConfig{}, "aaaaaaklmnbv", nil, "split", nil)
+	res1, _ := client.Treatment(&types.ClientConfig{}, "aaaaaaklmnbv", nil, "split", nil, nil)
 	assert.Equal(t, "on", res1.Treatment)
 
 	assert.Nil(t, client.Shutdown())
@@ -649,7 +649,7 @@ func TestInstantiationAndGetTreatmentE2EWithRBS(t *testing.T) {
 	attributes := make(map[string]interface{})
 	attributes["version"] = "3.4.5"
 
-	res1, _ := client.Treatment(&types.ClientConfig{}, "aaaaaaklmnbv", nil, "split", attributes)
+	res1, _ := client.Treatment(&types.ClientConfig{}, "aaaaaaklmnbv", nil, "split", attributes, nil)
 	assert.Equal(t, "on", res1.Treatment)
 
 	assert.Nil(t, client.Shutdown())
