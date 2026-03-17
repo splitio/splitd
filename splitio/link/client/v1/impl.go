@@ -26,6 +26,16 @@ type Impl struct {
 	listenerFeedback bool
 }
 
+func (c *Impl) WithEvaluationOptions(e *dtos.EvaluationOptions) types.OptFn {
+	return func(o *types.Options) { o.EvaluationOptions = e }
+}
+
+func defaultOpts() types.Options {
+	return types.Options{
+		EvaluationOptions: nil,
+	}
+}
+
 func New(id string, logger logging.LoggerInterface, conn transfer.RawConn, serializer serializer.Interface, listenerFeedback bool) (*Impl, error) {
 	i := &Impl{
 		logger:           logger,
@@ -43,23 +53,27 @@ func New(id string, logger logging.LoggerInterface, conn transfer.RawConn, seria
 }
 
 // Treatment implements Interface
-func (c *Impl) Treatment(key string, bucketingKey string, feature string, attrs map[string]interface{}) (*types.Result, error) {
-	return c.treatment(key, bucketingKey, feature, attrs, false)
+func (c *Impl) Treatment(key string, bucketingKey string, feature string, attrs map[string]interface{}, optFns ...types.OptFn) (*types.Result, error) {
+	options := getOptions(optFns...)
+	return c.treatment(key, bucketingKey, feature, attrs, false, options.EvaluationOptions)
 }
 
 // TreatmentWithConfig implements types.ClientInterface
-func (c *Impl) TreatmentWithConfig(key string, bucketingKey string, feature string, attrs map[string]interface{}) (*types.Result, error) {
-	return c.treatment(key, bucketingKey, feature, attrs, true)
+func (c *Impl) TreatmentWithConfig(key string, bucketingKey string, feature string, attrs map[string]interface{}, optFns ...types.OptFn) (*types.Result, error) {
+	options := getOptions(optFns...)
+	return c.treatment(key, bucketingKey, feature, attrs, true, options.EvaluationOptions)
 }
 
 // Treatment implements Interface
-func (c *Impl) Treatments(key string, bucketingKey string, features []string, attrs map[string]interface{}) (types.Results, error) {
-	return c.treatments(key, bucketingKey, features, attrs, false)
+func (c *Impl) Treatments(key string, bucketingKey string, features []string, attrs map[string]interface{}, optFns ...types.OptFn) (types.Results, error) {
+	options := getOptions(optFns...)
+	return c.treatments(key, bucketingKey, features, attrs, false, options.EvaluationOptions)
 }
 
 // TreatmentsWithConfig implements types.ClientInterface
-func (c *Impl) TreatmentsWithConfig(key string, bucketingKey string, features []string, attrs map[string]interface{}) (types.Results, error) {
-	return c.treatments(key, bucketingKey, features, attrs, true)
+func (c *Impl) TreatmentsWithConfig(key string, bucketingKey string, features []string, attrs map[string]interface{}, optFns ...types.OptFn) (types.Results, error) {
+	options := getOptions(optFns...)
+	return c.treatments(key, bucketingKey, features, attrs, true, options.EvaluationOptions)
 }
 
 // Track implements types.ClientInterface
@@ -139,7 +153,7 @@ func (c *Impl) Splits() ([]sdk.SplitView, error) {
 	return views, nil
 }
 
-func (c *Impl) treatment(key string, bucketingKey string, feature string, attrs map[string]interface{}, withConfig bool) (*types.Result, error) {
+func (c *Impl) treatment(key string, bucketingKey string, feature string, attrs map[string]interface{}, withConfig bool, evaluationOptions *dtos.EvaluationOptions) (*types.Result, error) {
 	var bkp *string
 	if bucketingKey != "" {
 		bkp = &bucketingKey
@@ -174,6 +188,7 @@ func (c *Impl) treatment(key string, bucketingKey string, feature string, attrs 
 			ChangeNumber: resp.Payload.ListenerData.ChangeNumber,
 			Label:        resp.Payload.ListenerData.Label,
 			BucketingKey: bucketingKey,
+			Properties:   sdk.SerializeProperties(evaluationOptions),
 		}
 	}
 
@@ -185,7 +200,7 @@ func (c *Impl) treatment(key string, bucketingKey string, feature string, attrs 
 	return toRet, nil
 }
 
-func (c *Impl) treatments(key string, bucketingKey string, features []string, attrs map[string]interface{}, withConfig bool) (types.Results, error) {
+func (c *Impl) treatments(key string, bucketingKey string, features []string, attrs map[string]interface{}, withConfig bool, evaluationOptions *dtos.EvaluationOptions) (types.Results, error) {
 	var bkp *string
 	if bucketingKey != "" {
 		bkp = &bucketingKey
@@ -221,6 +236,7 @@ func (c *Impl) treatments(key string, bucketingKey string, features []string, at
 				ChangeNumber: resp.Payload.Results[idx].ListenerData.ChangeNumber,
 				Label:        resp.Payload.Results[idx].ListenerData.Label,
 				BucketingKey: bucketingKey,
+				Properties:   sdk.SerializeProperties(evaluationOptions),
 			}
 		}
 
@@ -284,6 +300,14 @@ func doRPC[T any](c *Impl, rpc *protov1.RPC) (*T, error) {
 
 func (c *Impl) Shutdown() error {
 	return c.conn.Shutdown()
+}
+
+func getOptions(optFns ...types.OptFn) types.Options {
+	options := defaultOpts()
+	for _, optFn := range optFns {
+		optFn(&options)
+	}
+	return options
 }
 
 var _ types.ClientInterface = (*Impl)(nil)

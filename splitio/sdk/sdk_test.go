@@ -61,7 +61,7 @@ func TestTreatmentsWithImpressionsDisabled(t *testing.T) {
 
 	res, err := client.Treatments(
 		&types.ClientConfig{Metadata: types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}},
-		"key1", nil, []string{"f1", "f2", "f3"}, Attributes{"a": 1})
+		"key1", nil, []string{"f1", "f2", "f3"}, Attributes{"a": 1}, nil)
 	assert.Nil(t, err)
 	assert.Nil(t, res["f1"].Config)
 	assert.Nil(t, res["f2"].Config)
@@ -101,7 +101,7 @@ func TestTreatmentLabelsDisabled(t *testing.T) {
 		cfg:    conf.Config{LabelsEnabled: false},
 	}
 
-	res, err := client.Treatment(&types.ClientConfig{Metadata: types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}}, "key1", nil, "f1", Attributes{"a": 1})
+	res, err := client.Treatment(&types.ClientConfig{Metadata: types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}}, "key1", nil, "f1", Attributes{"a": 1}, nil)
 	assert.Nil(t, err)
 	assert.Nil(t, res.Config)
 	assertImpEq(t, expectedImpression, res.Impression)
@@ -156,7 +156,7 @@ func TestTreatmentLabelsEnabled(t *testing.T) {
 		cfg:    conf.Config{LabelsEnabled: true},
 	}
 
-	res, err := client.Treatment(&types.ClientConfig{Metadata: types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}}, "key1", nil, "f1", Attributes{"a": 1})
+	res, err := client.Treatment(&types.ClientConfig{Metadata: types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}}, "key1", nil, "f1", Attributes{"a": 1}, nil)
 	assert.Nil(t, err)
 	assert.Nil(t, res.Config)
 	assertImpEq(t, expectedImpression, res.Impression)
@@ -226,7 +226,7 @@ func TestTreatments(t *testing.T) {
 
 	res, err := client.Treatments(
 		&types.ClientConfig{Metadata: types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}},
-		"key1", nil, []string{"f1", "f2", "f3"}, Attributes{"a": 1})
+		"key1", nil, []string{"f1", "f2", "f3"}, Attributes{"a": 1}, nil)
 	assert.Nil(t, err)
 	assert.Nil(t, res["f1"].Config)
 	assert.Nil(t, res["f2"].Config)
@@ -308,7 +308,7 @@ func TestTreatmentsWithImpressionProperties(t *testing.T) {
 	}
 	res, err := client.Treatments(
 		&types.ClientConfig{Metadata: types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}},
-		"key1", nil, []string{"f1", "f2", "f3"}, Attributes{"a": 1}, client.WithEvaluationOptions(&opts))
+		"key1", nil, []string{"f1", "f2", "f3"}, Attributes{"a": 1}, &opts)
 	assert.Nil(t, err)
 	assert.Nil(t, res["f1"].Config)
 	assert.Nil(t, res["f2"].Config)
@@ -397,7 +397,7 @@ func TestTreatmentsByFlagSet(t *testing.T) {
 
 	res, err := client.TreatmentsByFlagSet(
 		&types.ClientConfig{Metadata: types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}},
-		"key1", nil, "set", Attributes{"a": 1})
+		"key1", nil, "set", Attributes{"a": 1}, nil)
 	assert.Nil(t, err)
 	assert.Nil(t, res["f1"].Config)
 	assert.Nil(t, res["f2"].Config)
@@ -486,7 +486,7 @@ func TestTreatmentsByFlagSets(t *testing.T) {
 
 	res, err := client.TreatmentsByFlagSets(
 		&types.ClientConfig{Metadata: types.ClientMetadata{ID: "some", SdkVersion: "go-1.2.3"}},
-		"key1", nil, []string{"set_1", "set_2"}, Attributes{"a": 1})
+		"key1", nil, []string{"set_1", "set_2"}, Attributes{"a": 1}, nil)
 	assert.Nil(t, err)
 	assert.Nil(t, res["f1"].Config)
 	assert.Nil(t, res["f2"].Config)
@@ -555,7 +555,7 @@ func TestImpressionsQueueFull(t *testing.T) {
 	for idx := 0; idx < 4; idx++ {
 		feature := fmt.Sprintf("f%d", idx)
 		expectedImpression.FeatureName = feature
-		res, err := client.Treatment(clientConf, "key1", nil, feature, Attributes{"a": 1})
+		res, err := client.Treatment(clientConf, "key1", nil, feature, Attributes{"a": 1}, nil)
 		assert.Nil(t, err)
 		assert.Nil(t, res.Config)
 		assertImpEq(t, expectedImpression, res.Impression)
@@ -567,7 +567,7 @@ func TestImpressionsQueueFull(t *testing.T) {
 	for idx := 4; idx < 8; idx++ {
 		feature := fmt.Sprintf("f%d", idx)
 		expectedImpression.FeatureName = feature
-		res, err := client.Treatment(clientConf, "key1", nil, feature, Attributes{"a": 1})
+		res, err := client.Treatment(clientConf, "key1", nil, feature, Attributes{"a": 1}, nil)
 		assert.Nil(t, err)
 		assert.Nil(t, res.Config)
 		assertImpEq(t, expectedImpression, res.Impression)
@@ -577,7 +577,7 @@ func TestImpressionsQueueFull(t *testing.T) {
 
 	feature := "f8"
 	expectedImpression.FeatureName = feature
-	res, err := client.Treatment(clientConf, "key1", nil, feature, Attributes{"a": 1})
+	res, err := client.Treatment(clientConf, "key1", nil, feature, Attributes{"a": 1}, nil)
 	assert.Nil(t, err)
 	assert.Nil(t, res.Config)
 	assertImpEq(t, expectedImpression, res.Impression)
