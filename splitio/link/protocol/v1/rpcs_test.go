@@ -334,6 +334,30 @@ func TestTreatmentsByFlagSetsRPCParsing(t *testing.T) {
 	assert.Equal(t, lang.Ref("bk"), r.BucketingKey)
 	assert.Equal(t, []string{"set_1", "set_2"}, r.FlagSets)
 	assert.Nil(t, r.Attributes)
+	assert.Nil(t, r.ImpressionProperties)
+
+	// impression properties (5th arg): valid map
+	r = TreatmentsByFlagSetsArgs{}
+	err = r.PopulateFromRPC(&RPC{
+		RPCBase: protocol.RPCBase{Version: protocol.V1},
+		OpCode:  OCTreatmentsByFlagSets,
+		Args: []interface{}{
+			"key", "bk", []interface{}{"set_1", "set_2"}, nil,
+			map[string]interface{}{"p": "v"},
+		}})
+	assert.Nil(t, err)
+	assert.Equal(t, "key", r.Key)
+	assert.Equal(t, []string{"set_1", "set_2"}, r.FlagSets)
+	assert.NotNil(t, r.ImpressionProperties)
+	assert.Equal(t, map[string]interface{}{"p": "v"}, r.ImpressionProperties)
+
+	// impression properties (5th arg): invalid type
+	assert.Equal(t,
+		RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsByFlagSetsArgImpressionPropertiesIdx)},
+		r.PopulateFromRPC(&RPC{
+			RPCBase: protocol.RPCBase{Version: protocol.V1},
+			OpCode:  OCTreatmentsByFlagSets,
+			Args:    []interface{}{"key", "bk", []interface{}{"s"}, nil, 123}}))
 }
 
 func TestTrackRPCParsing(t *testing.T) {

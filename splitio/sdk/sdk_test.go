@@ -19,6 +19,7 @@ import (
 	"github.com/splitio/splitd/splitio/sdk/workers"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTreatmentsWithImpressionsDisabled(t *testing.T) {
@@ -177,6 +178,153 @@ func TestTreatmentLabelsEnabled(t *testing.T) {
 
 	})
 	assert.Nil(t, err)
+}
+
+func TestTreatment_ReplacesControlWithGlobalFallback(t *testing.T) {
+	is, _ := storage.NewImpressionsQueue(100)
+	ev := &mocks.EvaluatorMock{}
+	ev.On("EvaluateFeature", "key1", (*string)(nil), "unknown_feature", Attributes(nil)).
+		Return(&evaluator.Result{Treatment: "control", Label: "l", EvaluationTime: 1, SplitChangeNumber: 0}).
+		Once()
+
+	fb := "my_fallback"
+	cfgStr := `{"k":1}`
+	im := &mocks.ImpressionManagerMock{}
+	im.On("Process", mock.Anything).
+		Return([]dtos.Impression{{KeyName: "key1", FeatureName: "unknown_feature", Treatment: "control"}}, []dtos.Impression{}).
+		Once()
+
+	client := &Impl{
+		logger: logging.NewLogger(nil),
+		is:     is,
+		ev:     ev,
+		iq:     im,
+		cfg: conf.Config{
+			LabelsEnabled: false,
+			FallbackTreatment: dtos.FallbackTreatmentConfig{
+				GlobalFallbackTreatment: &dtos.FallbackTreatment{Treatment: &fb, Config: &cfgStr},
+			},
+		},
+	}
+
+	res, err := client.Treatment(
+		&types.ClientConfig{Metadata: types.ClientMetadata{ID: "c", SdkVersion: "go-1"}},
+		"key1", nil, "unknown_feature", nil, nil)
+	assert.NoError(t, err)
+	require.NotNil(t, res)
+	assert.Equal(t, "my_fallback", res.Treatment)
+	require.NotNil(t, res.Config)
+	assert.Equal(t, cfgStr, *res.Config)
+	ev.AssertExpectations(t)
+}
+
+func TestTreatment_ReplacesControlWithByFlagFallback(t *testing.T) {
+	is, _ := storage.NewImpressionsQueue(100)
+	ev := &mocks.EvaluatorMock{}
+	ev.On("EvaluateFeature", "key1", (*string)(nil), "flag_a", Attributes(nil)).
+		Return(&evaluator.Result{Treatment: "control", Config: nil, Label: "l", EvaluationTime: 1, SplitChangeNumber: 0}).
+		Once()
+
+	byFlag := "per_flag"
+	im := &mocks.ImpressionManagerMock{}
+	im.On("Process", mock.Anything).
+		Return([]dtos.Impression{{KeyName: "key1", FeatureName: "flag_a", Treatment: "control"}}, []dtos.Impression{}).
+		Once()
+
+	client := &Impl{
+		logger: logging.NewLogger(nil),
+		is:     is,
+		ev:     ev,
+		iq:     im,
+		cfg: conf.Config{
+			FallbackTreatment: dtos.FallbackTreatmentConfig{
+				ByFlagFallbackTreatment: map[string]dtos.FallbackTreatment{
+					"flag_a": {Treatment: &byFlag},
+				},
+			},
+		},
+	}
+
+	res, err := client.Treatment(
+		&types.ClientConfig{Metadata: types.ClientMetadata{ID: "c", SdkVersion: "go-1"}},
+		"key1", nil, "flag_a", nil, nil)
+	assert.NoError(t, err)
+	require.NotNil(t, res)
+	assert.Equal(t, "per_flag", res.Treatment)
+	assert.Nil(t, res.Config)
+}
+
+func TestTreatment_KeepsControlWhenConfiguredFallbackIsControl(t *testing.T) {
+	is, _ := storage.NewImpressionsQueue(100)
+	ev := &mocks.EvaluatorMock{}
+	ev.On("EvaluateFeature", "key1", (*string)(nil), "f", Attributes(nil)).
+		Return(&evaluator.Result{Treatment: "control", Label: "l", EvaluationTime: 1, SplitChangeNumber: 0}).
+		Once()
+
+	ctrl := "control"
+	im := &mocks.ImpressionManagerMock{}
+	im.On("Process", mock.Anything).
+		Return([]dtos.Impression{{KeyName: "key1", FeatureName: "f", Treatment: "control"}}, []dtos.Impression{}).
+		Once()
+
+	client := &Impl{
+		logger: logging.NewLogger(nil),
+		is:     is,
+		ev:     ev,
+		iq:     im,
+		cfg: conf.Config{
+			FallbackTreatment: dtos.FallbackTreatmentConfig{
+				GlobalFallbackTreatment: &dtos.FallbackTreatment{Treatment: &ctrl},
+			},
+		},
+	}
+
+	res, err := client.Treatment(
+		&types.ClientConfig{Metadata: types.ClientMetadata{ID: "c", SdkVersion: "go-1"}},
+		"key1", nil, "f", nil, nil)
+	assert.NoError(t, err)
+	require.NotNil(t, res)
+	assert.Equal(t, "control", res.Treatment)
+}
+
+func TestTreatments_ReplacesControlWithGlobalFallback(t *testing.T) {
+	is, _ := storage.NewImpressionsQueue(100)
+	ev := &mocks.EvaluatorMock{}
+	ev.On("EvaluateFeatures", "key1", (*string)(nil), []string{"missing", "ok"}, Attributes(nil)).
+		Return(evaluator.Results{Evaluations: map[string]evaluator.Result{
+			"missing": {Treatment: "control", Label: "l1", EvaluationTime: 1, SplitChangeNumber: 0},
+			"ok":      {Treatment: "on", Label: "l2", EvaluationTime: 1, SplitChangeNumber: 1},
+		}}).
+		Once()
+
+	fb := "fallback_val"
+	im := &mocks.ImpressionManagerMock{}
+	im.On("Process", mock.Anything).
+		Return([]dtos.Impression{{FeatureName: "missing", Treatment: "control"}}, []dtos.Impression{}).
+		Once()
+	im.On("Process", mock.Anything).
+		Return([]dtos.Impression{{FeatureName: "ok", Treatment: "on"}}, []dtos.Impression{}).
+		Once()
+
+	client := &Impl{
+		logger: logging.NewLogger(nil),
+		is:     is,
+		ev:     ev,
+		iq:     im,
+		cfg: conf.Config{
+			LabelsEnabled: true,
+			FallbackTreatment: dtos.FallbackTreatmentConfig{
+				GlobalFallbackTreatment: &dtos.FallbackTreatment{Treatment: &fb},
+			},
+		},
+	}
+
+	out, err := client.Treatments(
+		&types.ClientConfig{Metadata: types.ClientMetadata{ID: "c", SdkVersion: "go-1"}},
+		"key1", nil, []string{"missing", "ok"}, nil, nil)
+	assert.NoError(t, err)
+	assert.Equal(t, "fallback_val", out["missing"].Treatment)
+	assert.Equal(t, "on", out["ok"].Treatment)
 }
 
 func TestTreatments(t *testing.T) {
