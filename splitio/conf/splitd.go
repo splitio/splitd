@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/splitio/go-split-commons/v9/dtos"
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio/common/lang"
 	"github.com/splitio/splitd/splitio/link"
@@ -122,14 +123,15 @@ func (l *Link) ToListenerOpts() (*link.ListenerOptions, error) {
 }
 
 type SDK struct {
-	Apikey           string       `yaml:"apikey"`
-	LabelsEnabled    *bool        `yaml:"labelsEnabled"`
-	StreamingEnabled *bool        `yaml:"streamingEnabled"`
-	URLs             URLs         `yaml:"urls"`
-	FeatureFlags     FeatureFlags `yaml:"featureFlags"`
-	Impressions      Impressions  `yaml:"impressions"`
-	Events           Events       `yaml:"events"`
-	FlagSetsFilter   []string     `yaml:"flagSetsFilter"`
+	Apikey            string                 `yaml:"apikey"`
+	LabelsEnabled     *bool                  `yaml:"labelsEnabled"`
+	StreamingEnabled  *bool                  `yaml:"streamingEnabled"`
+	FallbackTreatment fallbackTreatmentInput `yaml:"fallbackTreatment"`
+	URLs              URLs                   `yaml:"urls"`
+	FeatureFlags      FeatureFlags           `yaml:"featureFlags"`
+	Impressions       Impressions            `yaml:"impressions"`
+	Events            Events                 `yaml:"events"`
+	FlagSetsFilter    []string               `yaml:"flagSetsFilter"`
 }
 
 func (s *SDK) PopulateWithDefaults() {
@@ -137,6 +139,7 @@ func (s *SDK) PopulateWithDefaults() {
 	s.Apikey = apikeyPlaceHolder
 	s.LabelsEnabled = lang.Ref(cfg.LabelsEnabled)
 	s.StreamingEnabled = lang.Ref(cfg.StreamingEnabled)
+	s.FallbackTreatment = fallbackTreatmentFromConfig(cfg.FallbackTreatment)
 	s.URLs.PopulateWithDefaults()
 	s.FeatureFlags.PopulateWithDefaults()
 	s.Impressions.PopulateWithDefaults()
@@ -215,6 +218,11 @@ func (s *SDK) ToSDKConf() *sdkConf.Config {
 	// lang.SetIfNotNil(&cfg.FlagSetsFilter, s.FlagSetsFilter)
 	if len(s.FlagSetsFilter) > 0 {
 		cfg.FlagSetsFilter = s.FlagSetsFilter
+	}
+	if parsed, err := (&s.FallbackTreatment).toConfig(); err != nil {
+		log.Printf("[splitd] fallbackTreatment: %v", err)
+	} else if parsed != nil {
+		cfg.FallbackTreatment = *parsed
 	}
 	return cfg
 }
@@ -308,6 +316,131 @@ func (p *Profiling) PopulateWithDefaults() {
 	p.Enable = false
 	p.Host = "localhost"
 	p.Port = 8888
+}
+
+// fallbackTreatmentFromConfig maps the SDK default config's FallbackTreatment into our input type.
+func fallbackTreatmentFromConfig(c dtos.FallbackTreatmentConfig) fallbackTreatmentInput {
+	parsed := new(dtos.FallbackTreatmentConfig)
+	*parsed = c
+	return fallbackTreatmentInput{parsed: parsed}
+}
+
+type fallbackTreatmentEntry struct {
+	Treatment *string `json:"treatment" yaml:"treatment"`
+	Config    *string `json:"config,omitempty" yaml:"config,omitempty"`
+}
+
+type fallbackTreatmentInput struct {
+	parsed *dtos.FallbackTreatmentConfig
+	raw    string
+}
+
+func (f *fallbackTreatmentInput) UnmarshalYAML(value *yaml.Node) error {
+	if value == nil {
+		return nil
+	}
+
+	switch value.Kind {
+	case yaml.ScalarNode:
+		return f.unmarshalScalar(value)
+	case yaml.MappingNode:
+		return f.unmarshalMapping(value)
+	default:
+		return nil
+	}
+}
+
+func (f *fallbackTreatmentInput) unmarshalScalar(value *yaml.Node) error {
+	var s string
+	if err := value.Decode(&s); err != nil {
+		return err
+	}
+	f.parsed = nil
+	f.raw = strings.TrimSpace(s)
+	return nil
+}
+
+func (f *fallbackTreatmentInput) unmarshalMapping(value *yaml.Node) error {
+	var m struct {
+		Global *fallbackTreatmentEntry           `yaml:"global_fallback_treatment"`
+		ByFlag map[string]fallbackTreatmentEntry `yaml:"by_flag_fallback_treatment"`
+	}
+
+	if err := value.Decode(&m); err != nil {
+		return err
+	}
+
+	out := dtos.FallbackTreatmentConfig{}
+
+	// Procesar Global
+	if m.Global != nil && m.Global.Treatment != nil {
+		out.GlobalFallbackTreatment = &dtos.FallbackTreatment{
+			Treatment: m.Global.Treatment,
+			Config:    m.Global.Config,
+		}
+	}
+
+	// Procesar ByFlag
+	if len(m.ByFlag) > 0 {
+		out.ByFlagFallbackTreatment = make(map[string]dtos.FallbackTreatment)
+		for name, v := range m.ByFlag {
+			if v.Treatment != nil {
+				out.ByFlagFallbackTreatment[name] = dtos.FallbackTreatment{
+					Treatment: v.Treatment,
+					Config:    v.Config,
+				}
+			}
+		}
+	}
+
+	f.parsed = &out
+	f.raw = ""
+	return nil
+}
+
+func (f *fallbackTreatmentInput) toConfig() (*dtos.FallbackTreatmentConfig, error) {
+	if f == nil {
+		return nil, nil
+	}
+	if f.raw != "" {
+		return parseFallbackTreatmentJSON(f.raw)
+	}
+	if f.parsed != nil {
+		return f.parsed, nil
+	}
+	return nil, nil
+}
+
+func parseFallbackTreatmentJSON(raw string) (*dtos.FallbackTreatmentConfig, error) {
+	var wrapper struct {
+		FallbackTreatment struct {
+			GlobalFallbackTreatment *fallbackTreatmentEntry           `json:"global_fallback_treatment"`
+			ByFlagFallbackTreatment map[string]fallbackTreatmentEntry `json:"by_flag_fallback_treatment"`
+		} `json:"fallback_treatment"`
+	}
+	if err := json.Unmarshal([]byte(raw), &wrapper); err != nil {
+		return nil, fmt.Errorf("invalid JSON: %w", err)
+	}
+	out := dtos.FallbackTreatmentConfig{}
+	inner := &wrapper.FallbackTreatment
+	if inner.GlobalFallbackTreatment != nil && inner.GlobalFallbackTreatment.Treatment != nil {
+		out.GlobalFallbackTreatment = &dtos.FallbackTreatment{
+			Treatment: inner.GlobalFallbackTreatment.Treatment,
+			Config:    inner.GlobalFallbackTreatment.Config,
+		}
+	}
+	if len(inner.ByFlagFallbackTreatment) > 0 {
+		out.ByFlagFallbackTreatment = make(map[string]dtos.FallbackTreatment)
+		for name, v := range inner.ByFlagFallbackTreatment {
+			if v.Treatment != nil {
+				out.ByFlagFallbackTreatment[name] = dtos.FallbackTreatment{
+					Treatment: v.Treatment,
+					Config:    v.Config,
+				}
+			}
+		}
+	}
+	return &out, nil
 }
 
 func ReadConfig() (*Config, error) {

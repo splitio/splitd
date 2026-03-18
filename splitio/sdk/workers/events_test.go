@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/splitio/go-split-commons/v6/dtos"
-	"github.com/splitio/go-split-commons/v6/service"
-	"github.com/splitio/go-split-commons/v6/storage/inmemory"
+	"github.com/splitio/go-split-commons/v9/dtos"
+	"github.com/splitio/go-split-commons/v9/service"
+	"github.com/splitio/go-split-commons/v9/storage/inmemory"
 	"github.com/splitio/go-toolkit/v5/logging"
 	"github.com/splitio/splitd/splitio/sdk/conf"
 	sss "github.com/splitio/splitd/splitio/sdk/storage"
