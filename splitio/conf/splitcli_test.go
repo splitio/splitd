@@ -25,6 +25,7 @@ func TestCliConfig(t *testing.T) {
 		"-event-type=someEventType",
 		"-value=0.123",
 		`-attributes={"some": "attribute"}`,
+		`-impression-properties={"userId":  "123", "age": 30, "premium": true, "balance": 99.5}`,
 	}
 
 	parsed, err := ParseCliArgs()
@@ -42,6 +43,7 @@ func TestCliConfig(t *testing.T) {
 	assert.Equal(t, "someEventType", parsed.EventType)
 	assert.Equal(t, lang.Ref(float64(0.123)), parsed.EventVal)
 	assert.Equal(t, map[string]interface{}{"some": "attribute"}, parsed.Attributes)
+	assert.Equal(t, map[string]interface{}{"userId": "123", "age": float64(30), "premium": true, "balance": 99.5}, parsed.ImpressionProperties)
 
 	// test bad buffer size
 	os.Args = []string{os.Args[0], "-buffer-size=sarasa"}

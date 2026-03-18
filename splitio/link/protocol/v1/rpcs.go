@@ -123,17 +123,19 @@ func (r *RegisterArgs) PopulateFromRPC(rpc *RPC) error {
 }
 
 const (
-	TreatmentArgKeyIdx          int = 0
-	TreatmentArgBucketingKeyIdx int = 1
-	TreatmentArgFeatureIdx      int = 2
-	TreatmentArgAttributesIdx   int = 3
+	TreatmentArgKeyIdx                  int = 0
+	TreatmentArgBucketingKeyIdx         int = 1
+	TreatmentArgFeatureIdx              int = 2
+	TreatmentArgAttributesIdx           int = 3
+	TreatmentArgImpressionPropertiesIdx int = 4
 )
 
 type TreatmentArgs struct {
-	Key          string                 `msgpack:"k"`
-	BucketingKey *string                `msgpack:"b"`
-	Feature      string                 `msgpack:"f"`
-	Attributes   map[string]interface{} `msgpack:"a"`
+	Key                  string                 `msgpack:"k"`
+	BucketingKey         *string                `msgpack:"b"`
+	Feature              string                 `msgpack:"f"`
+	Attributes           map[string]interface{} `msgpack:"a"`
+	ImpressionProperties map[string]interface{} `msgpack:"i"`
 }
 
 func (r TreatmentArgs) Encode() []interface{} {
@@ -141,14 +143,14 @@ func (r TreatmentArgs) Encode() []interface{} {
 	if r.BucketingKey != nil {
 		bk = *r.BucketingKey
 	}
-	return []interface{}{r.Key, bk, r.Feature, r.Attributes}
+	return []interface{}{r.Key, bk, r.Feature, r.Attributes, r.ImpressionProperties}
 }
 
 func (t *TreatmentArgs) PopulateFromRPC(rpc *RPC) error {
 	if rpc.OpCode != OCTreatment && rpc.OpCode != OCTreatmentWithConfig {
 		return RPCParseError{Code: PECOpCodeMismatch}
 	}
-	if len(rpc.Args) != 4 {
+	if len(rpc.Args) < 4 {
 		return RPCParseError{Code: PECWrongArgCount}
 	}
 
@@ -177,21 +179,31 @@ func (t *TreatmentArgs) PopulateFromRPC(rpc *RPC) error {
 		t.Attributes = sanitizeAttributes(rawAttrs)
 	}
 
+	if len(rpc.Args) >= 5 && rpc.Args[TreatmentArgImpressionPropertiesIdx] != nil {
+		rawAttrs, err := getOptional[map[string]interface{}](rpc.Args[TreatmentArgImpressionPropertiesIdx])
+		if err != nil {
+			return RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentArgImpressionPropertiesIdx)}
+		}
+		t.ImpressionProperties = rawAttrs
+	}
+
 	return nil
 }
 
 const (
-	TreatmentsArgKeyIdx          int = 0
-	TreatmentsArgBucketingKeyIdx int = 1
-	TreatmentsArgFeaturesIdx     int = 2
-	TreatmentsArgAttributesIdx   int = 3
+	TreatmentsArgKeyIdx                  int = 0
+	TreatmentsArgBucketingKeyIdx         int = 1
+	TreatmentsArgFeaturesIdx             int = 2
+	TreatmentsArgAttributesIdx           int = 3
+	TreatmentsArgImpressionPropertiesIdx int = 4
 )
 
 type TreatmentsArgs struct {
-	Key          string                 `msgpack:"k"`
-	BucketingKey *string                `msgpack:"b"`
-	Features     []string               `msgpack:"f"`
-	Attributes   map[string]interface{} `msgpack:"a"`
+	Key                  string                 `msgpack:"k"`
+	BucketingKey         *string                `msgpack:"b"`
+	Features             []string               `msgpack:"f"`
+	Attributes           map[string]interface{} `msgpack:"a"`
+	ImpressionProperties map[string]interface{} `msgpack:"i"`
 }
 
 func (r TreatmentsArgs) Encode() []interface{} {
@@ -206,7 +218,7 @@ func (t *TreatmentsArgs) PopulateFromRPC(rpc *RPC) error {
 	if rpc.OpCode != OCTreatments && rpc.OpCode != OCTreatmentsWithConfig {
 		return RPCParseError{Code: PECOpCodeMismatch}
 	}
-	if len(rpc.Args) != 4 {
+	if len(rpc.Args) < 4 {
 		return RPCParseError{Code: PECWrongArgCount}
 	}
 
@@ -238,21 +250,31 @@ func (t *TreatmentsArgs) PopulateFromRPC(rpc *RPC) error {
 	}
 	t.Attributes = sanitizeAttributes(rawAttrs)
 
+	if len(rpc.Args) >= 5 && rpc.Args[TreatmentsArgImpressionPropertiesIdx] != nil {
+		rawAttrs, err := getOptional[map[string]interface{}](rpc.Args[TreatmentsArgImpressionPropertiesIdx])
+		if err != nil {
+			return RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsArgImpressionPropertiesIdx)}
+		}
+		t.ImpressionProperties = rawAttrs
+	}
+
 	return nil
 }
 
 const (
-	TreatmentsByFlagSetArgKeyIdx          int = 0
-	TreatmentsByFlagSetArgBucketingKeyIdx int = 1
-	TreatmentsByFlagSetArgFlagSetIdx      int = 2
-	TreatmentsByFlagSetArgAttributesIdx   int = 3
+	TreatmentsByFlagSetArgKeyIdx                  int = 0
+	TreatmentsByFlagSetArgBucketingKeyIdx         int = 1
+	TreatmentsByFlagSetArgFlagSetIdx              int = 2
+	TreatmentsByFlagSetArgAttributesIdx           int = 3
+	TreatmentsByFlagSetArgImpressionPropertiesIdx int = 4
 )
 
 type TreatmentsByFlagSetArgs struct {
-	Key          string                 `msgpack:"k"`
-	BucketingKey *string                `msgpack:"b"`
-	FlagSet      string                 `msgpack:"f"`
-	Attributes   map[string]interface{} `msgpack:"a"`
+	Key                  string                 `msgpack:"k"`
+	BucketingKey         *string                `msgpack:"b"`
+	FlagSet              string                 `msgpack:"f"`
+	Attributes           map[string]interface{} `msgpack:"a"`
+	ImpressionProperties map[string]interface{} `msgpack:"i"`
 }
 
 func (r TreatmentsByFlagSetArgs) Encode() []interface{} {
@@ -267,7 +289,7 @@ func (t *TreatmentsByFlagSetArgs) PopulateFromRPC(rpc *RPC) error {
 	if rpc.OpCode != OCTreatmentsByFlagSet && rpc.OpCode != OCTreatmentsWithConfigByFlagSet {
 		return RPCParseError{Code: PECOpCodeMismatch}
 	}
-	if len(rpc.Args) != 4 {
+	if len(rpc.Args) < 4 {
 		return RPCParseError{Code: PECWrongArgCount}
 	}
 
@@ -292,21 +314,31 @@ func (t *TreatmentsByFlagSetArgs) PopulateFromRPC(rpc *RPC) error {
 	}
 	t.Attributes = sanitizeAttributes(rawAttrs)
 
+	if len(rpc.Args) >= 5 && rpc.Args[TreatmentsByFlagSetArgImpressionPropertiesIdx] != nil {
+		rawAttrs, err := getOptional[map[string]interface{}](rpc.Args[TreatmentsByFlagSetArgImpressionPropertiesIdx])
+		if err != nil {
+			return RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsByFlagSetArgImpressionPropertiesIdx)}
+		}
+		t.ImpressionProperties = rawAttrs
+	}
+
 	return nil
 }
 
 const (
-	TreatmentsByFlagSetsArgKeyIdx          int = 0
-	TreatmentsByFlagSetsArgBucketingKeyIdx int = 1
-	TreatmentsByFlagSetsArgFlagSetsIdx     int = 2
-	TreatmentsByFlagSetsArgAttributesIdx   int = 3
+	TreatmentsByFlagSetsArgKeyIdx                  int = 0
+	TreatmentsByFlagSetsArgBucketingKeyIdx         int = 1
+	TreatmentsByFlagSetsArgFlagSetsIdx             int = 2
+	TreatmentsByFlagSetsArgAttributesIdx           int = 3
+	TreatmentsByFlagSetsArgImpressionPropertiesIdx int = 4
 )
 
 type TreatmentsByFlagSetsArgs struct {
-	Key          string                 `msgpack:"k"`
-	BucketingKey *string                `msgpack:"b"`
-	FlagSets     []string               `msgpack:"f"`
-	Attributes   map[string]interface{} `msgpack:"a"`
+	Key                  string                 `msgpack:"k"`
+	BucketingKey         *string                `msgpack:"b"`
+	FlagSets             []string               `msgpack:"f"`
+	Attributes           map[string]interface{} `msgpack:"a"`
+	ImpressionProperties map[string]interface{} `msgpack:"i"`
 }
 
 func (r TreatmentsByFlagSetsArgs) Encode() []interface{} {
@@ -321,7 +353,7 @@ func (t *TreatmentsByFlagSetsArgs) PopulateFromRPC(rpc *RPC) error {
 	if rpc.OpCode != OCTreatmentsByFlagSets && rpc.OpCode != OCTreatmentsWithConfigByFlagSets {
 		return RPCParseError{Code: PECOpCodeMismatch}
 	}
-	if len(rpc.Args) != 4 {
+	if len(rpc.Args) < 4 {
 		return RPCParseError{Code: PECWrongArgCount}
 	}
 
@@ -351,6 +383,14 @@ func (t *TreatmentsByFlagSetsArgs) PopulateFromRPC(rpc *RPC) error {
 		return RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsByFlagSetsArgAttributesIdx)}
 	}
 	t.Attributes = sanitizeAttributes(rawAttrs)
+
+	if len(rpc.Args) >= 5 && rpc.Args[TreatmentsByFlagSetsArgImpressionPropertiesIdx] != nil {
+		rawAttrs, err := getOptional[map[string]interface{}](rpc.Args[TreatmentsByFlagSetsArgImpressionPropertiesIdx])
+		if err != nil {
+			return RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentsByFlagSetsArgImpressionPropertiesIdx)}
+		}
+		t.ImpressionProperties = rawAttrs
+	}
 
 	return nil
 }
