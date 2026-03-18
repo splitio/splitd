@@ -7,6 +7,7 @@ import (
 	"os"
 	"runtime/debug"
 
+	"github.com/splitio/go-split-commons/v9/dtos"
 	"github.com/splitio/go-toolkit/v5/logging"
 
 	protov1 "github.com/splitio/splitd/splitio/link/protocol/v1"
@@ -169,7 +170,7 @@ func (m *ClientManager) handleGetTreatment(rpc *protov1.RPC, withConfig bool) (i
 		return nil, fmt.Errorf("error parsing treatment arguments: %w", err)
 	}
 
-	res, err := m.splitSDK.Treatment(m.clientConfig, args.Key, args.BucketingKey, args.Feature, args.Attributes)
+	res, err := m.splitSDK.Treatment(m.clientConfig, args.Key, args.BucketingKey, args.Feature, args.Attributes, &dtos.EvaluationOptions{Properties: args.ImpressionProperties})
 	if err != nil {
 		return &protov1.ResponseWrapper[protov1.TreatmentPayload]{Status: protov1.ResultInternalError}, err
 	}
@@ -201,7 +202,7 @@ func (m *ClientManager) handleGetTreatments(rpc *protov1.RPC, withConfig bool) (
 		return nil, fmt.Errorf("error parsing treatments arguments: %w", err)
 	}
 
-	res, err := m.splitSDK.Treatments(m.clientConfig, args.Key, args.BucketingKey, args.Features, args.Attributes)
+	res, err := m.splitSDK.Treatments(m.clientConfig, args.Key, args.BucketingKey, args.Features, args.Attributes, &dtos.EvaluationOptions{Properties: args.ImpressionProperties})
 	if err != nil {
 		return &protov1.ResponseWrapper[protov1.TreatmentsPayload]{Status: protov1.ResultInternalError}, err
 	}
@@ -243,7 +244,7 @@ func (m *ClientManager) handleGetTreatmentsByFlagSet(rpc *protov1.RPC, withConfi
 		return nil, fmt.Errorf("error parsing treatmentsByFlagSet arguments: %w", err)
 	}
 
-	res, err := m.splitSDK.TreatmentsByFlagSet(m.clientConfig, args.Key, args.BucketingKey, args.FlagSet, args.Attributes)
+	res, err := m.splitSDK.TreatmentsByFlagSet(m.clientConfig, args.Key, args.BucketingKey, args.FlagSet, args.Attributes, &dtos.EvaluationOptions{Properties: args.ImpressionProperties})
 	if err != nil {
 		return &protov1.ResponseWrapper[protov1.TreatmentsWithFeaturePayload]{Status: protov1.ResultInternalError}, err
 	}
@@ -284,7 +285,7 @@ func (m *ClientManager) handleGetTreatmentsByFlagSets(rpc *protov1.RPC, withConf
 		return nil, fmt.Errorf("error parsing treatmentsByFlagSets arguments: %w", err)
 	}
 
-	res, err := m.splitSDK.TreatmentsByFlagSets(m.clientConfig, args.Key, args.BucketingKey, args.FlagSets, args.Attributes)
+	res, err := m.splitSDK.TreatmentsByFlagSets(m.clientConfig, args.Key, args.BucketingKey, args.FlagSets, args.Attributes, &dtos.EvaluationOptions{Properties: args.ImpressionProperties})
 	if err != nil {
 		return &protov1.ResponseWrapper[protov1.TreatmentsWithFeaturePayload]{Status: protov1.ResultInternalError}, err
 	}

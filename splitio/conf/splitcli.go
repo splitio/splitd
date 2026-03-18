@@ -25,15 +25,16 @@ type CliArgs struct {
 	WriteTimeoutMS int
 
 	// command
-	Method       string
-	Key          string
-	BucketingKey string
-	Feature      string
-	Features     []string
-	TrafficType  string
-	EventType    string
-	EventVal     *float64
-	Attributes   map[string]interface{}
+	Method               string
+	Key                  string
+	BucketingKey         string
+	Feature              string
+	Features             []string
+	TrafficType          string
+	EventType            string
+	EventVal             *float64
+	Attributes           map[string]interface{}
+	ImpressionProperties map[string]interface{}
 }
 
 func (a *CliArgs) LinkOpts() (*link.ConsumerOptions, error) {
@@ -85,6 +86,7 @@ func ParseCliArgs() (*CliArgs, error) {
 	et := cliFlags.String("event-type", "", "event type")
 	ev := cliFlags.String("value", "", "event associated value")
 	at := cliFlags.String("attributes", "", "json representation of attributes")
+	pr := cliFlags.String("impression-properties", "null", "json representation of")
 	err := cliFlags.Parse(os.Args[1:])
 	if err != nil {
 		return nil, fmt.Errorf("error parsing arguments: %w", err)
@@ -107,22 +109,31 @@ func ParseCliArgs() (*CliArgs, error) {
 		return nil, fmt.Errorf("error parsing attributes: %w", err)
 	}
 
+	if *pr == "" {
+		*pr = "null"
+	}
+	impressionPorperties := make(map[string]interface{})
+	if err = json.Unmarshal([]byte(*pr), &impressionPorperties); err != nil {
+		return nil, fmt.Errorf("error parsing impression properties: %w", err)
+	}
+
 	return &CliArgs{
-		ID:            *id,
-		Serialization: *s,
-		Protocol:      *p,
-		LogLevel:      *ll,
-		ConnType:      *ct,
-		ConnAddr:      *ca,
-		BufSize:       *bs,
-		Method:        *m,
-		Key:           *k,
-		BucketingKey:  *bk,
-		Feature:       *f,
-		Features:      strings.Split(*fs, ","),
-		TrafficType:   *tt,
-		EventType:     *et,
-		EventVal:      eventVal,
-		Attributes:    attrs,
+		ID:                   *id,
+		Serialization:        *s,
+		Protocol:             *p,
+		LogLevel:             *ll,
+		ConnType:             *ct,
+		ConnAddr:             *ca,
+		BufSize:              *bs,
+		Method:               *m,
+		Key:                  *k,
+		BucketingKey:         *bk,
+		Feature:              *f,
+		Features:             strings.Split(*fs, ","),
+		TrafficType:          *tt,
+		EventType:            *et,
+		EventVal:             eventVal,
+		Attributes:           attrs,
+		ImpressionProperties: impressionPorperties,
 	}, nil
 }

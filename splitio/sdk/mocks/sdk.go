@@ -1,6 +1,7 @@
 package mocks
 
 import (
+	"github.com/splitio/go-split-commons/v9/dtos"
 	"github.com/splitio/splitd/splitio/sdk"
 	"github.com/splitio/splitd/splitio/sdk/types"
 	"github.com/stretchr/testify/mock"
@@ -17,6 +18,7 @@ func (m *SDKMock) Treatment(
 	bucketingKey *string,
 	feature string,
 	attributes map[string]interface{},
+	evaluationOptions *dtos.EvaluationOptions,
 ) (*sdk.EvaluationResult, error) {
 	args := m.Called(md, key, bucketingKey, feature, attributes)
 	return args.Get(0).(*sdk.EvaluationResult), args.Error(1)
@@ -29,6 +31,7 @@ func (m *SDKMock) Treatments(
 	bucketingKey *string,
 	features []string,
 	attributes map[string]interface{},
+	evaluationOptions *dtos.EvaluationOptions,
 ) (map[string]sdk.EvaluationResult, error) {
 	args := m.Called(md, key, bucketingKey, features, attributes)
 	return args.Get(0).(map[string]sdk.EvaluationResult), args.Error(1)
@@ -41,6 +44,7 @@ func (m *SDKMock) TreatmentsByFlagSet(
 	bucketingKey *string,
 	flagSet string,
 	attributes map[string]interface{},
+	evaluationOptions *dtos.EvaluationOptions,
 ) (map[string]sdk.EvaluationResult, error) {
 	args := m.Called(md, key, bucketingKey, flagSet, attributes)
 	return args.Get(0).(map[string]sdk.EvaluationResult), args.Error(1)
@@ -53,6 +57,7 @@ func (m *SDKMock) TreatmentsByFlagSets(
 	bucketingKey *string,
 	flagSets []string,
 	attributes map[string]interface{},
+	evaluationOptions *dtos.EvaluationOptions,
 ) (map[string]sdk.EvaluationResult, error) {
 	args := m.Called(md, key, bucketingKey, flagSets, attributes)
 	return args.Get(0).(map[string]sdk.EvaluationResult), args.Error(1)
