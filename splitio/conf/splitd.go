@@ -339,44 +339,62 @@ func (f *fallbackTreatmentInput) UnmarshalYAML(value *yaml.Node) error {
 	if value == nil {
 		return nil
 	}
+
 	switch value.Kind {
 	case yaml.ScalarNode:
-		var s string
-		if err := value.Decode(&s); err != nil {
-			return err
-		}
-		f.parsed = nil
-		f.raw = strings.TrimSpace(s)
-		return nil
+		return f.unmarshalScalar(value)
 	case yaml.MappingNode:
-		var m struct {
-			Global *fallbackTreatmentEntry           `yaml:"global_fallback_treatment"`
-			ByFlag map[string]fallbackTreatmentEntry `yaml:"by_flag_fallback_treatment"`
+		return f.unmarshalMapping(value)
+	default:
+		return nil
+	}
+}
+
+func (f *fallbackTreatmentInput) unmarshalScalar(value *yaml.Node) error {
+	var s string
+	if err := value.Decode(&s); err != nil {
+		return err
+	}
+	f.parsed = nil
+	f.raw = strings.TrimSpace(s)
+	return nil
+}
+
+func (f *fallbackTreatmentInput) unmarshalMapping(value *yaml.Node) error {
+	var m struct {
+		Global *fallbackTreatmentEntry           `yaml:"global_fallback_treatment"`
+		ByFlag map[string]fallbackTreatmentEntry `yaml:"by_flag_fallback_treatment"`
+	}
+
+	if err := value.Decode(&m); err != nil {
+		return err
+	}
+
+	out := dtos.FallbackTreatmentConfig{}
+
+	// Procesar Global
+	if m.Global != nil && m.Global.Treatment != nil {
+		out.GlobalFallbackTreatment = &dtos.FallbackTreatment{
+			Treatment: m.Global.Treatment,
+			Config:    m.Global.Config,
 		}
-		if err := value.Decode(&m); err != nil {
-			return err
-		}
-		out := dtos.FallbackTreatmentConfig{}
-		if m.Global != nil && m.Global.Treatment != nil {
-			out.GlobalFallbackTreatment = &dtos.FallbackTreatment{
-				Treatment: m.Global.Treatment,
-				Config:    m.Global.Config,
-			}
-		}
-		if len(m.ByFlag) > 0 {
-			out.ByFlagFallbackTreatment = make(map[string]dtos.FallbackTreatment)
-			for name, v := range m.ByFlag {
-				if v.Treatment != nil {
-					out.ByFlagFallbackTreatment[name] = dtos.FallbackTreatment{
-						Treatment: v.Treatment,
-						Config:    v.Config,
-					}
+	}
+
+	// Procesar ByFlag
+	if len(m.ByFlag) > 0 {
+		out.ByFlagFallbackTreatment = make(map[string]dtos.FallbackTreatment)
+		for name, v := range m.ByFlag {
+			if v.Treatment != nil {
+				out.ByFlagFallbackTreatment[name] = dtos.FallbackTreatment{
+					Treatment: v.Treatment,
+					Config:    v.Config,
 				}
 			}
 		}
-		f.parsed = &out
-		return nil
 	}
+
+	f.parsed = &out
+	f.raw = ""
 	return nil
 }
 
@@ -396,7 +414,7 @@ func (f *fallbackTreatmentInput) toConfig() (*dtos.FallbackTreatmentConfig, erro
 func parseFallbackTreatmentJSON(raw string) (*dtos.FallbackTreatmentConfig, error) {
 	var wrapper struct {
 		FallbackTreatment struct {
-			GlobalFallbackTreatment *fallbackTreatmentEntry          `json:"global_fallback_treatment"`
+			GlobalFallbackTreatment *fallbackTreatmentEntry           `json:"global_fallback_treatment"`
 			ByFlagFallbackTreatment map[string]fallbackTreatmentEntry `json:"by_flag_fallback_treatment"`
 		} `json:"fallback_treatment"`
 	}

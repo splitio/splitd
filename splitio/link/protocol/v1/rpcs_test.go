@@ -117,6 +117,35 @@ func TestTreatmentRPCParsing(t *testing.T) {
 	assert.Equal(t, lang.Ref("bk"), r.BucketingKey)
 	assert.Equal(t, "feat1", r.Feature)
 	assert.Nil(t, r.Attributes)
+
+	// impression properties (5th arg): valid map
+	r = TreatmentArgs{}
+	err = r.PopulateFromRPC(&RPC{
+		RPCBase: protocol.RPCBase{Version: protocol.V1},
+		OpCode:  OCTreatment,
+		Args:    []interface{}{"key", "bk", "feat1", nil, map[string]interface{}{"p": "v"}}})
+	assert.Nil(t, err)
+	assert.Equal(t, "key", r.Key)
+	assert.Equal(t, "feat1", r.Feature)
+	assert.NotNil(t, r.ImpressionProperties)
+	assert.Equal(t, map[string]interface{}{"p": "v"}, r.ImpressionProperties)
+
+	// impression properties (5th arg): invalid type returns PECInvalidArgType at index 4
+	assert.Equal(t,
+		RPCParseError{Code: PECInvalidArgType, Data: int64(TreatmentArgImpressionPropertiesIdx)},
+		r.PopulateFromRPC(&RPC{
+			RPCBase: protocol.RPCBase{Version: protocol.V1},
+			OpCode:  OCTreatment,
+			Args:    []interface{}{"key", "bk", "feat1", nil, 123}}))
+
+	// 4 args only: impression properties not set (optional)
+	r = TreatmentArgs{}
+	err = r.PopulateFromRPC(&RPC{
+		RPCBase: protocol.RPCBase{Version: protocol.V1},
+		OpCode:  OCTreatment,
+		Args:    []interface{}{"key", "bk", "feat1", map[string]interface{}{"a": 1}}})
+	assert.Nil(t, err)
+	assert.Nil(t, r.ImpressionProperties)
 }
 
 func TestTreatmentsRPCParsing(t *testing.T) {
