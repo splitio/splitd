@@ -1,8 +1,8 @@
 package mocks
 
 import (
-	"github.com/splitio/go-split-commons/v6/dtos"
-	"github.com/splitio/go-split-commons/v6/storage"
+	"github.com/splitio/go-split-commons/v9/dtos"
+	"github.com/splitio/go-split-commons/v9/storage"
 	"github.com/splitio/go-toolkit/v5/datastructures/set"
 	"github.com/stretchr/testify/mock"
 )
@@ -70,6 +70,16 @@ func (m *SplitStorageMock) GetAllFlagSetNames() []string {
 
 func (m *SplitStorageMock) LargeSegmentNames() *set.ThreadUnsafeSet {
 	return m.Called().Get(0).(*set.ThreadUnsafeSet)
+}
+
+func (m *SplitStorageMock) ReplaceAll(toAdd []dtos.SplitDTO, changeNumber int64) error {
+	args := m.Called(toAdd, changeNumber)
+	return args.Error(0)
+}
+
+func (m *SplitStorageMock) RuleBasedSegmentNames() *set.ThreadUnsafeSet {
+	args := m.Called()
+	return args.Get(0).(*set.ThreadUnsafeSet)
 }
 
 var _ storage.SplitStorage = (*SplitStorageMock)(nil)

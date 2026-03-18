@@ -3,10 +3,10 @@ package conf
 import (
 	"time"
 
-	"github.com/splitio/go-split-commons/v6/conf"
-	"github.com/splitio/go-split-commons/v6/dtos"
-	"github.com/splitio/go-split-commons/v6/flagsets"
-	"github.com/splitio/go-split-commons/v6/service/api/specs"
+	"github.com/splitio/go-split-commons/v9/conf"
+	"github.com/splitio/go-split-commons/v9/dtos"
+	"github.com/splitio/go-split-commons/v9/flagsets"
+	"github.com/splitio/go-split-commons/v9/service/api/specs"
 )
 
 const (
@@ -15,14 +15,15 @@ const (
 )
 
 type Config struct {
-	LabelsEnabled    bool
-	StreamingEnabled bool
-	Splits           Splits
-	Segments         Segments
-	Impressions      Impressions
-	Events           Events
-	URLs             URLs
-	FlagSetsFilter   []string
+	LabelsEnabled     bool
+	StreamingEnabled  bool
+	Splits            Splits
+	Segments          Segments
+	Impressions       Impressions
+	Events            Events
+	URLs              URLs
+	FlagSetsFilter    []string
+	FallbackTreatment dtos.FallbackTreatmentConfig
 }
 
 type Splits struct {
@@ -81,6 +82,7 @@ func (c *Config) ToAdvancedConfig() *conf.AdvancedConfig {
 	d.ImpressionsQueueSize = c.Impressions.QueueSize
 	d.AuthSpecVersion = specs.FLAG_V1_1
 	d.FlagsSpecVersion = specs.FLAG_V1_1
+	d.FallbackTreatment = c.FallbackTreatment
 
 	return &d
 }
