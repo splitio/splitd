@@ -22,11 +22,11 @@ func NewRegisterRPC(id string, listener bool) *v1.RPC {
 	}
 }
 
-func NewTreatmentRPC(key string, bucketing string, feature string, attrs map[string]interface{}, withConfig bool) *v1.RPC {
+func NewTreatmentRPC(key string, bucketing string, feature string, attrs map[string]interface{}, impressionProperties map[string]interface{}, withConfig bool) *v1.RPC {
 	rpc := &v1.RPC{
 		RPCBase: protocol.RPCBase{Version: protocol.V1},
 		OpCode:  v1.OCTreatment,
-		Args:    []interface{}{key, bucketing, feature, attrs},
+		Args:    []interface{}{key, bucketing, feature, attrs, impressionProperties},
 	}
 	if withConfig {
 		rpc.OpCode = v1.OCTreatmentWithConfig
