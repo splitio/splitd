@@ -1,5 +1,5 @@
 # ----- Builder image
-ARG GOLANG_VERSION=1.23.6
+ARG GOLANG_VERSION=1.24.0
 FROM golang:${GOLANG_VERSION}-bookworm AS builder
 
 ARG FIPS_MODE

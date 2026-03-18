@@ -15,6 +15,8 @@ import (
 	"github.com/splitio/splitd/splitio/link/transfer"
 	"github.com/splitio/splitd/splitio/sdk/conf"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestConfig(t *testing.T) {
@@ -30,6 +32,7 @@ func TestConfig(t *testing.T) {
 	cfg = Config{}
 
 	assert.Nil(t, cfg.parse(dir+string(filepath.Separator)+"splitd.yaml.tpl"))
+	expected.SDK.FallbackTreatment = cfg.SDK.FallbackTreatment
 	assert.Equal(t, expected, cfg)
 
 	assert.Error(t, cfg.parse("someNonexistantFile"))
@@ -184,4 +187,45 @@ func TestDefaultConf(t *testing.T) {
 
 	assert.Equal(t, defaultLogLevel, *c.Logger.Level)
 	assert.Equal(t, defaultLogOutput, *c.Logger.Output)
+}
+
+func TestFallbackTreatmentToSDKConf(t *testing.T) {
+	// JSON string form
+	var cfg Config
+	cfg.PopulateWithDefaults()
+	err := yaml.Unmarshal([]byte(`
+sdk:
+  apikey: test
+  fallbackTreatment: '{"fallback_treatment":{"global_fallback_treatment":{"treatment":"control"},"by_flag_fallback_treatment":{"my_flag":{"treatment":"off"}}}}'
+`), &cfg)
+	assert.Nil(t, err)
+	sdkConf := cfg.SDK.ToSDKConf()
+	require.NotNil(t, sdkConf)
+	require.NotNil(t, sdkConf.FallbackTreatment.GlobalFallbackTreatment)
+	require.NotEmpty(t, sdkConf.FallbackTreatment.ByFlagFallbackTreatment)
+	assert.Equal(t, "control", *sdkConf.FallbackTreatment.GlobalFallbackTreatment.Treatment)
+	assert.Equal(t, "off", *sdkConf.FallbackTreatment.ByFlagFallbackTreatment["my_flag"].Treatment)
+
+	// Native YAML object form
+	var cfg2 Config
+	cfg2.PopulateWithDefaults()
+	err = yaml.Unmarshal([]byte(`
+sdk:
+  apikey: test
+  fallbackTreatment:
+    global_fallback_treatment:
+      treatment: global_val
+    by_flag_fallback_treatment:
+      some_flag:
+        treatment: on
+        config: "{}"
+`), &cfg2)
+	assert.Nil(t, err)
+	sdkConf2 := cfg2.SDK.ToSDKConf()
+	require.NotNil(t, sdkConf2)
+	require.NotNil(t, sdkConf2.FallbackTreatment.GlobalFallbackTreatment)
+	require.Contains(t, sdkConf2.FallbackTreatment.ByFlagFallbackTreatment, "some_flag")
+	assert.Equal(t, "global_val", *sdkConf2.FallbackTreatment.GlobalFallbackTreatment.Treatment)
+	assert.Equal(t, "on", *sdkConf2.FallbackTreatment.ByFlagFallbackTreatment["some_flag"].Treatment)
+	assert.Equal(t, "{}", *sdkConf2.FallbackTreatment.ByFlagFallbackTreatment["some_flag"].Config)
 }
