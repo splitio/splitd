@@ -1,5 +1,5 @@
 # ----- Builder image
-ARG GOLANG_VERSION=1.24.0
+ARG GOLANG_VERSION=1.26.1
 FROM golang:${GOLANG_VERSION}-bookworm AS builder
 
 ARG FIPS_MODE
@@ -20,9 +20,9 @@ RUN export GITHUB_SHA="${COMMIT_SHA}" && bash -c '\
   fi'
 
 # ----- Runner image
-FROM debian:bookworm-20250203-slim AS runner
+FROM debian:bookworm-slim AS runner
 
-ARG YQ_VERSION=v4.44.6
+ARG YQ_VERSION=v4.52.4
 
 RUN DEBIAN_FRONTEND=noninteractive \
   apt-get update && \
