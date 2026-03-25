@@ -1,6 +1,6 @@
 module github.com/splitio/splitd
 
-go 1.24.0
+go 1.26.1
 
 require (
 	github.com/gin-gonic/gin v1.10.0
@@ -8,7 +8,7 @@ require (
 	github.com/splitio/go-toolkit/v5 v5.4.1
 	github.com/stretchr/testify v1.11.1
 	github.com/vmihailenco/msgpack/v5 v5.3.5
-	golang.org/x/sync v0.18.0
+	golang.org/x/sync v0.20.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -39,10 +39,10 @@ require (
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	golang.org/x/arch v0.8.0 // indirect
-	golang.org/x/crypto v0.45.0 // indirect
+	golang.org/x/crypto v0.49.0 // indirect
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
-	golang.org/x/net v0.47.0 // indirect
-	golang.org/x/sys v0.38.0 // indirect
-	golang.org/x/text v0.31.0 // indirect
+	golang.org/x/net v0.52.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
+	golang.org/x/text v0.35.0 // indirect
 	google.golang.org/protobuf v1.34.1 // indirect
 )
