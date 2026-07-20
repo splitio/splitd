@@ -1,44 +1,43 @@
 # =============================================================================
-# splitd_ci — Harness CI + Release pipeline (CANDIDATE — PENDING PLATFORM VALIDATION)
+# splitd_ci — Harness CI + Release pipeline
 # =============================================================================
-# Reproduces the full behavior of .github/workflows/ci.yml:
-#   - PR to main:   set VERSION, version validation, build, test, cross-build, sonar
-#   - push to main: set VERSION, build, test, cross-build, sonar, git tag, GitHub Release
+# Reproduces .github/workflows/ci.yml:
+#   - PR to main:   set VERSION, version validation, build, test, cross-build,
+#                   sonar scan + quality gate
+#   - push to main: same, plus git tag + GitHub Release (5 .bin assets)
 #
 # Org: PROD  |  Project: Harness_Split  |  Pipeline identifier: splitd_ci
 # Design reference: docs/superpowers/specs/2026-07-17-harness-ci-migration-design.md
-# Implementation plan: docs/superpowers/plans/2026-07-20-harness-ci-migration.md
+# Plan: docs/superpowers/plans/2026-07-20-harness-ci-migration.md
 #
 # -----------------------------------------------------------------------------
-# ⚠  THIS YAML IS A CANDIDATE, NOT VERIFIED CONFIG.
-# It was authored from the design reference and is self-consistent with the repo
-# (version.go parsing and the 5 binaries_release filenames were checked), but it
-# has NOT been validated against the live Harness platform. Per the plan (Task 1),
-# verify and reconcile ALL of the following in the real Harness_Split project
-# BEFORE relying on it, then update this file to match the validated pipeline:
+# VALIDATION STATUS (validated via Harness API against PROD/Harness_Split,
+# using the working pipeline `fme_core_ci_gosonarqube_v2` as the reference):
 #
-#   [ ] runtime.type — Cloud vs. Kubernetes/self-hosted available in Harness_Split
-#   [ ] platform os/arch values
-#   [ ] Run-step output variable capture (whether `export` is required) and the
-#       reference form <+steps.<id>.output.outputVariables.<name>>
-#   [ ] trigger gating expressions: <+trigger.event> == "PUSH" and
-#       <+codebase.build.type> == "PR" (exact values in this Harness version)
-#   [ ] same-stage workspace sharing so cross_build .bin files are readable by the
-#       github_release step WITHOUT an explicit artifact upload/download
-#   [ ] git-tag mechanism (Run + token vs. a native/SCM step) and least-privilege
-#       token scope for pushing tags
-#   [ ] GitHub Release plugin (plugins/github-release) availability + exact settings
-#       key names (api_key / files / title / tag) for this Harness version
-#   [ ] Sonar plugin (aosapps/drone-sonar-plugin) + from_secret settings syntax
-#   [ ] secret reference syntax: <+secrets.getValue("...")> vs from_secret
-#   [ ] connectorRef requirements for Plugin steps (Docker connector to pull images)
-#   [ ] secret log-safety (token must not be echoed; avoid `set -x`)
+#   ✅ CI stage: type CI, runtime Cloud (size flex), platform Linux/Amd64
+#   ✅ Secret ref syntax <+secrets.getValue("...")>
+#   ✅ Codebase/trigger expressions (<+codebase.build.type>, <+codebase.prNumber>,
+#      <+codebase.sourceBranch>, <+codebase.targetBranch>, <+codebase.commitSha>)
+#   ✅ Image pulls use the real Docker connector `dockerhub`
+#   ✅ SONAR reconciled to the PROJECT STANDARD: sonar-scanner CLI Run step +
+#      Post Quality Gate polling (secret `sonarqube-token`, host sonar.harness.io)
+#      — NOT the drone sonar plugin (no project uses it).
 #
-# Connectors/secrets referenced (create/verify in Harness_Split — Task 2/3):
-#   - GitHub codebase connector  → properties.ci.codebase.connectorRef (<+input>)
-#   - Docker connector           → Plugin step connectorRef (<+input>)
-#   - GITHUB_WRITE_TOKEN (secret) → git_tag + github_release (least-privilege scope)
-#   - SONARQUBE_HOST, SONARQUBE_TOKEN (secrets) → sonarqube step
+#   ⚠ STILL UNPROVEN — no pipeline in the account does these; verify before use:
+#      [ ] git_tag step: pushing a tag from CI (mechanism + least-privilege token)
+#      [ ] github_release step: `plugins/github-release` availability + settings
+#      [ ] same-stage workspace sharing so cross_build .bin files reach github_release
+#      [ ] output variable capture (`export` + <+steps...outputVariables...>)
+#
+#   ⚠ BUILD ENV — the reference Go pipeline sets GOPROXY (Harness Go proxy netrc),
+#      GOPRIVATE=github.com/splitio/*, and AWS CodeArtifact auth for PRIVATE modules.
+#      splitd's go.mod deps (go-split-commons/v9, go-toolkit/v5) are PUBLIC, so plain
+#      `make` MAY work — but VERIFY `make test`/`make binaries_release` resolve deps
+#      in Harness Cloud; if not, add the same GOPROXY/GOPRIVATE env as the reference.
+#
+#   Secret names to confirm exist in Harness_Split (real names from reference):
+#      sonarqube-token, fme-github-netrc-token
+#      + a token for tag/release (GITHUB_WRITE_TOKEN — create with least privilege)
 # =============================================================================
 pipeline:
   name: splitd_ci
@@ -49,10 +48,9 @@ pipeline:
   properties:
     ci:
       codebase:
-        connectorRef: <+input>   # GitHub codebase connector (clone + triggers).
-                                 # Write ops use GITHUB_WRITE_TOKEN, not this connector.
         repoName: splitd
         build: <+input>
+        sparseCheckout: []
   stages:
     - stage:
         name: CI
@@ -60,12 +58,15 @@ pipeline:
         type: CI
         spec:
           cloneCodebase: true
+          caching:
+            enabled: true
           platform:
             os: Linux
             arch: Amd64
           runtime:
             type: Cloud
-            spec: {}
+            spec:
+              size: flex
           execution:
             steps:
               - step:
@@ -73,6 +74,7 @@ pipeline:
                   name: Set VERSION
                   type: Run
                   spec:
+                    connectorRef: dockerhub
                     image: golang:1.26.1
                     shell: Sh
                     # MUST `export` — Harness only captures an exported outputVariable.
@@ -87,9 +89,9 @@ pipeline:
                   type: Run
                   # PR-only: fail if the release tag already exists (forces a version bump).
                   spec:
+                    connectorRef: dockerhub
                     image: golang:1.26.1
                     shell: Sh
-                    # Harness shallow-clones by default; GHA used fetch-depth: 0.
                     command: |
                       VERSION="<+steps.set_version.output.outputVariables.VERSION>"
                       git fetch --tags --quiet
@@ -105,6 +107,7 @@ pipeline:
                   name: Build binaries
                   type: Run
                   spec:
+                    connectorRef: dockerhub
                     image: golang:1.26.1
                     shell: Sh
                     command: make splitd splitcli
@@ -113,6 +116,7 @@ pipeline:
                   name: Run tests
                   type: Run
                   spec:
+                    connectorRef: dockerhub
                     image: golang:1.26.1
                     shell: Sh
                     command: make test
@@ -123,29 +127,104 @@ pipeline:
                   # Produces the 5 .bin artifacts uploaded by github_release. Same stage
                   # → same workspace (VERIFY), so binaries are on disk downstream.
                   spec:
+                    connectorRef: dockerhub
                     image: golang:1.26.1
                     shell: Sh
                     command: make binaries_release
               - step:
-                  identifier: sonarqube
-                  name: SonarQube Scan
-                  type: Plugin
-                  # Drone Sonar plugin (no native Sonar step in Harness CI). Repo-level
-                  # config comes from sonar-project.properties in the repo root.
+                  identifier: sonarqube_analysis
+                  name: SonarQube Analysis
+                  type: Run
+                  # PROJECT STANDARD (from fme_core_ci_gosonarqube_v2): download the
+                  # sonar-scanner CLI and run it. Repo config from sonar-project.properties.
                   spec:
-                    connectorRef: <+input>   # Docker connector to pull the plugin image
-                    image: aosapps/drone-sonar-plugin
-                    settings:
-                      sonar_host:
-                        from_secret: SONARQUBE_HOST
-                      sonar_token:
-                        from_secret: SONARQUBE_TOKEN
+                    shell: Sh
+                    command: |
+                      export SONAR_SCANNER_VERSION=6.2.1.4610
+                      curl -sSLo sonar-scanner.zip "https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-${SONAR_SCANNER_VERSION}-linux-x64.zip"
+                      unzip -q sonar-scanner.zip
+                      export PATH="$(pwd)/sonar-scanner-${SONAR_SCANNER_VERSION}-linux-x64/bin:$PATH"
+
+                      SONAR_EXTRA_ARGS=""
+                      if [ "<+codebase.build.type>" = "PR" ]; then
+                        SONAR_EXTRA_ARGS="-Dsonar.pullrequest.key=<+codebase.prNumber> \
+                          -Dsonar.pullrequest.branch=<+codebase.sourceBranch> \
+                          -Dsonar.pullrequest.base=<+codebase.targetBranch>"
+                      elif [ "<+codebase.branch>" != "main" ]; then
+                        SONAR_EXTRA_ARGS="-Dsonar.branch.name=<+codebase.branch>"
+                      fi
+
+                      sonar-scanner \
+                        -Dsonar.host.url="https://sonar.harness.io/" \
+                        -Dsonar.token="${SONAR_TOKEN}" \
+                        -Dsonar.projectVersion="<+steps.set_version.output.outputVariables.VERSION>" \
+                        $SONAR_EXTRA_ARGS
+                    envVariables:
+                      SONAR_TOKEN: <+secrets.getValue("sonarqube-token")>
+                      SONAR_HOST_URL: https://sonar.harness.io
+              - step:
+                  identifier: post_quality_gate
+                  name: Post Quality Gate
+                  type: Run
+                  # PROJECT STANDARD: poll the sonar CE task, then post a GitHub commit
+                  # status. Reads .scannerwork/report-task.txt from the sonar step
+                  # (same-stage workspace).
+                  spec:
+                    shell: Sh
+                    command: |
+                      REPORT_FILE=".scannerwork/report-task.txt"
+                      if [ ! -f "$REPORT_FILE" ]; then
+                        echo "ERROR: $REPORT_FILE not found. Ensure this runs in the same workspace as sonar-scanner."
+                        exit 1
+                      fi
+                      cat "$REPORT_FILE"
+                      CE_TASK_URL=$(grep "ceTaskUrl" "$REPORT_FILE" | cut -d'=' -f2-)
+
+                      MAX_RETRIES=30; RETRY_INTERVAL=10; TASK_STATUS="PENDING"
+                      for i in $(seq 1 $MAX_RETRIES); do
+                        echo "Attempt $i/$MAX_RETRIES - checking analysis task..."
+                        TASK_RESPONSE=$(curl -s -u "${SONAR_TOKEN}:" "$CE_TASK_URL")
+                        TASK_STATUS=$(echo "$TASK_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['task']['status'])" 2>/dev/null || echo "UNKNOWN")
+                        echo "Task status: $TASK_STATUS"
+                        [ "$TASK_STATUS" = "SUCCESS" ] || [ "$TASK_STATUS" = "FAILED" ] || [ "$TASK_STATUS" = "CANCELLED" ] && break
+                        sleep $RETRY_INTERVAL
+                      done
+                      if [ "$TASK_STATUS" != "SUCCESS" ]; then
+                        echo "Analysis task did not complete successfully: $TASK_STATUS"; exit 1
+                      fi
+
+                      ANALYSIS_ID=$(echo "$TASK_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['task']['analysisId'])")
+                      QG_RESPONSE=$(curl -s -u "${SONAR_TOKEN}:" "https://sonar.harness.io/api/qualitygates/project_status?analysisId=${ANALYSIS_ID}")
+                      echo "Quality Gate response: $QG_RESPONSE"
+                      QG_STATUS=$(echo "$QG_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['projectStatus']['status'])")
+                      echo "Quality Gate Status: $QG_STATUS"
+
+                      case "$QG_STATUS" in
+                        OK)    GH_STATE="success"; DESC="Quality gate passed" ;;
+                        ERROR) GH_STATE="failure"; DESC="Quality gate failed" ;;
+                        WARN)  GH_STATE="success"; DESC="Quality gate passed with warnings" ;;
+                        *)     GH_STATE="failure"; DESC="Quality gate status: $QG_STATUS" ;;
+                      esac
+
+                      curl -s -X POST \
+                        -H "Authorization: token ${GITHUB_TOKEN}" \
+                        -H "Accept: application/vnd.github.v3+json" \
+                        "https://api.github.com/repos/splitio/<+pipeline.properties.ci.codebase.repoName>/statuses/<+codebase.commitSha>" \
+                        -d "{\"state\":\"${GH_STATE}\",\"description\":\"${DESC}\",\"context\":\"sonarqube/quality-gate\",\"target_url\":\"https://sonar.harness.io/dashboard?id=${SONAR_PROJECT_KEY}\"}"
+                    envVariables:
+                      SONAR_TOKEN: <+secrets.getValue("sonarqube-token")>
+                      SONAR_HOST_URL: https://sonar.harness.io
+                      GITHUB_TOKEN: <+secrets.getValue("fme-github-netrc-token")>
+                      SONAR_PROJECT_KEY: <+pipeline.properties.ci.codebase.repoName>
+              # ⚠ UNPROVEN — no account pipeline does git tag / GitHub Release. Verify
+              #   the mechanism + least-privilege token on the platform before relying.
               - step:
                   identifier: git_tag
                   name: Create git tag
                   type: Run
                   # push-to-main only: create + push v<VERSION>. Token must not be echoed.
                   spec:
+                    connectorRef: dockerhub
                     image: alpine/git
                     shell: Sh
                     envVariables:
@@ -164,7 +243,7 @@ pipeline:
                   # push-to-main only: publish release v<VERSION> and upload the 5 .bin
                   # files produced by cross_build (same-stage workspace — VERIFY).
                   spec:
-                    connectorRef: <+input>   # Docker connector to pull the plugin image
+                    connectorRef: dockerhub
                     image: plugins/github-release
                     settings:
                       api_key: <+secrets.getValue("GITHUB_WRITE_TOKEN")>
