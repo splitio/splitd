@@ -1,0 +1,181 @@
+# =============================================================================
+# splitd_ci — Harness CI + Release pipeline (CANDIDATE — PENDING PLATFORM VALIDATION)
+# =============================================================================
+# Reproduces the full behavior of .github/workflows/ci.yml:
+#   - PR to main:   set VERSION, version validation, build, test, cross-build, sonar
+#   - push to main: set VERSION, build, test, cross-build, sonar, git tag, GitHub Release
+#
+# Org: PROD  |  Project: Harness_Split  |  Pipeline identifier: splitd_ci
+# Design reference: docs/superpowers/specs/2026-07-17-harness-ci-migration-design.md
+# Implementation plan: docs/superpowers/plans/2026-07-20-harness-ci-migration.md
+#
+# -----------------------------------------------------------------------------
+# ⚠  THIS YAML IS A CANDIDATE, NOT VERIFIED CONFIG.
+# It was authored from the design reference and is self-consistent with the repo
+# (version.go parsing and the 5 binaries_release filenames were checked), but it
+# has NOT been validated against the live Harness platform. Per the plan (Task 1),
+# verify and reconcile ALL of the following in the real Harness_Split project
+# BEFORE relying on it, then update this file to match the validated pipeline:
+#
+#   [ ] runtime.type — Cloud vs. Kubernetes/self-hosted available in Harness_Split
+#   [ ] platform os/arch values
+#   [ ] Run-step output variable capture (whether `export` is required) and the
+#       reference form <+steps.<id>.output.outputVariables.<name>>
+#   [ ] trigger gating expressions: <+trigger.event> == "PUSH" and
+#       <+codebase.build.type> == "PR" (exact values in this Harness version)
+#   [ ] same-stage workspace sharing so cross_build .bin files are readable by the
+#       github_release step WITHOUT an explicit artifact upload/download
+#   [ ] git-tag mechanism (Run + token vs. a native/SCM step) and least-privilege
+#       token scope for pushing tags
+#   [ ] GitHub Release plugin (plugins/github-release) availability + exact settings
+#       key names (api_key / files / title / tag) for this Harness version
+#   [ ] Sonar plugin (aosapps/drone-sonar-plugin) + from_secret settings syntax
+#   [ ] secret reference syntax: <+secrets.getValue("...")> vs from_secret
+#   [ ] connectorRef requirements for Plugin steps (Docker connector to pull images)
+#   [ ] secret log-safety (token must not be echoed; avoid `set -x`)
+#
+# Connectors/secrets referenced (create/verify in Harness_Split — Task 2/3):
+#   - GitHub codebase connector  → properties.ci.codebase.connectorRef (<+input>)
+#   - Docker connector           → Plugin step connectorRef (<+input>)
+#   - GITHUB_WRITE_TOKEN (secret) → git_tag + github_release (least-privilege scope)
+#   - SONARQUBE_HOST, SONARQUBE_TOKEN (secrets) → sonarqube step
+# =============================================================================
+pipeline:
+  name: splitd_ci
+  identifier: splitd_ci
+  projectIdentifier: Harness_Split
+  orgIdentifier: PROD
+  tags: {}
+  properties:
+    ci:
+      codebase:
+        connectorRef: <+input>   # GitHub codebase connector (clone + triggers).
+                                 # Write ops use GITHUB_WRITE_TOKEN, not this connector.
+        repoName: splitd
+        build: <+input>
+  stages:
+    - stage:
+        name: CI
+        identifier: CI
+        type: CI
+        spec:
+          cloneCodebase: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Cloud
+            spec: {}
+          execution:
+            steps:
+              - step:
+                  identifier: set_version
+                  name: Set VERSION
+                  type: Run
+                  spec:
+                    image: golang:1.26.1
+                    shell: Sh
+                    # MUST `export` — Harness only captures an exported outputVariable.
+                    command: |
+                      export VERSION="$(cat splitio/version.go | grep 'Version =' | awk '{print $4}' | tr -d '"')"
+                      echo "VERSION=$VERSION"
+                    outputVariables:
+                      - name: VERSION
+              - step:
+                  identifier: version_validation
+                  name: Version validation
+                  type: Run
+                  # PR-only: fail if the release tag already exists (forces a version bump).
+                  spec:
+                    image: golang:1.26.1
+                    shell: Sh
+                    # Harness shallow-clones by default; GHA used fetch-depth: 0.
+                    command: |
+                      VERSION="<+steps.set_version.output.outputVariables.VERSION>"
+                      git fetch --tags --quiet
+                      if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+                        echo "[ERROR] Tag v${VERSION} already exists."
+                        exit 1
+                      fi
+                  when:
+                    stageStatus: Success
+                    condition: <+codebase.build.type> == "PR"
+              - step:
+                  identifier: build
+                  name: Build binaries
+                  type: Run
+                  spec:
+                    image: golang:1.26.1
+                    shell: Sh
+                    command: make splitd splitcli
+              - step:
+                  identifier: test
+                  name: Run tests
+                  type: Run
+                  spec:
+                    image: golang:1.26.1
+                    shell: Sh
+                    command: make test
+              - step:
+                  identifier: cross_build
+                  name: Cross build release binaries
+                  type: Run
+                  # Produces the 5 .bin artifacts uploaded by github_release. Same stage
+                  # → same workspace (VERIFY), so binaries are on disk downstream.
+                  spec:
+                    image: golang:1.26.1
+                    shell: Sh
+                    command: make binaries_release
+              - step:
+                  identifier: sonarqube
+                  name: SonarQube Scan
+                  type: Plugin
+                  # Drone Sonar plugin (no native Sonar step in Harness CI). Repo-level
+                  # config comes from sonar-project.properties in the repo root.
+                  spec:
+                    connectorRef: <+input>   # Docker connector to pull the plugin image
+                    image: aosapps/drone-sonar-plugin
+                    settings:
+                      sonar_host:
+                        from_secret: SONARQUBE_HOST
+                      sonar_token:
+                        from_secret: SONARQUBE_TOKEN
+              - step:
+                  identifier: git_tag
+                  name: Create git tag
+                  type: Run
+                  # push-to-main only: create + push v<VERSION>. Token must not be echoed.
+                  spec:
+                    image: alpine/git
+                    shell: Sh
+                    envVariables:
+                      GITHUB_TOKEN: <+secrets.getValue("GITHUB_WRITE_TOKEN")>
+                    command: |
+                      VERSION="<+steps.set_version.output.outputVariables.VERSION>"
+                      git tag "v${VERSION}"
+                      git push "https://x-access-token:${GITHUB_TOKEN}@github.com/splitio/splitd.git" "v${VERSION}"
+                  when:
+                    stageStatus: Success
+                    condition: <+trigger.event> == "PUSH"
+              - step:
+                  identifier: github_release
+                  name: Create GitHub Release
+                  type: Plugin
+                  # push-to-main only: publish release v<VERSION> and upload the 5 .bin
+                  # files produced by cross_build (same-stage workspace — VERIFY).
+                  spec:
+                    connectorRef: <+input>   # Docker connector to pull the plugin image
+                    image: plugins/github-release
+                    settings:
+                      api_key: <+secrets.getValue("GITHUB_WRITE_TOKEN")>
+                      title: splitd-<+steps.set_version.output.outputVariables.VERSION>
+                      tag: v<+steps.set_version.output.outputVariables.VERSION>
+                      files: |
+                        splitd-darwin-amd64-<+steps.set_version.output.outputVariables.VERSION>.bin
+                        splitd-darwin-arm-<+steps.set_version.output.outputVariables.VERSION>.bin
+                        splitd-linux-amd64-<+steps.set_version.output.outputVariables.VERSION>.bin
+                        splitd-linux-amd64-fips-<+steps.set_version.output.outputVariables.VERSION>.bin
+                        splitd-linux-arm-<+steps.set_version.output.outputVariables.VERSION>.bin
+                  when:
+                    stageStatus: Success
+                    condition: <+trigger.event> == "PUSH"
