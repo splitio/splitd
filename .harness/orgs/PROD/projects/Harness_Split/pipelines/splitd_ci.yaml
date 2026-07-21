@@ -19,6 +19,8 @@
 #   ✅ Codebase/trigger expressions (<+codebase.build.type>, <+codebase.prNumber>,
 #      <+codebase.sourceBranch>, <+codebase.targetBranch>, <+codebase.commitSha>)
 #   ✅ Image pulls use the real Docker connector `dockerhub`
+#   ✅ Codebase uses GitHub connector `fmegithubrunnersci` + depth 0 (same as
+#      deploy_qos_v3) — required, else Harness clones from Harness Code and fails
 #   ✅ SONAR reconciled to the PROJECT STANDARD: sonar-scanner CLI Run step +
 #      Post Quality Gate polling (secret `sonarqube-token`, host sonar.harness.io)
 #      — NOT the drone sonar plugin (no project uses it).
@@ -48,9 +50,13 @@ pipeline:
   properties:
     ci:
       codebase:
+        # GitHub connector (same as deploy_qos_v3). Without this, Harness defaults
+        # to Harness Code (git0.harness.io) and cloneCodebase fails.
+        connectorRef: fmegithubrunnersci
         repoName: splitd
         build: <+input>
         sparseCheckout: []
+        depth: 0   # full clone → version_validation can see all existing tags
   stages:
     - stage:
         name: CI
