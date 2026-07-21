@@ -125,7 +125,15 @@ pipeline:
                     connectorRef: dockerhub
                     image: golang:1.26.1
                     shell: Sh
-                    command: make test
+                    # `make test` runs unit-tests + entrypoint-test; the latter
+                    # (infra/entrypoint.sh + test_entrypoint.sh) needs jq and yq,
+                    # which the golang image lacks (GHA ubuntu-latest had them
+                    # preinstalled). Install both before running.
+                    command: |
+                      apt-get update -qq && apt-get install -y -qq --no-install-recommends jq
+                      curl -sSLo /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+                      chmod +x /usr/local/bin/yq
+                      make test
               - step:
                   identifier: cross_build
                   name: Cross build release binaries
