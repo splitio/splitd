@@ -1,0 +1,15 @@
+inputSet:
+  name: splitd_ci_main_release
+  tags: {}
+  identifier: splitd_ci_main_release
+  orgIdentifier: PROD
+  projectIdentifier: Harness_Split
+  pipeline:
+    identifier: splitd_ci
+    properties:
+      ci:
+        codebase:
+          build:
+            type: branch
+            spec:
+              branch: <+trigger.branch>
