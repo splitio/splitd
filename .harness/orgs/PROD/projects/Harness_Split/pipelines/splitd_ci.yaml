@@ -37,9 +37,10 @@
 #      `make` MAY work — but VERIFY `make test`/`make binaries_release` resolve deps
 #      in Harness Cloud; if not, add the same GOPROXY/GOPRIVATE env as the reference.
 #
-#   Secret names to confirm exist in Harness_Split (real names from reference):
-#      sonarqube-token, fme-github-netrc-token
-#      + a token for tag/release (GITHUB_WRITE_TOKEN — create with least privilege)
+#   Secret names (verified to exist in Harness_Split):
+#      sonarqube-token (sonar), fme-github-netrc-token (github status + tag/release).
+#      fme-github-netrc-token is proven to auth against splitio/splitd (used by
+#      post_quality_gate); VERIFY it has contents+releases write on the controlled test.
 # =============================================================================
 pipeline:
   name: splitd_ci
@@ -237,14 +238,19 @@ pipeline:
                   name: Create git tag
                   type: Run
                   # push-to-main only: create + push v<VERSION>. Token must not be echoed.
+                  # Uses fme-github-netrc-token — proven to auth against splitio/splitd
+                  # (post_quality_gate posts commit statuses with it). VERIFY it has
+                  # contents write (tag push) on the controlled release test.
                   spec:
                     connectorRef: dockerhub
                     image: alpine/git
                     shell: Sh
                     envVariables:
-                      GITHUB_TOKEN: <+secrets.getValue("GITHUB_WRITE_TOKEN")>
+                      GITHUB_TOKEN: <+secrets.getValue("fme-github-netrc-token")>
                     command: |
                       VERSION="<+steps.set_version.output.outputVariables.VERSION>"
+                      git config user.email "fme-ci@split.io"
+                      git config user.name "splitd CI"
                       git tag "v${VERSION}"
                       git push "https://x-access-token:${GITHUB_TOKEN}@github.com/splitio/splitd.git" "v${VERSION}"
                   when:
@@ -260,7 +266,7 @@ pipeline:
                     connectorRef: dockerhub
                     image: plugins/github-release
                     settings:
-                      api_key: <+secrets.getValue("GITHUB_WRITE_TOKEN")>
+                      api_key: <+secrets.getValue("fme-github-netrc-token")>
                       title: splitd-<+steps.set_version.output.outputVariables.VERSION>
                       tag: v<+steps.set_version.output.outputVariables.VERSION>
                       files: |
