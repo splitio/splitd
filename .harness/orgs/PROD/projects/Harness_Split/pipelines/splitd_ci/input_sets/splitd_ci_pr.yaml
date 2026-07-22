@@ -1,0 +1,15 @@
+inputSet:
+  name: splitd_ci_pr
+  tags: {}
+  identifier: splitd_ci_pr
+  orgIdentifier: PROD
+  projectIdentifier: Harness_Split
+  pipeline:
+    identifier: splitd_ci
+    properties:
+      ci:
+        codebase:
+          build:
+            type: PR
+            spec:
+              number: <+trigger.prNumber>
