@@ -30,3 +30,6 @@ splitd.linux.*
 
 # DS Store
 .DS_Store
+
+# Internal migration docs — must never be committed to this public repo
+docs/superpowers/

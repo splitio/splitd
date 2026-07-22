@@ -1,0 +1,236 @@
+pipeline:
+  name: splitd_ci
+  identifier: splitd_ci
+  projectIdentifier: Harness_Split
+  orgIdentifier: PROD
+  tags: {}
+  properties:
+    ci:
+      codebase:
+        # GitHub connector (same as deploy_qos_v3). Without this, Harness defaults
+        # to Harness Code (git0.harness.io) and cloneCodebase fails.
+        connectorRef: fmegithubrunnersci
+        repoName: splitd
+        build: <+input>
+        sparseCheckout: []
+        depth: 0   # full clone → version_validation can see all existing tags
+  stages:
+    - stage:
+        name: CI
+        identifier: CI
+        type: CI
+        spec:
+          cloneCodebase: true
+          caching:
+            enabled: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Cloud
+            spec:
+              size: flex
+          execution:
+            steps:
+              - step:
+                  identifier: set_version
+                  name: Set VERSION
+                  type: Run
+                  spec:
+                    connectorRef: dockerhub
+                    image: golang:1.26.1
+                    shell: Sh
+                    # MUST `export` — Harness only captures an exported outputVariable.
+                    command: |
+                      export VERSION="$(cat splitio/version.go | grep 'Version =' | awk '{print $4}' | tr -d '"')"
+                      echo "VERSION=$VERSION"
+                    outputVariables:
+                      - name: VERSION
+              - step:
+                  identifier: version_validation
+                  name: Version validation
+                  type: Run
+                  # PR-only: fail if the release tag already exists (forces a version bump).
+                  spec:
+                    connectorRef: dockerhub
+                    image: golang:1.26.1
+                    shell: Sh
+                    command: |
+                      VERSION="<+steps.set_version.output.outputVariables.VERSION>"
+                      git fetch --tags --quiet
+                      if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+                        echo "[ERROR] Tag v${VERSION} already exists."
+                        exit 1
+                      fi
+                  when:
+                    stageStatus: Success
+                    condition: <+codebase.build.type> == "PR"
+              - step:
+                  identifier: build
+                  name: Build binaries
+                  type: Run
+                  spec:
+                    connectorRef: dockerhub
+                    image: golang:1.26.1
+                    shell: Sh
+                    command: make splitd splitcli
+              - step:
+                  identifier: test
+                  name: Run tests
+                  type: Run
+                  spec:
+                    connectorRef: dockerhub
+                    image: golang:1.26.1
+                    shell: Sh
+                    # `make test` runs unit-tests + entrypoint-test; the latter
+                    # (infra/entrypoint.sh + test_entrypoint.sh) needs jq and yq,
+                    # which the golang image lacks (GHA ubuntu-latest had them
+                    # preinstalled). Install both before running.
+                    command: |
+                      apt-get update -qq && apt-get install -y -qq --no-install-recommends jq
+                      curl -sSLo /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+                      chmod +x /usr/local/bin/yq
+                      make test
+              - step:
+                  identifier: cross_build
+                  name: Cross build release binaries
+                  type: Run
+                  # Produces the 5 .bin artifacts uploaded by github_release. Same stage
+                  # → same workspace (VERIFY), so binaries are on disk downstream.
+                  spec:
+                    connectorRef: dockerhub
+                    image: golang:1.26.1
+                    shell: Sh
+                    command: make binaries_release
+              - step:
+                  identifier: sonarqube_analysis
+                  name: SonarQube Analysis
+                  type: Run
+                  # PROJECT STANDARD (from fme_core_ci_gosonarqube_v2): download the
+                  # sonar-scanner CLI and run it. Repo config from sonar-project.properties.
+                  spec:
+                    shell: Sh
+                    command: |
+                      export SONAR_SCANNER_VERSION=6.2.1.4610
+                      curl -sSLo sonar-scanner.zip "https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-${SONAR_SCANNER_VERSION}-linux-x64.zip"
+                      unzip -q sonar-scanner.zip
+                      export PATH="$(pwd)/sonar-scanner-${SONAR_SCANNER_VERSION}-linux-x64/bin:$PATH"
+
+                      SONAR_EXTRA_ARGS=""
+                      if [ "<+codebase.build.type>" = "PR" ]; then
+                        SONAR_EXTRA_ARGS="-Dsonar.pullrequest.key=<+codebase.prNumber> \
+                          -Dsonar.pullrequest.branch=<+codebase.sourceBranch> \
+                          -Dsonar.pullrequest.base=<+codebase.targetBranch>"
+                      elif [ "<+codebase.branch>" != "main" ]; then
+                        SONAR_EXTRA_ARGS="-Dsonar.branch.name=<+codebase.branch>"
+                      fi
+
+                      sonar-scanner \
+                        -Dsonar.host.url="https://sonar.harness.io/" \
+                        -Dsonar.token="${SONAR_TOKEN}" \
+                        -Dsonar.projectVersion="<+steps.set_version.output.outputVariables.VERSION>" \
+                        $SONAR_EXTRA_ARGS
+                    envVariables:
+                      SONAR_TOKEN: <+secrets.getValue("sonarqube-token")>
+                      SONAR_HOST_URL: https://sonar.harness.io
+              - step:
+                  identifier: post_quality_gate
+                  name: Post Quality Gate
+                  type: Run
+                  # PROJECT STANDARD: poll the sonar CE task, then post a GitHub commit
+                  # status. Reads .scannerwork/report-task.txt from the sonar step
+                  # (same-stage workspace).
+                  spec:
+                    shell: Sh
+                    command: |
+                      REPORT_FILE=".scannerwork/report-task.txt"
+                      if [ ! -f "$REPORT_FILE" ]; then
+                        echo "ERROR: $REPORT_FILE not found. Ensure this runs in the same workspace as sonar-scanner."
+                        exit 1
+                      fi
+                      cat "$REPORT_FILE"
+                      CE_TASK_URL=$(grep "ceTaskUrl" "$REPORT_FILE" | cut -d'=' -f2-)
+
+                      MAX_RETRIES=30; RETRY_INTERVAL=10; TASK_STATUS="PENDING"
+                      for i in $(seq 1 $MAX_RETRIES); do
+                        echo "Attempt $i/$MAX_RETRIES - checking analysis task..."
+                        TASK_RESPONSE=$(curl -s -u "${SONAR_TOKEN}:" "$CE_TASK_URL")
+                        TASK_STATUS=$(echo "$TASK_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['task']['status'])" 2>/dev/null || echo "UNKNOWN")
+                        echo "Task status: $TASK_STATUS"
+                        [ "$TASK_STATUS" = "SUCCESS" ] || [ "$TASK_STATUS" = "FAILED" ] || [ "$TASK_STATUS" = "CANCELLED" ] && break
+                        sleep $RETRY_INTERVAL
+                      done
+                      if [ "$TASK_STATUS" != "SUCCESS" ]; then
+                        echo "Analysis task did not complete successfully: $TASK_STATUS"; exit 1
+                      fi
+
+                      ANALYSIS_ID=$(echo "$TASK_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['task']['analysisId'])")
+                      QG_RESPONSE=$(curl -s -u "${SONAR_TOKEN}:" "https://sonar.harness.io/api/qualitygates/project_status?analysisId=${ANALYSIS_ID}")
+                      echo "Quality Gate response: $QG_RESPONSE"
+                      QG_STATUS=$(echo "$QG_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['projectStatus']['status'])")
+                      echo "Quality Gate Status: $QG_STATUS"
+
+                      case "$QG_STATUS" in
+                        OK)    GH_STATE="success"; DESC="Quality gate passed" ;;
+                        ERROR) GH_STATE="failure"; DESC="Quality gate failed" ;;
+                        WARN)  GH_STATE="success"; DESC="Quality gate passed with warnings" ;;
+                        *)     GH_STATE="failure"; DESC="Quality gate status: $QG_STATUS" ;;
+                      esac
+
+                      curl -s -X POST \
+                        -H "Authorization: token ${GITHUB_TOKEN}" \
+                        -H "Accept: application/vnd.github.v3+json" \
+                        "https://api.github.com/repos/splitio/<+pipeline.properties.ci.codebase.repoName>/statuses/<+codebase.commitSha>" \
+                        -d "{\"state\":\"${GH_STATE}\",\"description\":\"${DESC}\",\"context\":\"sonarqube/quality-gate\",\"target_url\":\"https://sonar.harness.io/dashboard?id=${SONAR_PROJECT_KEY}\"}"
+                    envVariables:
+                      SONAR_TOKEN: <+secrets.getValue("sonarqube-token")>
+                      SONAR_HOST_URL: https://sonar.harness.io
+                      GITHUB_TOKEN: <+secrets.getValue("fme-github-netrc-token")>
+                      SONAR_PROJECT_KEY: <+pipeline.properties.ci.codebase.repoName>
+              # ⚠ UNPROVEN — no account pipeline does git tag / GitHub Release. Verify
+              #   the mechanism + least-privilege token on the platform before relying.
+              - step:
+                  identifier: git_tag
+                  name: Create git tag
+                  type: Run
+                  # push-to-main only: create + push v<VERSION>. Token must not be echoed.
+                  # Uses fme-github-netrc-token — proven to auth against splitio/splitd
+                  # (post_quality_gate posts commit statuses with it). VERIFY it has
+                  # contents write (tag push) on the controlled release test.
+                  spec:
+                    connectorRef: dockerhub
+                    image: alpine/git
+                    shell: Sh
+                    envVariables:
+                      GITHUB_TOKEN: <+secrets.getValue("fme-github-netrc-token")>
+                    command: |
+                      VERSION="<+steps.set_version.output.outputVariables.VERSION>"
+                      git config user.email "fme-ci@split.io"
+                      git config user.name "splitd CI"
+                      git tag "v${VERSION}"
+                      git push "https://x-access-token:${GITHUB_TOKEN}@github.com/splitio/splitd.git" "v${VERSION}"
+                  when:
+                    stageStatus: Success
+                    condition: <+trigger.event> == "PUSH"
+              - step:
+                  identifier: github_release
+                  name: Create GitHub Release
+                  type: Plugin
+                  # push-to-main only: publish release v<VERSION> and upload the 5 .bin
+                  # files produced by cross_build (same-stage workspace — VERIFY).
+                  spec:
+                    connectorRef: dockerhub
+                    image: plugins/github-release
+                    settings:
+                      api_key: <+secrets.getValue("fme-github-netrc-token")>
+                      title: splitd-<+steps.set_version.output.outputVariables.VERSION>
+                      tag: v<+steps.set_version.output.outputVariables.VERSION>
+                      files: |
+                        splitd-darwin-amd64-<+steps.set_version.output.outputVariables.VERSION>.bin
+                        splitd-darwin-arm-<+steps.set_version.output.outputVariables.VERSION>.bin
+                        splitd-linux-amd64-<+steps.set_version.output.outputVariables.VERSION>.bin
+                        splitd-linux-amd64-fips-<+steps.set_version.output.outputVariables.VERSION>.bin
+                        splitd-linux-arm-<+steps.set_version.output.outputVariables.VERSION>.bin
+                  when:
+                    stageStatus: Success
+                    condition: <+trigger.event> == "PUSH"
