@@ -215,22 +215,52 @@ pipeline:
               - step:
                   identifier: github_release
                   name: Create GitHub Release
-                  type: Plugin
-                  # push-to-main only: publish release v<VERSION> and upload the 5 .bin
-                  # files produced by cross_build (same-stage workspace — VERIFY).
+                  type: Run
+                  # push-to-main only: create the Release via the GitHub REST API and
+                  # upload the 5 .bin assets from the same-stage workspace.
+                  # NOTE: the plugins/github-release Drone plugin only runs on TAG-event
+                  # builds ("github release plugin is only available for tags"). This is a
+                  # push-to-branch build, so we call the API directly (same curl pattern
+                  # as post_quality_gate). The tag itself is created by the git_tag step.
                   spec:
                     connectorRef: dockerhub
-                    image: plugins/github-release
-                    settings:
-                      api_key: <+secrets.getValue("fme-github-netrc-token")>
-                      title: splitd-<+steps.set_version.output.outputVariables.VERSION>
-                      tag: v<+steps.set_version.output.outputVariables.VERSION>
-                      files: |
-                        splitd-darwin-amd64-<+steps.set_version.output.outputVariables.VERSION>.bin
-                        splitd-darwin-arm-<+steps.set_version.output.outputVariables.VERSION>.bin
-                        splitd-linux-amd64-<+steps.set_version.output.outputVariables.VERSION>.bin
-                        splitd-linux-amd64-fips-<+steps.set_version.output.outputVariables.VERSION>.bin
-                        splitd-linux-arm-<+steps.set_version.output.outputVariables.VERSION>.bin
+                    image: golang:1.26.1
+                    shell: Sh
+                    envVariables:
+                      GITHUB_TOKEN: <+secrets.getValue("fme-github-netrc-token")>
+                    command: |
+                      set -e
+                      VERSION="<+steps.set_version.output.outputVariables.VERSION>"
+                      TAG="v${VERSION}"
+                      REPO="splitio/splitd"
+
+                      # Create the release for the tag git_tag already pushed.
+                      RESP=$(curl -s -X POST \
+                        -H "Authorization: token ${GITHUB_TOKEN}" \
+                        -H "Accept: application/vnd.github+json" \
+                        "https://api.github.com/repos/${REPO}/releases" \
+                        -d "{\"tag_name\":\"${TAG}\",\"name\":\"splitd-${VERSION}\"}")
+                      RELEASE_ID=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))")
+                      if [ -z "$RELEASE_ID" ]; then
+                        echo "Failed to create release:"; echo "$RESP"; exit 1
+                      fi
+                      echo "Created release id=${RELEASE_ID} for ${TAG}"
+
+                      # Upload the 5 .bin assets produced by cross_build (same workspace).
+                      for f in \
+                        "splitd-darwin-amd64-${VERSION}.bin" \
+                        "splitd-darwin-arm-${VERSION}.bin" \
+                        "splitd-linux-amd64-${VERSION}.bin" \
+                        "splitd-linux-amd64-fips-${VERSION}.bin" \
+                        "splitd-linux-arm-${VERSION}.bin"; do
+                        echo "Uploading ${f}..."
+                        curl -s -X POST \
+                          -H "Authorization: token ${GITHUB_TOKEN}" \
+                          -H "Content-Type: application/octet-stream" \
+                          --data-binary @"${f}" \
+                          "https://uploads.github.com/repos/${REPO}/releases/${RELEASE_ID}/assets?name=${f}" \
+                          -o /dev/null -w "  ${f}: HTTP %{http_code}\n"
+                      done
                   when:
                     stageStatus: Success
                     condition: <+trigger.event> == "PUSH"
