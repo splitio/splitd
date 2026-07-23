@@ -224,7 +224,7 @@ pipeline:
                   # as post_quality_gate). The tag itself is created by the git_tag step.
                   spec:
                     connectorRef: dockerhub
-                    image: golang:1.26.1
+                    image: alpine/curl
                     shell: Sh
                     envVariables:
                       GITHUB_TOKEN: <+secrets.getValue("fme-github-netrc-token")>
@@ -233,18 +233,31 @@ pipeline:
                       VERSION="<+steps.set_version.output.outputVariables.VERSION>"
                       TAG="v${VERSION}"
                       REPO="splitio/splitd"
+                      API="https://api.github.com/repos/${REPO}/releases"
+
+                      # helper: extract the numeric release id from a JSON body (no python/jq).
+                      extract_id() { grep -o '"id"[ ]*:[ ]*[0-9]*' | head -1 | grep -o '[0-9]*'; }
 
                       # Create the release for the tag git_tag already pushed.
                       RESP=$(curl -s -X POST \
                         -H "Authorization: token ${GITHUB_TOKEN}" \
                         -H "Accept: application/vnd.github+json" \
-                        "https://api.github.com/repos/${REPO}/releases" \
+                        "${API}" \
                         -d "{\"tag_name\":\"${TAG}\",\"name\":\"splitd-${VERSION}\"}")
-                      RELEASE_ID=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))")
+                      RELEASE_ID=$(printf '%s' "$RESP" | extract_id)
+
+                      # If it already exists (re-run on same tag), fetch its id instead of failing.
                       if [ -z "$RELEASE_ID" ]; then
-                        echo "Failed to create release:"; echo "$RESP"; exit 1
+                        echo "Create returned no id (may already exist); looking it up..."
+                        RELEASE_ID=$(curl -s \
+                          -H "Authorization: token ${GITHUB_TOKEN}" \
+                          -H "Accept: application/vnd.github+json" \
+                          "${API}/tags/${TAG}" | extract_id)
                       fi
-                      echo "Created release id=${RELEASE_ID} for ${TAG}"
+                      if [ -z "$RELEASE_ID" ]; then
+                        echo "Failed to create or find release for ${TAG}:"; echo "$RESP"; exit 1
+                      fi
+                      echo "Release id=${RELEASE_ID} for ${TAG}"
 
                       # Upload the 5 .bin assets produced by cross_build (same workspace).
                       for f in \
@@ -253,6 +266,7 @@ pipeline:
                         "splitd-linux-amd64-${VERSION}.bin" \
                         "splitd-linux-amd64-fips-${VERSION}.bin" \
                         "splitd-linux-arm-${VERSION}.bin"; do
+                        if [ ! -f "$f" ]; then echo "MISSING artifact: $f"; exit 1; fi
                         echo "Uploading ${f}..."
                         curl -s -X POST \
                           -H "Authorization: token ${GITHUB_TOKEN}" \
