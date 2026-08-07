@@ -1,3 +1,3 @@
 package splitio
 
-const Version = "1.7.1-rc2"
+const Version = "1.7.1-rc3"
