@@ -132,14 +132,14 @@ func executeCall(c types.ClientInterface, a *conf.CliArgs) (string, error) {
 		asJson, err := json.Marshal(splits)
 		return string(asJson), err
 	default:
-		return "", fmt.Errorf("unknwon method '%s'", a.Method)
+		return "", fmt.Errorf("unknown method '%s'", a.Method)
 	}
 }
 
 func formatWithConfig(treatment string, config *string) string {
-	var emtpyCfg string = ""
+	var emptyCfg string = ""
 	if config == nil {
-		config = &emtpyCfg
+		config = &emptyCfg
 	}
 	return fmt.Sprintf("[%s -- %s]", treatment, *config)
 }
