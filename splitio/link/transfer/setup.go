@@ -127,7 +127,7 @@ func ensureAddressUsable(logger logging.LoggerInterface, address net.Addr) error
 			return fmt.Errorf("error removing dead-socket file from a previous execution: %w", err)
 		}
 
-		logger.Warning("Dead socket file removed successfuly")
+		logger.Warning("Dead socket file removed successfully")
 
 	}
 	return nil

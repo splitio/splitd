@@ -132,7 +132,7 @@ func (c *Config) Normalize() []string {
 		c.Impressions.SyncPeriod = minimumImpressionsRefreshRate
 	}
 
-	// Sanitize flagsets and append erros into warnings for logging purposes
+	// Sanitize flagsets and append errors into warnings for logging purposes
 	sanitizedFlagSets, warns := flagsets.SanitizeMany(c.FlagSetsFilter)
 	if len(warns) != 0 {
 		for _, err := range warns {
