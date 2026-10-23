@@ -112,8 +112,8 @@ func ParseCliArgs() (*CliArgs, error) {
 	if *pr == "" {
 		*pr = "null"
 	}
-	impressionPorperties := make(map[string]interface{})
-	if err = json.Unmarshal([]byte(*pr), &impressionPorperties); err != nil {
+	impressionProperties := make(map[string]interface{})
+	if err = json.Unmarshal([]byte(*pr), &impressionProperties); err != nil {
 		return nil, fmt.Errorf("error parsing impression properties: %w", err)
 	}
 
@@ -134,6 +134,6 @@ func ParseCliArgs() (*CliArgs, error) {
 		EventType:            *et,
 		EventVal:             eventVal,
 		Attributes:           attrs,
-		ImpressionProperties: impressionPorperties,
+		ImpressionProperties: impressionProperties,
 	}, nil
 }

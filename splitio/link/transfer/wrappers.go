@@ -118,7 +118,7 @@ func (c *StreamBasedConnection) SendMessage(data []byte) error {
 	return nil
 }
 
-// io.EOF shuold NOT be wrapped since the go standard library queries by exact comparison and does
+// io.EOF should NOT be wrapped since the go standard library queries by exact comparison and does
 // not check the error chain (errors.Is), hence the need for a conditional wrapper
 func formatErrorIfApplicable(message string, err error) error {
 
