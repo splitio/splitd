@@ -40,7 +40,7 @@ pipeline:
                   type: Run
                   spec:
                     connectorRef: dockerhub
-                    image: golang:1.26.1
+                    image: golang:1.26.10
                     shell: Sh
                     # MUST `export` — Harness only captures an exported outputVariable.
                     command: |
@@ -55,7 +55,7 @@ pipeline:
                   # PR-only: fail if the release tag already exists (forces a version bump).
                   spec:
                     connectorRef: dockerhub
-                    image: golang:1.26.1
+                    image: golang:1.26.10
                     shell: Sh
                     command: |
                       VERSION="<+steps.set_version.output.outputVariables.VERSION>"
@@ -73,7 +73,7 @@ pipeline:
                   type: Run
                   spec:
                     connectorRef: dockerhub
-                    image: golang:1.26.1
+                    image: golang:1.26.10
                     shell: Sh
                     command: make splitd splitcli
               - step:
@@ -82,7 +82,7 @@ pipeline:
                   type: Run
                   spec:
                     connectorRef: dockerhub
-                    image: golang:1.26.1
+                    image: golang:1.26.10
                     shell: Sh
                     # `make test` runs unit-tests + entrypoint-test; the latter
                     # (infra/entrypoint.sh + test_entrypoint.sh) needs jq and yq,
@@ -116,7 +116,7 @@ pipeline:
                   # → same workspace (VERIFY), so binaries are on disk downstream.
                   spec:
                     connectorRef: dockerhub
-                    image: golang:1.26.1
+                    image: golang:1.26.10
                     shell: Sh
                     command: make binaries_release
               - step:
