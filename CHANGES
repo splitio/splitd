@@ -1,3 +1,10 @@
+1.7.1 (October 24, 2026)
+- Fixed vulnerabilities (audited with govulncheck; 25 reachable vulnerabilities in the Go standard library and golang.org/x/net, 0 remaining):
+  - Updated Go toolchain from 1.26.1 to 1.26.10 (go.mod and sidecar Dockerfile), fixing GO-2026-6809, 6613, 6608, 6607, 6605, 6218, 6090, 6089, 5972, 5856, 5039, 5037, 4971, 4947, 4946, 4870, 4866 and 4865 in crypto/x509, crypto/tls, net/http, net/textproto, net/url and encoding/asn1.
+  - Updated golang.org/x/net from 0.52.0 to 0.61.0, fixing GO-2026-6617, 6612, 6611, 6610, 6603, 5026 and 4918 (also reachable through net/http).
+  - Updated golang.org/x/crypto (0.49.0 to 0.58.0), golang.org/x/sync (0.20.0 to 0.24.0), golang.org/x/sys, golang.org/x/text, golang.org/x/arch and golang.org/x/exp to their latest versions.
+  - Known and not fixable: GO-2026-5932 (golang.org/x/crypto/openpgp is unmaintained, no fix available). splitd does not import or call it.
+
 1.7.0 (March 18, 2026)
 - Added a new optional argument to the client `getTreatment` methods to allow passing additional evaluation options, such as a map of properties to append to the generated impressions sent to Split backend. Read more in our docs.
 - Added new configuration for Fallback Treatments, which allows setting a treatment value and optional config to be returned in place of "control", either globally or by flag. Read more in our docs.
