@@ -1,5 +1,5 @@
 1.7.2 (October 27, 2026)
-- Sidecar docker images are now published for both linux/amd64 and linux/arm64 (1.7.1 was only published for linux/arm64). `make images_release` builds and pushes the multi-arch images with docker buildx.
+- Sidecar docker images are now published for both linux/amd64 and linux/arm64. `make images_release` builds and pushes the multi-arch images with docker buildx.
 - Fixed vulnerabilities in the sidecar docker image (audited with trivy):
   - Updated base images from Debian 12 (bookworm) to Debian 13 (trixie), removing the critical vulnerability and reducing high ones from 60 to 43 (none of the remaining ones has a fix available in Debian yet). Packages are upgraded at build time.
   - yq is now built from source (v4.54.1) with the patched Go toolchain and golang.org/x/net 0.61.0, for the image's target architecture. This fixes the 63 vulnerabilities reported on the previous yq binary, and the amd64 yq binary shipped in arm64 images.
