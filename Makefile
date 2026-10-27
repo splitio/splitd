@@ -1,13 +1,12 @@
-.PHONY: clean build test sidecar_image unit-tests entrypoint-test splitio/commitsha.go
+.PHONY: clean build test sidecar_image images_release unit-tests entrypoint-test splitio/commitsha.go
 
 # Setup defaults
 GO ?=go
 DOCKER ?= docker
 SHELL = /usr/bin/env bash -o pipefail
 
-# setup platform specific docker image builds
-PLATFORM ?=
-PLATFORM_STR := $(if $(PLATFORM),--platform=$(PLATFORM),)
+# platforms included in the published multi-arch docker images
+PLATFORM_STR ?= linux/amd64,linux/arm64
 
 VERSION	:= $(shell cat splitio/version.go | grep 'const Version' | sed 's/const Version = //' | tr -d '"')
 COMMIT_SHA := $(shell bash -c '[[ ! -z $${GITHUB_SHA} ]] && echo $${GITHUB_SHA:0:7} || git rev-parse --short=7 HEAD')
@@ -78,20 +77,16 @@ $(CONFIG_TEMPLATE): $(SOURCES) sdhelper
 sdhelper: $(GO_FILES)
 	go build -o sdhelper cmd/sdhelper/main.go
 
-## build docker images for sidecar
+## build & push multi-arch (amd64 + arm64) docker images for sidecar (requires buildx + qemu)
 images_release: # entrypoints
-	$(DOCKER) build $(PLATFORM_STR) \
+	$(DOCKER) buildx build --platform=$(PLATFORM_STR) --push \
 		-t splitsoftware/splitd-sidecar:latest -t splitsoftware/splitd-sidecar:$(VERSION) \
 		--build-arg COMMIT_SHA=$(COMMIT_SHA) \
 		-f infra/sidecar.Dockerfile .
-	$(DOCKER) build $(PLATFORM_STR) -t splitsoftware/splitd-sidecar-fips:latest -t splitsoftware/splitd-sidecar-fips:$(VERSION) \
+	$(DOCKER) buildx build --platform=$(PLATFORM_STR) --push \
+		-t splitsoftware/splitd-sidecar-fips:latest -t splitsoftware/splitd-sidecar-fips:$(VERSION) \
 		--build-arg FIPS_MODE=enabled --build-arg COMMIT_SHA=$(COMMIT_SHA) \
 		-f infra/sidecar.Dockerfile .
-	@echo "Image created. Make sure everything works ok, and then run the following commands to push them."
-	@echo "$(DOCKER) push splitsoftware/splitd-sidecar:latest"
-	@echo "$(DOCKER) push splitsoftware/splitd-sidecar:$(VERSION)"
-	@echo "$(DOCKER) push splitsoftware/splitd-sidecar-fips:latest"
-	@echo "$(DOCKER) push splitsoftware/splitd-sidecar-fips:$(VERSION)"
 
 ## build release for binaires
 binaries_release: splitd-linux-amd64-$(VERSION).bin \
