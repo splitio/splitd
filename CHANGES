@@ -1,9 +1,15 @@
 1.7.2 (October 27, 2026)
-- Sidecar docker images are now published for both linux/amd64 and linux/arm64. `make images_release` builds and pushes the multi-arch images with docker buildx.
-- Fixed vulnerabilities in the sidecar docker image (audited with trivy):
-  - Updated base images from Debian 12 (bookworm) to Debian 13 (trixie), removing the critical vulnerability and reducing high ones from 60 to 43 (none of the remaining ones has a fix available in Debian yet). Packages are upgraded at build time.
-  - yq is now built from source (v4.54.1) with the patched Go toolchain and golang.org/x/net 0.61.0, for the image's target architecture. This fixes the 63 vulnerabilities reported on the previous yq binary, and the amd64 yq binary shipped in arm64 images.
+- Sidecar docker images (standard and FIPS) are now published for both linux/amd64 and linux/arm64. Until now the published images (including 1.7.1) were linux/amd64 only.
+  - `make images_release` builds and pushes the multi-arch images with docker buildx.
+  - The Harness CD pipelines build the images for both architectures (QEMU + buildx, `PLUGIN_PLATFORM=linux/amd64,linux/arm64`).
+  - The Harness CI pipeline now builds and runs the tests natively on amd64 and arm64.
+- Fixed vulnerabilities in the sidecar docker images (audited with trivy, comparing the published 1.7.1 images against 1.7.2; unfixed findings are not counted as fixable):
+  - Total findings went from 337 to 167: critical 1 to 0, high 92 to 43, medium 126 to 58, low 106 to 60. 107 CVEs were fixed (including 36 critical/high). The same result is obtained for the standard and FIPS images, on both amd64 and arm64.
+  - Updated base images from Debian 12 (bookworm) to Debian 13 (trixie), removing the critical vulnerability (CVE-2023-45853 in zlib1g) and reducing the Debian package findings from 268 to 162 (high 58 to 43). None of the remaining ones has a fix available in Debian yet. Packages are also upgraded at build time (`apt-get upgrade`).
+  - yq is now built from source (v4.54.1, previously v4.52.4 built with Go 1.26.0) with the patched Go toolchain and golang.org/x/net 0.61.0, for the image's target architecture. This removes the 66 findings reported on the previous yq binary (34 high, 26 medium) from the Go standard library, golang.org/x/net, x/sys and x/text, and fixes the amd64 yq binary being shipped in arm64 images.
   - Removed wget from the runtime image (it was only used to download yq).
+  - The splitd binary has no vulnerabilities with a fix available (govulncheck: 0).
+  - No Go dependency changes between 1.7.1 and 1.7.2.
 
 1.7.1 (October 24, 2026)
 - Fixed vulnerabilities (audited with govulncheck; 25 reachable vulnerabilities in the Go standard library and golang.org/x/net, 0 remaining):
