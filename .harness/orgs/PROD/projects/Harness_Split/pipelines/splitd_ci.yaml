@@ -16,6 +16,76 @@ pipeline:
         depth: 0   # full clone → version_validation can see all existing tags
   stages:
     - stage:
+        name: Test
+        identifier: Test
+        type: CI
+        # Runs the build + tests natively on every architecture we publish images for.
+        strategy:
+          matrix:
+            arch:
+              - Amd64
+              - Arm64
+          maxConcurrency: 2
+        spec:
+          cloneCodebase: true
+          envVariables:
+            CI_ENABLE_HCLI_FOR_TESTS: "true"
+          caching:
+            enabled: true
+          platform:
+            os: Linux
+            arch: <+matrix.arch>
+          runtime:
+            type: Cloud
+            spec:
+              size: flex
+          execution:
+            steps:
+              - step:
+                  identifier: build
+                  name: Build binaries
+                  type: Run
+                  spec:
+                    connectorRef: dockerhub
+                    image: golang:1.26.10
+                    shell: Sh
+                    command: make splitd splitcli
+              - step:
+                  identifier: test
+                  name: Run tests
+                  type: Run
+                  spec:
+                    connectorRef: dockerhub
+                    image: golang:1.26.10
+                    shell: Sh
+                    # `make test` runs unit-tests + entrypoint-test; the latter
+                    # (infra/entrypoint.sh + test_entrypoint.sh) needs jq and yq,
+                    # which the golang image lacks (GHA ubuntu-latest had them
+                    # preinstalled). Install both before running.
+                    command: |
+                      apt-get update -qq && apt-get install -y -qq --no-install-recommends jq
+                      curl -sSLo /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(dpkg --print-architecture)"
+                      chmod +x /usr/local/bin/yq
+                      make test
+              - step:
+                  name: harnessCoverage
+                  identifier: harnessCoverage
+                  when:
+                    stageStatus: Success
+                    condition: <+matrix.arch> == "Amd64"
+                  template:
+                    templateRef: account.codeCoverage
+                    versionLabel: v1
+                    templateInputs:
+                      type: Run
+                      spec:
+                        envVariables:
+                          patch_coverage_percent: "80"
+                          file_path: "coverage.out"
+                          overall_coverage_percent: ""
+                          ignore_failure: "true"
+                          exclude: "**/*_test.go,**/vendor/**"
+    - stage:
         name: CI
         identifier: CI
         type: CI
@@ -67,47 +137,6 @@ pipeline:
                   when:
                     stageStatus: Success
                     condition: <+codebase.build.type> == "PR"
-              - step:
-                  identifier: build
-                  name: Build binaries
-                  type: Run
-                  spec:
-                    connectorRef: dockerhub
-                    image: golang:1.26.10
-                    shell: Sh
-                    command: make splitd splitcli
-              - step:
-                  identifier: test
-                  name: Run tests
-                  type: Run
-                  spec:
-                    connectorRef: dockerhub
-                    image: golang:1.26.10
-                    shell: Sh
-                    # `make test` runs unit-tests + entrypoint-test; the latter
-                    # (infra/entrypoint.sh + test_entrypoint.sh) needs jq and yq,
-                    # which the golang image lacks (GHA ubuntu-latest had them
-                    # preinstalled). Install both before running.
-                    command: |
-                      apt-get update -qq && apt-get install -y -qq --no-install-recommends jq
-                      curl -sSLo /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-                      chmod +x /usr/local/bin/yq
-                      make test
-              - step:
-                  name: harnessCoverage
-                  identifier: harnessCoverage
-                  template:
-                    templateRef: account.codeCoverage
-                    versionLabel: v1
-                    templateInputs:
-                      type: Run
-                      spec:
-                        envVariables:
-                          patch_coverage_percent: "80"
-                          file_path: "coverage.out"
-                          overall_coverage_percent: ""
-                          ignore_failure: "true"
-                          exclude: "**/*_test.go,**/vendor/**"
               - step:
                   identifier: cross_build
                   name: Cross build release binaries
