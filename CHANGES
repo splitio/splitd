@@ -1,9 +1,9 @@
 1.7.2 (October 27, 2026)
-- Sidecar docker images are now published for both linux/amd64 and linux/arm64. `make images_release` builds and pushes the multi-arch images with docker buildx.
-- Fixed vulnerabilities in the sidecar docker image (audited with trivy):
-  - Updated base images from Debian 12 (bookworm) to Debian 13 (trixie), removing the critical vulnerability and reducing high ones from 60 to 43 (none of the remaining ones has a fix available in Debian yet). Packages are upgraded at build time.
-  - yq is now built from source (v4.54.1) with the patched Go toolchain and golang.org/x/net 0.61.0, for the image's target architecture. This fixes the 63 vulnerabilities reported on the previous yq binary, and the amd64 yq binary shipped in arm64 images.
-  - Removed wget from the runtime image (it was only used to download yq).
+- Sidecar docker images (standard and FIPS) are now published for linux/amd64 and linux/arm64. Previously they were linux/amd64 only.
+- Fixed vulnerabilities in the sidecar docker images by updating the base image to Debian 13 (trixie) and rebuilding yq from source with a patched Go toolchain and golang.org/x/net. Also removed wget from the runtime image. This fixes 107 CVEs, including:
+  - Critical: CVE-2023-45853.
+  - High: CVE-2026-25679, CVE-2026-25681, CVE-2026-27136, CVE-2026-27137, CVE-2026-27145, CVE-2026-32280, CVE-2026-32281, CVE-2026-32283, CVE-2026-33810, CVE-2026-33811, CVE-2026-33814, CVE-2026-33818, CVE-2026-39820, CVE-2026-39821, CVE-2026-39822, CVE-2026-39836, CVE-2026-41992, CVE-2026-42499, CVE-2026-42504, CVE-2026-46600, CVE-2026-53613, CVE-2026-53615, CVE-2026-56851, CVE-2026-56852, CVE-2026-56853, CVE-2026-56858, CVE-2026-56859, CVE-2026-56860, CVE-2026-56862, CVE-2026-58471, CVE-2026-58472, CVE-2026-78667, CVE-2026-78669, CVE-2026-97031, CVE-2026-111943.
+  - 71 additional medium, low and unrated CVEs.
 
 1.7.1 (October 24, 2026)
 - Fixed vulnerabilities (audited with govulncheck; 25 reachable vulnerabilities in the Go standard library and golang.org/x/net, 0 remaining):
