@@ -1,4 +1,4 @@
-1.7.2 (October 27, 2026)
+1.7.2 (Nov 4, 2026)
 - Sidecar docker images (standard and FIPS) are now published for linux/amd64 and linux/arm64. Previously they were linux/amd64 only.
 - Fixed vulnerabilities in the sidecar docker images by updating the base image to Debian 13 (trixie) and rebuilding yq from source with a patched Go toolchain and golang.org/x/net. Also removed wget from the runtime image. This fixes 107 CVEs, including:
   - Critical: CVE-2023-45853.
