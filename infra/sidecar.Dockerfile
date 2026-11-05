@@ -8,7 +8,7 @@ ARG COMMIT_SHA
 # for the target platform and with the same patched go toolchain used for splitd.
 ARG YQ_VERSION=v4.54.1
 # override yq's pinned x/net to pick up security fixes not yet released upstream
-ARG YQ_XNET_VERSION=v0.61.0
+ARG YQ_XNET_VERSION=v0.62.0
 
 RUN DEBIAN_FRONTEND=noninteractive \
   apt-get update && \
