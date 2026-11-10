@@ -9,6 +9,7 @@ inputSet:
     properties:
       ci:
         codebase:
+          connectorRef: fmegithubrunnersci
           build:
             type: PR
             spec:

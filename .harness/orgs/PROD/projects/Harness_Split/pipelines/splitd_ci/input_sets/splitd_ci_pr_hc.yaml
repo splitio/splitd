@@ -1,0 +1,18 @@
+inputSet:
+  name: splitd_ci_pr_hc
+  tags: {}
+  identifier: splitd_ci_pr_hc
+  orgIdentifier: PROD
+  projectIdentifier: Harness_Split
+  pipeline:
+    identifier: splitd_ci
+    properties:
+      ci:
+        codebase:
+          # Empty connector → clone from Harness Code (git0.harness.io), matching
+          # the Harness Code PR trigger. Same as fme_core_ci/pr_hc.yaml.
+          connectorRef: ""
+          build:
+            type: PR
+            spec:
+              number: <+trigger.payload.pull_req.number>

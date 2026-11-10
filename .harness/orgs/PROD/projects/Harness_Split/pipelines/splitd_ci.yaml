@@ -7,9 +7,15 @@ pipeline:
   properties:
     ci:
       codebase:
-        # GitHub connector (same as deploy_qos_v3). Without this, Harness defaults
-        # to Harness Code (git0.harness.io) and cloneCodebase fails.
-        connectorRef: fmegithubrunnersci
+        # Clone source is set per trigger through its input set (same pattern as
+        # fme_core_ci in fme-core-pipelines):
+        #   - GitHub triggers (splitd_ci_pr, splitd_ci_main_release):
+        #       connectorRef: fmegithubrunnersci
+        #   - Harness Code triggers (splitd_ci_pr_hc):
+        #       connectorRef: ""  → clone from git0.harness.io
+        # The connector must match the trigger source: the PR number/branch comes
+        # from the trigger, so a mismatch clones a different PR.
+        connectorRef: <+input>
         repoName: splitd
         build: <+input>
         sparseCheckout: []
